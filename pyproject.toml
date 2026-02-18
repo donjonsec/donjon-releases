@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "donjon-platform"
+version = "7.0.0"
+description = "Security intelligence platform with FAIR risk quantification, AI analysis, and compliance automation"
+readme = "README.md"
+license = {text = "Proprietary — see LICENSE for EULA"}
+requires-python = ">=3.10"
+keywords = ["security", "vulnerability-scanner", "risk-quantification", "compliance", "purple-team"]
+authors = [{name = "DonjonSec"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "pyyaml>=6.0,<7",
+    "psutil>=5.9",
+    "dilithium-py>=1.4",
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg2-binary>=2.9"]
+web = ["flask>=3.0"]
+server = ["gunicorn>=21"]
+all = ["donjon-platform[postgres,web,server]"]
+
+[project.urls]
+Homepage = "https://github.com/DonjonSec/donjon-platform"
+Documentation = "https://github.com/DonjonSec/donjon-platform/tree/main/docs"
+Repository = "https://github.com/DonjonSec/donjon-platform"
+Issues = "https://github.com/DonjonSec/donjon-platform/issues"
+
+[tool.setuptools.packages.find]
+include = ["lib*", "scanners*", "utilities*", "web*"]
+
+[tool.bandit]
+exclude_dirs = ["venv", "tools", "data", "docs", "tests", "infrastructure"]
+skips = []
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*/run_full_test.py"]

@@ -1,0 +1,643 @@
+DONJON PLATFORM — END USER LICENSE AGREEMENT
+
+Version 1.5 — Effective Date: February 2026
+Copyright (c) 2026 DonjonSec. All rights reserved.
+
+IMPORTANT: READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING THE
+SOFTWARE. BY INSTALLING, COPYING, OR OTHERWISE USING THE SOFTWARE, YOU
+AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE,
+DO NOT INSTALL OR USE THE SOFTWARE.
+
+================================================================================
+1. DEFINITIONS
+================================================================================
+
+"Affiliate" means any entity that controls, is controlled by, or is under
+common control with a party, where "control" means ownership of more than
+fifty percent (50%) of the voting securities or membership interests.
+
+"Commercial Security Assessment Services" means providing vulnerability
+assessment, penetration testing, or security scanning as a primary service
+offering to third-party clients for separate compensation.
+
+"Community Edition" means the free-of-charge version of the Software with
+feature limitations as described in Section 3.
+
+"Customer" or "You" means the individual or entity that has accepted this
+Agreement, or who installs, accesses, or uses the Software.
+
+"DonjonSec" means the legal entity or owner licensing this Software
+(currently Cristofer Michael Santos d/b/a DonjonSec), including its
+successors and assigns.
+
+"Documentation" means the official user manuals, API reference, and
+technical release notes provided with the Software. "Documentation"
+expressly excludes marketing materials, white papers, public website
+content, and third-party articles.
+
+"License Key" means the cryptographically signed file (license.json) that
+activates paid features of the Software.
+
+"MSSP" means Managed Security Service Provider — an entity that provides
+security assessment services to third-party clients using the Software.
+
+"Software" means the Donjon Platform application, including all modules,
+scanners, libraries, documentation, updates, and associated files.
+
+"Subscription Term" means the period during which Customer is authorized
+to use paid features of the Software, as specified in the applicable order.
+
+================================================================================
+2. LICENSE GRANT
+================================================================================
+
+2.1 COMMUNITY EDITION. Subject to the terms of this Agreement, DonjonSec
+grants You a non-exclusive, non-transferable, royalty-free license to
+install and use the Community Edition of the Software for Your internal
+purposes, subject to the feature limitations described in Section 3. No
+License Key is required.
+
+2.2 PRO EDITION. Subject to payment of applicable fees and the terms of
+this Agreement, DonjonSec grants You a non-exclusive, non-transferable
+license to install and use the Pro Edition of the Software during the
+Subscription Term for Your internal business purposes. The license is
+per-installation and may not be shared across multiple installations
+without additional licenses.
+
+2.3 ENTERPRISE EDITION. Subject to payment of applicable fees and the
+terms of this Agreement, DonjonSec grants You a non-exclusive,
+non-transferable license to install and use the Enterprise Edition of
+the Software during the Subscription Term, with no limitation on the
+number of authorized users within Your organization.
+
+2.4 MSSP EDITION. Subject to a separate written MSSP Addendum (Section 13)
+and payment of applicable fees, DonjonSec grants You a license to use the
+Software to provide security assessment services to Your authorized
+clients, subject to the terms and restrictions of the MSSP Addendum.
+
+2.5 AFFILIATES. You may sublicense the Software to Your Affiliates,
+provided that (a) each Affiliate agrees to be bound by this Agreement,
+(b) You remain liable for all fees and breaches by Your Affiliates, and
+(c) the total usage does not exceed the licensed capacity.
+
+2.6 BUSINESS USE ONLY. You represent and warrant that You are licensing
+the Software for business, professional, trade, or professional development
+purposes, and not as a "consumer" for personal, family, or household use.
+Any use by a "consumer" as defined by applicable protection laws is
+strictly prohibited and immediately terminates this license.
+
+================================================================================
+3. COMMUNITY EDITION TERMS
+================================================================================
+
+The Community Edition is provided free of charge with the following
+limitations:
+
+  (a) Maximum of sixteen (16) scan targets per assessment session
+  (b) Maximum of three (3) compliance frameworks
+  (c) Maximum of ten (10) AI-assisted analysis queries per day
+  (d) Basic scan modes only (Quick and Standard)
+  (e) Export formats limited to CSV and JSON
+  (f) Single-user operation
+  (g) Community support only (no SLA; support provided AS IS without warranty)
+
+The Community Edition is provided "AS IS" without warranty of any kind.
+DonjonSec reserves the right to modify Community Edition features at
+any time. Community Edition users may not remove or alter any proprietary
+notices, branding, or attribution in the Software or its output.
+
+================================================================================
+4. RESTRICTIONS
+================================================================================
+
+You shall NOT, directly or indirectly:
+
+  (a) Copy, modify, merge, adapt, translate, or create derivative works
+      of the Software, except as expressly permitted by this Agreement;
+
+  (b) Reverse engineer, disassemble, decompile, or otherwise attempt to
+      derive the source code of the Software, except to the extent that
+      such activity is expressly permitted by applicable law for
+      interoperability purposes, and only after first requesting the
+      necessary information from DonjonSec;
+
+  (c) Sell, lease, rent, loan, sublicense, distribute, or otherwise
+      transfer the Software to any third party, except as expressly
+      permitted under the MSSP Addendum;
+
+  (d) Use the Software to provide Commercial Security Assessment Services
+      to third parties without an active MSSP license;
+
+  (e) Remove, alter, or obscure any proprietary notices, labels, marks,
+      or technical protection measures in the Software;
+
+  (f) Circumvent, disable, or interfere with any license verification,
+      feature enforcement, or security mechanisms in the Software;
+
+  (g) Use the Software to develop a competing product or service;
+
+  (h) Exceed the number of installations, users, or other capacity
+      restrictions specified in Your license;
+
+  (i) Publish benchmarks or performance comparisons of the Software
+      without prior written consent from DonjonSec;
+
+  (j) Use the Software, its code, or its output (including scan results
+      and AI analysis) to train, retrain, fine-tune, or generate data
+      for any artificial intelligence, machine learning, or large
+      language models.
+
+================================================================================
+5. AUTHORIZED ASSESSMENT USE
+================================================================================
+
+5.1 AUTHORIZATION REQUIRED. The Software is designed for authorized
+security assessment activities. You represent and warrant that:
+
+  (a) You have obtained explicit written authorization from the
+      authorized representative of the owner of any system, network,
+      or infrastructure before using the Software to scan, assess,
+      test, or evaluate such system;
+
+  (b) Your authorization covers the specific scope, systems, and
+      methods of assessment;
+
+  (c) You will maintain documentation of such authorization and make
+      it available to DonjonSec upon reasonable request;
+
+  (d) You will not use the Software to access, scan, or assess any
+      system for which You do not have valid authorization.
+
+5.2 PROHIBITED SCANNING. You shall NOT use the Software to:
+
+  (a) Scan systems or networks without explicit authorization from
+      the system owner;
+
+  (b) Conduct denial-of-service attacks, whether intentional or
+      through misconfiguration;
+
+  (c) Access, exfiltrate, or modify data on systems beyond the scope
+      of Your authorization;
+
+  (d) Violate the Computer Fraud and Abuse Act (18 U.S.C. Section 1030)
+      or equivalent laws in any jurisdiction.
+
+5.3 ASSESSMENT DISCLAIMER. DonjonSec makes NO warranty or representation
+that:
+
+  (a) All security vulnerabilities, risks, or threats will be detected;
+
+  (b) Assessment results are complete, accurate, or free of false
+      positives or false negatives;
+
+  (c) Remediation recommendations will be effective;
+
+  (d) The Software will not cause disruption or damage to assessed
+      systems.
+
+5.4 ASSUMPTION OF RISK. You assume full risk and responsibility for all
+assessment activities conducted using the Software, including any damage
+to assessed systems, data loss, service disruption, or business impact.
+
+5.5 HIGH-RISK ACTIVITIES. The Software is not fault-tolerant and is not
+designed, manufactured, or intended for use in hazardous environments
+requiring fail-safe performance, such as in the operation of nuclear
+facilities, aircraft navigation or communication systems, air traffic
+control, time-critical financial trading or ledger systems, direct life
+support machines, or weapons systems, in which the failure of the
+Software could lead directly to death, personal injury, or severe
+physical or environmental damage ("High-Risk Activities").
+DONJONSEC SPECIFICALLY DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY OF
+FITNESS FOR HIGH-RISK ACTIVITIES. You agree not to use the Software in
+High-Risk environments.
+
+================================================================================
+6. INTELLECTUAL PROPERTY
+================================================================================
+
+6.1 OWNERSHIP. The Software, including all copies, modifications,
+enhancements, derivative works, and associated intellectual property
+rights (patents, copyrights, trade secrets, trademarks), is and shall
+remain the exclusive property of DonjonSec. All rights not expressly
+granted herein are reserved.
+
+6.2 FEEDBACK. If You provide suggestions, ideas, or feedback regarding
+the Software, You hereby grant DonjonSec a perpetual, irrevocable,
+worldwide, royalty-free, fully paid-up, sublicensable license to use,
+exploit, and incorporate such Feedback into its products and services.
+You further waive any moral rights or other rights of authorship in
+such Feedback.
+
+6.3 THIRD-PARTY COMPONENTS. The Software may include open-source
+components subject to their own license terms. A list of third-party
+components and their licenses is available in the Documentation.
+
+================================================================================
+7. DATA COLLECTION AND TELEMETRY
+================================================================================
+
+7.1 PERMITTED COLLECTION. The Software may collect and transmit the
+following data to DonjonSec:
+
+  (a) License key status and activation data;
+  (b) Software version and update status;
+  (c) Aggregate usage statistics (features used, frequency);
+  (d) Error and crash reports (without personal or assessment data);
+  (e) System configuration (operating system, memory, processor type).
+
+7.2 DATA NOT COLLECTED. The Software does NOT intentionally collect or
+transmit:
+
+  (a) Content, targets, or results of assessments or scans;
+  (b) IP addresses, hostnames, or network topology of assessed systems;
+  (c) Customer data, credentials, or personally identifiable information;
+  (d) Assessment findings, vulnerabilities, or remediation details.
+
+  In the event of unintentional collection of data described in this
+  Section 7.2, DonjonSec shall promptly delete such data upon discovery
+  or upon written notification by Customer.
+
+7.3 TIER-SPECIFIC CONTROLS.
+
+  Community: Telemetry is enabled by default and may not be disabled.
+  Pro:        Telemetry may be disabled via configuration.
+  Enterprise: Telemetry may be disabled; Zero Data Retention available.
+  MSSP:       Customer controls data flow; audit rights included.
+
+7.4 DATA USAGE AND OWNERSHIP. DonjonSec may use collected data for product
+improvement, statistical analysis, license compliance, and threat
+detection. You acknowledge and agree that all aggregated, anonymized, or
+statistical data derived from the Software ("Aggregated Data") is the
+exclusive property of DonjonSec. DonjonSec retains all rights to use,
+sell, transfer, or commercialize Aggregated Data for any purpose,
+provided such data does not identify You.
+
+7.5 DATA BREACH NOTIFICATION. In the event of a security breach affecting
+Customer data collected under this Section 7, DonjonSec shall notify
+affected Customers within thirty (30) days of discovery, in compliance
+with applicable laws requiring such notice.
+
+7.6 PRIVACY POLICY. DonjonSec's collection and use of data is subject to
+the DonjonSec Privacy Policy available at https://donjonsec.com/legal/privacy
+(or such other URL as DonjonSec may provide), which is incorporated by
+reference.
+
+================================================================================
+8. WARRANTY DISCLAIMER
+================================================================================
+
+8.1 COMMUNITY EDITION. THE COMMUNITY EDITION IS PROVIDED "AS IS" AND
+"AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. THE SOFTWARE MAY CONTAIN
+BUGS OR ERRORS.
+
+8.2 PAID EDITIONS. For a period of ninety (90) days from the date of
+purchase, DonjonSec warrants that the Software will perform substantially
+in accordance with the Documentation. This warranty does not apply to:
+(a) free features or Community Edition functionality; (b) third-party
+components; (c) AI-assisted analysis output; (d) issues caused by
+unauthorized modification, misuse, or third-party software; or (e)
+any features designated as "Beta," "Preview," "Evaluation," or "Trial."
+
+8.3 AI AND ANALYSIS DISCLAIMER. The Software utilizes probabilistic
+algorithms and Artificial Intelligence ("AI") to identify potential
+vulnerabilities. You acknowledge that:
+
+  (a) AI outputs are probabilistic and may produce "hallucinations,"
+      false positives, or false negatives;
+
+  (b) The Software may fail to detect existing vulnerabilities (false
+      negatives) or report vulnerabilities that do not exist (false
+      positives);
+
+  (c) The Software is a tool to assist human analysis, not a substitute
+      for it. You remain solely responsible for verifying all findings;
+
+  (d) DonjonSec shall not be liable for any security breach, data loss,
+      or compromise occurring in systems scanned by the Software,
+      regardless of whether the Software failed to detect the
+      vulnerability exploited in such breach.
+
+8.4 EXCLUSIVE REMEDY. DonjonSec's entire liability and Your exclusive
+remedy for breach of the warranty in Section 8.2 shall be, at
+DonjonSec's option, (a) repair or replacement of the Software, or
+(b) refund of the fees paid for the current Subscription Term.
+
+================================================================================
+9. LIMITATION OF LIABILITY
+================================================================================
+
+9.1 LIABILITY CAP. TO THE MAXIMUM EXTENT PERMITTED BY LAW, DONJONSEC'S
+TOTAL CUMULATIVE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED:
+
+  Community Edition: ONE HUNDRED UNITED STATES DOLLARS (US $100).
+  Paid Editions: THE TOTAL FEES PAID BY CUSTOMER IN THE TWELVE (12)
+  MONTHS IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO LIABILITY.
+
+  OR, IF SUCH CAP IS UNENFORCEABLE, THE MINIMUM AMOUNT PERMITTED BY
+  APPLICABLE LAW.
+
+9.2 EXCLUDED DAMAGES. IN NO EVENT SHALL EITHER PARTY BE LIABLE FOR ANY:
+
+  (a) Loss of profits, revenue, business opportunities, or goodwill;
+  (b) Loss of data or information;
+  (c) Business interruption or loss of use;
+  (d) Indirect, incidental, special, consequential, exemplary, or
+      punitive damages;
+
+  WHETHER ARISING OUT OF CONTRACT, TORT, NEGLIGENCE, STRICT LIABILITY,
+  OR OTHERWISE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+9.3 ASSESSMENT DAMAGES. WITHOUT LIMITING THE FOREGOING, DONJONSEC SHALL
+NOT BE LIABLE FOR ANY DAMAGE TO ASSESSED SYSTEMS, DATA LOSS DURING
+SCANNING, NETWORK DISRUPTION, SERVICE UNAVAILABILITY, OR ANY OTHER
+IMPACT RESULTING FROM YOUR USE OF THE SOFTWARE FOR SECURITY ASSESSMENTS.
+
+9.4 EXCEPTIONS. The limitations in this Section 9 do not apply to:
+(a) either party's indemnification obligations; (b) infringement of
+intellectual property rights; (c) willful misconduct or gross negligence.
+
+9.5 BASIS OF THE BARGAIN. The parties agree that the limitations of
+liability and exclusions of damages set forth in this Section 9 are a
+fundamental element of the basis of the bargain between DonjonSec and
+You. DonjonSec would not be able to provide the Software, or would have
+to provide it at a significantly higher price, without such limitations.
+These limitations shall apply even if any limited remedy fails of its
+essential purpose.
+
+================================================================================
+10. INDEMNIFICATION
+================================================================================
+
+10.1 BY CUSTOMER. You shall indemnify, defend, and hold harmless
+DonjonSec and its officers, directors, employees, and agents from and
+against all liabilities, damages, losses, costs, and expenses (including
+reasonable attorneys' fees) arising out of or relating to:
+
+  (a) Your use of the Software in violation of this Agreement or
+      applicable law;
+
+  (b) Your failure to obtain proper authorization for assessment
+      activities;
+
+  (c) Third-party claims arising from Your assessment activities,
+      including claims of unauthorized access, system damage, or
+      data breach;
+
+  (d) Your breach of representations and warranties in this Agreement;
+
+  (e) Any fines, penalties, or inquiries from government or regulatory
+      bodies (including but not limited to the FTC, SEC, or data
+      protection authorities) resulting from Your use of the Software.
+
+10.2 BY DONJONSEC. DonjonSec shall indemnify, defend, and hold harmless
+Customer from third-party claims alleging that Customer's authorized use
+of the Software infringes a valid patent, copyright, or trade secret,
+provided that Customer (a) promptly notifies DonjonSec, (b) grants
+DonjonSec sole control of the defense, and (c) provides reasonable
+cooperation.
+
+This indemnity shall not apply to any claim arising out of or relating
+to: (i) Your modification of the Software; (ii) use of the Software in
+combination with hardware or software not provided by DonjonSec; (iii)
+Your continued use of the Software after being notified of the alleged
+infringement; (iv) use of the Software in a manner not authorized
+by this Agreement; or (v) if Customer is a U.S. Government entity, to
+the extent such indemnity is prohibited by federal law.
+
+================================================================================
+11. EXPORT CONTROLS
+================================================================================
+
+11.1 COMPLIANCE. The Software may be subject to United States Export
+Administration Regulations (EAR) and other export control laws. You agree
+to comply with all applicable export control regulations and shall not
+export, re-export, or transfer the Software in violation of such laws.
+
+11.2 REPRESENTATIONS. You represent that:
+
+  (a) You are not located in, organized under the laws of, or a
+      resident of any country subject to comprehensive U.S. sanctions;
+
+  (b) You are not listed on any U.S. government restricted party list
+      (OFAC SDN List, BIS Entity List, or State Department restricted
+      party lists);
+
+  (c) You will not use the Software for the development of biological,
+      chemical, or nuclear weapons, or missile delivery systems.
+
+11.3 GOVERNMENT CUSTOMERS. Use of the Software by U.S. government
+customers is subject to "Restricted Rights" as defined in FAR 52.227-14
+and DFARS 252.227-7014. Foreign government customers must obtain prior
+written approval from DonjonSec.
+
+================================================================================
+12. TERM AND TERMINATION
+================================================================================
+
+12.1 TERM. Community Edition licenses are perpetual. Paid Edition
+licenses are valid for the Subscription Term specified in the applicable
+order and automatically renew for successive one-year terms unless either
+party provides written notice of non-renewal at least thirty (30) days
+before expiration.
+
+12.2 TERMINATION FOR CAUSE. Either party may terminate this Agreement
+immediately upon written notice if the other party:
+
+  (a) Materially breaches this Agreement and fails to cure within
+      thirty (30) days of written notice;
+
+  (b) Becomes insolvent, files for bankruptcy, or ceases operations.
+
+12.3 TERMINATION BY DONJONSEC. DonjonSec may terminate this Agreement:
+
+  (a) Immediately without notice if You violate Section 5 (Authorized
+      Use), Section 11 (Export), or Section 4 (Restrictions);
+
+  (b) Upon fifteen (15) days notice if You breach any other term and
+      fail to cure (except as provided below for MSSP);
+
+  (c) For convenience (at DonjonSec's sole discretion) upon sixty (60)
+      days written notice. In the event of termination for convenience,
+      DonjonSec shall refund to You a pro-rata portion of any prepaid
+      fees for the remainder of the Subscription Term.
+
+  For violations of Section 12.3(b) related to unauthorized commercial
+  services (Section 13), DonjonSec shall provide fifteen (15) days
+  written notice and an opportunity to cure by ceasing the unauthorized
+  activity or upgrading to an MSSP license.
+
+12.4 EFFECT OF TERMINATION. Upon termination:
+
+  (a) All licenses immediately terminate;
+  (b) You must cease all use of the Software within thirty (30) days;
+  (c) You must destroy or return all copies of the Software;
+  (d) You must certify compliance in writing within thirty (30) days;
+  (e) For MSSP licensees: You must notify all end-customers and cease
+      providing services using the Software.
+
+  Notwithstanding the foregoing, Customer may export Customer Data in
+  standard machine-readable format during a thirty (30) day wind-down
+  period following termination. DonjonSec shall make such data reasonably
+  available to Customer for this purpose.
+
+12.5 SURVIVAL. Sections 4 (Restrictions), 6 (Intellectual Property),
+8 (Warranty Disclaimer), 9 (Limitation of Liability), 10 (Indemnification),
+11 (Export Controls), 13.5 (Audit Rights), and 14 (General) survive
+termination.
+
+12.6 SUSPENSION FOR SECURITY. DonjonSec reserves the right to
+immediately suspend Your access to the Software or License Key without
+notice if DonjonSec reasonably believes Your use of the Software:
+(a) poses a security risk to the Software or any third party;
+(b) may be fraudulent or illegal; or (c) impacts the stability of
+DonjonSec's infrastructure.
+
+================================================================================
+13. MSSP / RESELLER ADDENDUM
+================================================================================
+
+This Section applies only to MSSP Edition licensees.
+
+13.1 AUTHORIZATION. Subject to an active MSSP license and a separate
+written MSSP agreement, You may use the Software to provide security
+assessment services to Your authorized clients.
+
+13.2 PERMITTED ACTIVITIES. You may:
+
+  (a) Offer assessment, scanning, and consulting services to clients;
+  (b) Generate and deliver reports to clients with required DonjonSec
+      attribution;
+  (c) Charge clients for services at Your own pricing;
+  (d) Bundle the Software with professional security services.
+
+13.3 PROHIBITED ACTIVITIES. You may NOT:
+
+  (a) Resell, distribute, or sublicense the Software as a standalone
+      product;
+  (b) Allow clients direct access to the Software without supervision;
+  (c) Sub-license to other resellers or service providers;
+  (d) Remove DonjonSec attribution from generated reports.
+
+13.4 CLIENT OBLIGATIONS. You must:
+
+  (a) Obtain proper authorization for all client assessments;
+  (b) Maintain data isolation between clients;
+  (c) Comply with all scanning and assessment restrictions;
+  (d) Maintain professional liability insurance with minimum coverage
+      of US $1,000,000 per occurrence, or such lesser amount as
+      DonjonSec may approve in writing.
+
+13.5 AUDIT RIGHTS. DonjonSec may audit Your compliance with this
+Addendum upon thirty (30) days written notice, no more than once per
+calendar year.
+
+13.6 TERMINATION. Upon termination of MSSP rights, You must
+immediately cease providing services using the Software and notify
+all affected clients within fifteen (15) days.
+
+================================================================================
+14. GENERAL
+================================================================================
+
+14.1 GOVERNING LAW; DISPUTE RESOLUTION; BINDING ARBITRATION; CLASS
+ACTION WAIVER.
+
+READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS, INCLUDING
+YOUR RIGHT TO FILE A LAWSUIT IN COURT.
+
+This Agreement shall be governed by the laws of the State of Florida,
+United States, without regard to conflict of laws principles.
+
+(a) MANDATORY ARBITRATION. Any dispute, claim, or controversy arising
+out of or relating to this Agreement, the Software, or the breach,
+termination, enforcement, interpretation, or validity thereof, including
+the determination of the scope or applicability of this agreement to
+arbitrate, shall be determined by binding arbitration in Orange County,
+Florida before one arbitrator. The arbitration shall be administered by
+the American Arbitration Association (AAA) pursuant to its Commercial
+Arbitration Rules. Judgment on the award may be entered in any court
+having jurisdiction. THE PARTIES EXPLICITLY WAIVE THEIR RIGHT TO A
+JURY TRIAL.
+
+(b) CLASS ACTION WAIVER. YOU AND DONJONSEC AGREE THAT EACH MAY BRING
+CLAIMS AGAINST THE OTHER ONLY IN AN INDIVIDUAL CAPACITY, AND NOT AS A
+PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS OR REPRESENTATIVE
+PROCEEDING. Further, unless both You and DonjonSec agree otherwise, the
+arbitrator may not consolidate more than one person's claims with Your
+claims and may not otherwise preside over any form of a representative
+or class proceeding. If this specific Class Action Waiver is found to
+be unenforceable, then the Mandatory Arbitration provision (Section
+14.1a) shall be null and void, and the dispute shall be decided by a
+court of competent jurisdiction in Seminole County, Florida; however,
+the remainder of this Agreement shall remain in force.
+
+(c) INJUNCTIVE RELIEF. Notwithstanding the foregoing, DonjonSec reserves
+the right to seek injunctive or other equitable relief in a court of
+competent jurisdiction to prevent the actual or threatened infringement,
+misappropriation, or violation of its copyrights, trademarks, trade
+secrets, patents, or other intellectual property rights. DONJONSEC SHALL
+NOT BE REQUIRED TO POST A BOND OR OTHER SECURITY IN ORDER TO OBTAIN
+SUCH INJUNCTIVE RELIEF.
+
+(d) RIGHT TO OPT OUT. You have the right to opt out of the arbitration
+agreement and class action waiver in this Section 14.1 within thirty
+(30) days of the date You first accepted this Agreement. To exercise
+this right, You must send written notice to legal@donjonsec.com with
+the subject line "Arbitration Opt-Out." If You opt out, the arbitration
+and class action waiver provisions will not apply, and disputes will be
+resolved in the state or federal courts located in Seminole County, Florida.
+
+14.2 ENTIRE AGREEMENT. This Agreement constitutes the entire agreement
+between the parties regarding the Software and supersedes all prior
+agreements, representations, and understandings.
+
+14.3 SEVERABILITY. If any provision of this Agreement is held
+unenforceable, the remaining provisions shall continue in full force
+and effect.
+
+14.4 WAIVER. The failure of either party to enforce any right or
+provision of this Agreement shall not constitute a waiver of such right
+or provision.
+
+14.5 ASSIGNMENT. You may not assign this Agreement without DonjonSec's
+prior written consent. DonjonSec may assign, transfer, or delegate this
+Agreement and its rights and obligations without Your consent and
+without notice in connection with a merger, acquisition, corporate
+reorganization, or sale of all or substantially all of its assets.
+
+14.6 NOTICES. All notices under this Agreement shall be in writing and
+sent to:
+
+  DonjonSec
+  Email: legal@donjonsec.com
+  or at such physical address as DonjonSec may designate on its website.
+
+14.7 FORCE MAJEURE. Neither party shall be liable for delays or failures
+in performance resulting from causes beyond its reasonable control,
+including natural disasters, war, terrorism, pandemics, government
+actions, or internet disruptions. The affected party's obligations will
+be suspended for the duration of the force majeure event. If such event
+continues for more than ninety (90) days, either party may terminate
+the affected Subscription Term with a pro-rata refund of prepaid fees.
+
+14.8 UPDATES. DonjonSec may update this Agreement from time to time.
+Continued use of the Software after notification of changes (via email,
+in-app notification, or website publication at https://donjonsec.com/legal/eula)
+constitutes acceptance of the updated terms. Material changes reducing
+Your rights or increasing Your obligations will not apply to Paid
+Editions until the next Subscription Term renewal.
+
+14.9 ATTORNEYS' FEES. In any legal action, arbitration, or other proceeding
+brought to enforce, interpret, or construe the terms of this Agreement,
+the prevailing party shall be entitled to recover its reasonable
+attorneys' fees and costs from the non-prevailing party.
+
+================================================================================
+
+For licensing inquiries: sales@donjonsec.com
+For legal inquiries: legal@donjonsec.com
+For support: info@donjonsec.com
+
+https://donjonsec.com

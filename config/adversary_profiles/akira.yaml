@@ -1,0 +1,56 @@
+profile:
+  id: akira
+  name: "Akira (GOLD SAHARA)"
+  aliases: [GOLD SAHARA, Storm-1567]
+  attribution: Eastern European
+  motivation: financial
+  target_sectors: [manufacturing, construction, healthcare, professional_services]
+  active_since: 2023
+
+  ttps:
+    - tactic: Initial Access
+      technique: VPN Credential Exploitation - Cisco ASA
+      technique_id: T1133
+      simulation_check: check_vpn_credential_abuse
+      description: Exploits vulnerabilities and stolen credentials targeting Cisco ASA and other VPN appliances
+    - tactic: Credential Access
+      technique: LSASS Memory Dump
+      technique_id: T1003.001
+      simulation_check: check_lsass_access
+      description: Dumps LSASS process memory using comsvcs.dll and Mimikatz for credential harvesting
+    - tactic: Execution
+      technique: PowerShell Abuse
+      technique_id: T1059
+      simulation_check: check_powershell_abuse
+      description: Uses encoded and obfuscated PowerShell commands for reconnaissance and payload delivery
+    - tactic: Impact
+      technique: Data Encrypted for Impact
+      technique_id: T1486
+      simulation_check: check_ransomware_indicators
+      description: Encrypts files with hybrid RSA/ChaCha20 encryption appending .akira extension
+    - tactic: Exfiltration
+      technique: Double Extortion Exfiltration
+      technique_id: T1567
+      simulation_check: check_data_exfil_volume
+      description: Exfiltrates data to attacker infrastructure using tools like WinSCP and rclone
+    - tactic: Lateral Movement
+      technique: Remote Desktop Protocol
+      technique_id: T1021
+      simulation_check: check_rdp_lateral_movement
+      description: Moves laterally using RDP with harvested domain admin credentials
+    - tactic: Defense Evasion
+      technique: Disable or Modify Security Tools
+      technique_id: T1562
+      simulation_check: check_security_tool_tampering
+      description: Terminates or uninstalls EDR and AV products using PowerTool and BYOVD techniques
+    - tactic: Defense Evasion
+      technique: Indicator Removal
+      technique_id: T1070
+      simulation_check: check_log_clearing
+      description: Clears Windows event logs and removes forensic artifacts to hinder investigation
+
+  detection_priorities:
+    - VPN appliance vulnerability patching and MFA enforcement
+    - LSASS access monitoring and credential guard deployment
+    - EDR tamper protection and BYOVD driver block policies
+    - Rclone and WinSCP usage detection for data staging

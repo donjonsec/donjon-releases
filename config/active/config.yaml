@@ -1,0 +1,199 @@
+# Donjon v7.0 Configuration
+# 365-day retention for compliance
+
+version: '7.0.0'
+
+platform:
+  name: Donjon
+  mode: auto  # auto-detect: portable, installed, cicd
+  auto_detect_networks: true
+
+scanning:
+  stealth_level: 3
+  delay_min_seconds: 30
+  delay_max_seconds: 300
+  concurrent_scans: 1
+  timeout_minutes: 120
+  excluded_hosts: []
+  excluded_ports: []
+
+scheduling:
+  enabled: false
+  window_start: '18:00'
+  window_end: '20:00'
+  randomize_start: true
+  frequency: monthly
+  day_of_month: 1
+  run_until_complete: true
+
+retention:
+  days: 365
+  compress_after_days: 30
+  archive_format: tar.gz
+  auto_cleanup: true
+
+evidence:
+  collect_screenshots: false
+  hash_algorithm: sha256
+  include_raw_output: true
+  timestamp_format: '%Y-%m-%d %H:%M:%S UTC'
+
+compliance:
+  frameworks:
+    - NIST-800-53
+    - HIPAA
+    - SOC1-Type2
+    - SOC2-Type2
+    - PCI-DSS-v4
+    - ISO27001-2022
+    - CMMC
+    - FedRAMP
+    - GDPR
+    - SOX
+  auto_map_findings: true
+  generate_attestations: true
+  include_remediation: true
+
+reporting:
+  formats:
+    - json
+    - html
+    - csv
+    - pdf
+    - sarif
+  executive_summary: true
+  technical_details: true
+  include_evidence_refs: true
+
+export:
+  oscal: true
+  scap: false
+  csv_grc: true
+  json_api: true
+  sarif: true
+
+network:
+  auto_detect: false
+  scan_ranges:
+    - 198.51.100.1  # Replace with your target (RFC 5737 example address)
+  exclude_ranges:
+    - 127.0.0.0/8
+  dns_resolution: true
+
+tools:
+  nmap:
+    enabled: true
+    extra_args: ''
+  nikto:
+    enabled: true
+    extra_args: ''
+  nuclei:
+    enabled: true
+    extra_args: ''
+    templates: default
+  testssl:
+    enabled: true
+    extra_args: ''
+
+# v7.0: AI Analysis
+ai:
+  provider: template  # template (default), ollama, openai
+  model: ''
+  api_url: ''
+  sanitize_external: true  # Strip IPs/hostnames before sending to external LLMs
+
+# v7.0: Risk Quantification (FAIR)
+risk:
+  industry: default
+  benchmark_year: 2025
+  monte_carlo_iterations: 10000
+  custom_benchmarks: {}
+
+# v7.0: Container Security
+container:
+  enabled: true
+  runtime: auto  # auto, docker, podman
+  trivy_enabled: true
+
+# v7.0: Cloud Security
+cloud:
+  enabled: true  # Disabled automatically in portable mode
+  aws:
+    enabled: true
+    read_only: true
+  azure:
+    enabled: true
+    read_only: true
+  gcp:
+    enabled: true
+    read_only: true
+
+# v7.0: Attack Surface Management
+asm:
+  active_enumeration: false  # Passive-first, active requires opt-in
+  ct_logs: true
+  dns_brute: false
+
+# v7.0: SBOM
+sbom:
+  enabled: true
+  formats:
+    - cyclonedx
+    - spdx
+
+# v7.0: CI/CD
+cicd:
+  security_gate:
+    fail_on_critical: true
+    max_high: 5
+    max_medium: 20
+
+# v7.0: Adversary Emulation
+adversary:
+  enabled: true
+  default_profile: scattered_spider
+  safe_mode: true  # Only check defenses, never exploit
+  detection_timeout: 30
+
+notifications:
+  enabled: false
+  email:
+    enabled: false
+    smtp_server: ''
+    smtp_port: 587
+    use_tls: true
+    recipients: []
+  slack:
+    enabled: false
+    webhook_url: ''
+  teams:
+    enabled: false
+    webhook_url: ''
+  on_critical: true
+  on_complete: true
+
+integrations:
+  thehive:
+    enabled: false
+    url: ''
+    api_key: ''
+  wazuh:
+    enabled: false
+    url: ''
+    api_key: ''
+  siem:
+    enabled: false
+    type: ''
+    endpoint: ''
+  jira:
+    enabled: false
+    url: ''
+    project_key: ''
+    email: ''
+  servicenow:
+    enabled: false
+    instance_url: ''
+  shodan:
+    enabled: false
+  censys:
+    enabled: false

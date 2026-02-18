@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security &amp; Licensing Guide - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html" class="active"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#pqc-overview"><span class="nav-icon">&#x1F30D;</span> Post-Quantum Overview</a>
+        <a href="#ml-dsa"><span class="nav-icon">&#x1F510;</span> ML-DSA-65</a>
+        <a href="#dual-signature"><span class="nav-icon">&#x270D;</span> Dual Signatures</a>
+        <a href="#fingerprinting"><span class="nav-icon">&#x1F5B5;</span> Machine Fingerprinting</a>
+        <a href="#airgap-security"><span class="nav-icon">&#x2708;</span> Air-Gap Security</a>
+        <a href="#license-architecture"><span class="nav-icon">&#x1F3DB;</span> License Architecture</a>
+        <a href="#revocation"><span class="nav-icon">&#x1F6AB;</span> Revocation</a>
+        <a href="#best-practices"><span class="nav-icon">&#x2705;</span> Best Practices</a>
+        <a href="#incident-response"><span class="nav-icon">&#x1F6A8;</span> Incident Response</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">Security &amp; Licensing Guide</span>
+        </div>
+
+        <h1>Security &amp; Licensing Guide</h1>
+        <p>Donjon v7.0 implements a post-quantum cryptographic licensing system using dual signatures. This guide explains the security architecture, cryptographic primitives, and operational procedures for license management.</p>
+
+        <!-- PQC Overview -->
+        <h2 id="pqc-overview">Post-Quantum Cryptography Overview</h2>
+
+        <p>Quantum computers threaten current public-key cryptography. Shor's algorithm can efficiently factor large integers and compute discrete logarithms, breaking RSA and elliptic-curve cryptography. Donjon addresses this with a <strong>hybrid post-quantum + classical</strong> approach.</p>
+
+        <div class="card">
+            <div class="card-title">Why Post-Quantum Matters for Licensing</div>
+            <div class="card-description">
+                <p>License forgery resistance must remain strong for the full expected lifetime of the product. A license signed today must resist adversaries who may have access to quantum computers in the future. By signing with both classical and post-quantum algorithms, Donjon ensures license integrity even against "harvest now, decrypt later" attacks.</p>
+            </div>
+        </div>
+
+        <h3>Cryptographic Strategy</h3>
+        <table>
+            <thead><tr><th>Layer</th><th>Algorithm</th><th>Standard</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>Post-Quantum</strong></td>
+                    <td>ML-DSA-65</td>
+                    <td>NIST FIPS 204</td>
+                    <td>Quantum-resistant digital signature</td>
+                </tr>
+                <tr>
+                    <td><strong>Classical</strong></td>
+                    <td>Ed25519</td>
+                    <td>RFC 8032</td>
+                    <td>Proven classical digital signature</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- ML-DSA-65 -->
+        <h2 id="ml-dsa">ML-DSA-65 (NIST FIPS 204)</h2>
+
+        <p>ML-DSA (Module-Lattice-Based Digital Signature Algorithm), formerly known as CRYSTALS-Dilithium, is NIST's primary post-quantum digital signature standard, finalized in FIPS 204 (August 2024).</p>
+
+        <h3>Why ML-DSA-65?</h3>
+        <ul>
+            <li><strong>NIST standardized</strong> &mdash; First finalized post-quantum signature standard (FIPS 204, August 2024)</li>
+            <li><strong>High security level</strong> &mdash; Designed for long-term license protection against both classical and quantum threats</li>
+            <li><strong>Performance</strong> &mdash; Fast verification suitable for startup-time license checks</li>
+            <li><strong>Well-studied foundation</strong> &mdash; Based on lattice-based cryptography with extensive academic review</li>
+        </ul>
+
+        <!-- Dual Signature -->
+        <h2 id="dual-signature">Dual-Signature Verification</h2>
+
+        <p>Donjon v2 licenses carry <strong>two independent signatures</strong> over the same payload. Both must verify successfully for the license to be accepted.</p>
+
+        <h3>Verification Overview</h3>
+        <p>License files carry <strong>two independent digital signatures</strong>. The platform verifies both signatures using embedded public keys, checks expiry, machine binding, and revocation status. No network call is required.</p>
+
+        <h3>Why Dual Signatures?</h3>
+        <ul>
+            <li><strong>Defense in depth</strong> &mdash; If either algorithm is compromised, the other still protects</li>
+            <li><strong>Future-proofing</strong> &mdash; Classical signatures protect against flaws in new PQC algorithms; post-quantum signatures protect against quantum attacks on classical crypto</li>
+        </ul>
+
+        <!-- Machine Fingerprinting -->
+        <h2 id="fingerprinting">Machine Fingerprinting</h2>
+
+        <p>Licenses can be bound to a specific machine to prevent unauthorized redistribution. The fingerprint is a deterministic SHA-256 hash of stable hardware identifiers.</p>
+
+        <h3>Fingerprint Components</h3>
+        <p>The machine fingerprint is a deterministic hash of stable hardware identifiers including network adapter, hostname, platform, processor, and OS-level machine ID. The fingerprint is computed locally and never transmitted.</p>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Fingerprint Stability</div>
+            <p>Any change to the fingerprint components (hostname change, NIC replacement, OS reinstall) will cause a machine-bound license to fail verification. Contact support for a license transfer if your hardware changes.</p>
+        </div>
+
+        <!-- Air-Gap Security -->
+        <h2 id="airgap-security">Air-Gap Security Model</h2>
+
+        <p>Donjon's license system is designed to work completely offline. No network call is required for license verification.</p>
+
+        <h3>How It Works</h3>
+        <ul>
+            <li><strong>Public keys are embedded</strong> &mdash; Both the Ed25519 and ML-DSA-65 public keys are compiled into the product. The private keys never leave the license generation tool.</li>
+            <li><strong>Verification is local</strong> &mdash; The platform verifies signatures using the embedded public keys. No license server callback is needed.</li>
+            <li><strong>Revocation is file-based</strong> &mdash; A local <code>data/revoked.json</code> file lists revoked license IDs. This file can be updated manually or via a periodic sync when connectivity is available.</li>
+        </ul>
+
+        <h3>Offline Capabilities</h3>
+        <table>
+            <thead><tr><th>Operation</th><th>Online Required?</th></tr></thead>
+            <tbody>
+                <tr><td>License verification</td><td><span class="status-ok">No</span></td></tr>
+                <tr><td>All scanning operations</td><td><span class="status-ok">No</span> (except cloud scanner)</td></tr>
+                <tr><td>AI analysis (template mode)</td><td><span class="status-ok">No</span></td></tr>
+                <tr><td>Report generation</td><td><span class="status-ok">No</span></td></tr>
+                <tr><td>Compliance mapping</td><td><span class="status-ok">No</span></td></tr>
+                <tr><td>License activation (initial)</td><td><span class="status-warn">File transfer only</span></td></tr>
+                <tr><td>Revocation list updates</td><td><span class="status-warn">Optional sync</span></td></tr>
+                <tr><td>Vulnerability DB updates</td><td><span class="status-warn">Pre-populate before air-gap</span></td></tr>
+            </tbody>
+        </table>
+
+        <!-- License Server Architecture -->
+        <h2 id="license-architecture">License Server Architecture</h2>
+
+        <h3>License Generation</h3>
+        <p>Licenses are created by a separate offline admin tool that is <strong>never distributed</strong> with the product. The product contains only public verification keys &mdash; even full source code access does not allow forging licenses.</p>
+
+        <h3>Key Security Properties</h3>
+        <ul>
+            <li><strong>No private keys in product:</strong> Only public verification keys are embedded. Signing keys are kept offline.</li>
+            <li><strong>Asymmetric cryptography:</strong> The signing key and verification key are different, eliminating shared-secret risks.</li>
+            <li><strong>Dual algorithm protection:</strong> Both classical and post-quantum signatures must verify successfully.</li>
+        </ul>
+
+        <h3>License Server: license.donjonsec.com</h3>
+        <p>The optional license server (<code>license.donjonsec.com</code>) provides:</p>
+        <ul>
+            <li>License purchase and download portal</li>
+            <li>Revocation list distribution</li>
+            <li>License transfer processing</li>
+            <li>Renewal management</li>
+        </ul>
+        <p>The server is <strong>optional</strong> -- it is not contacted during normal product operation. It is only used for administrative license lifecycle events.</p>
+
+        <!-- Revocation -->
+        <h2 id="revocation">Revocation Process</h2>
+
+        <p>Licenses can be revoked when necessary (theft, terms violation, replacement).</p>
+
+        <h3>Revocation Mechanism</h3>
+        <ol>
+            <li>The revoked license ID is added to the master revocation list on <code>license.donjonsec.com</code></li>
+            <li>The revocation list is distributed as <code>revoked.json</code> in the product's <code>data/</code> directory</li>
+            <li>On each license load, the platform checks the local revocation list</li>
+            <li>If the license ID is found, the platform falls back to Community tier</li>
+        </ol>
+
+        <p>Revoked license IDs are maintained in a local revocation list file within the platform's data directory.</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Air-Gap Revocation</div>
+            <p>In air-gapped environments, update the revocation list manually by copying the latest <code>revoked.json</code> from a connected machine to the air-gapped system's <code>data/</code> directory.</p>
+        </div>
+
+        <!-- Security Best Practices -->
+        <h2 id="best-practices">Security Best Practices for Deployment</h2>
+
+        <h3>Platform Security</h3>
+        <ul>
+            <li><strong>Run with least privilege.</strong> Donjon does not require root/admin access for most operations. Only grant elevated privileges for specific scans (e.g., SYN scans with nmap).</li>
+            <li><strong>Protect the data directory.</strong> The evidence database contains sensitive scan results. Set appropriate file permissions (<code>chmod 700 data/</code> on Linux).</li>
+            <li><strong>Use HTTPS.</strong> The web dashboard runs on port 8443. Configure TLS certificates for production deployments.</li>
+            <li><strong>Rotate API keys.</strong> Change API keys periodically and use different keys for different integrations.</li>
+        </ul>
+
+        <h3>Data Protection</h3>
+        <ul>
+            <li><strong>Enable AI data sanitization.</strong> Always set <code>sanitize_external: true</code> when using external AI providers. This strips IP addresses and hostnames before sending data.</li>
+            <li><strong>Credential storage uses Fernet encryption.</strong> The credential manager encrypts stored credentials using symmetric encryption.</li>
+            <li><strong>Cloud credentials are never stored in portable mode.</strong> When running from USB, cloud provider credentials are not persisted to prevent accidental exposure.</li>
+            <li><strong>Container scanner uses read-only operations only.</strong> No <code>exec</code> or <code>attach</code> commands are used.</li>
+        </ul>
+
+        <h3>License Security</h3>
+        <ul>
+            <li><strong>Do not share license files.</strong> Machine-bound licenses are non-transferable without support approval.</li>
+            <li><strong>Keep the revocation list updated.</strong> Periodically sync <code>revoked.json</code> in connected environments.</li>
+            <li><strong>Verify license integrity.</strong> If you suspect tampering, re-download the license from the portal.</li>
+        </ul>
+
+        <h3>Network Security</h3>
+        <ul>
+            <li><strong>Only scan authorized targets.</strong> Unauthorized scanning may violate laws and regulations. Always obtain written authorization.</li>
+            <li><strong>Use dedicated scan networks.</strong> When possible, scan from a dedicated assessment VLAN.</li>
+            <li><strong>Monitor scan traffic.</strong> Inform network security teams before running scans to avoid triggering alerts.</li>
+        </ul>
+
+        <!-- Incident Response -->
+        <h2 id="incident-response">Incident Response</h2>
+
+        <h3>Compromised License</h3>
+        <ol class="steps">
+            <li><strong>Revoke the license immediately.</strong> Contact support at <a href="https://donjonsec.com">donjonsec.com</a> to add the license to the revocation list.</li>
+            <li><strong>Distribute the updated revocation list.</strong> Update <code>data/revoked.json</code> on all deployments.</li>
+            <li><strong>Issue a replacement license.</strong> Generate a new license with a new license ID.</li>
+        </ol>
+
+        <h3>Compromised Scan Data</h3>
+        <ol class="steps">
+            <li><strong>Isolate the affected system.</strong> Disconnect from the network if the evidence database was exposed.</li>
+            <li><strong>Assess the exposure.</strong> Determine what scan data, findings, and credentials may have been exposed.</li>
+            <li><strong>Notify affected parties.</strong> If scan results include information about third-party systems, notify the system owners.</li>
+            <li><strong>Rotate credentials.</strong> If the credential manager was compromised, rotate all stored credentials.</li>
+            <li><strong>Review audit logs.</strong> Use the audit trail (<code>GET /api/v1/audit</code>) to understand what actions were taken.</li>
+        </ol>
+
+        <h3>Suspected License Forgery</h3>
+        <p>The dual-signature scheme makes forgery computationally infeasible. If you suspect a forged license:</p>
+        <ol>
+            <li>Check the platform log for signature verification results</li>
+            <li>Verify the <code>license.json</code> file has not been modified (check file hashes)</li>
+            <li>Ensure all required cryptographic dependencies are properly installed</li>
+            <li>Contact support with the license ID and verification log output</li>
+        </ol>
+
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+            <p>ML-DSA-65 (FIPS 204) + Ed25519 Dual-Signature Verification</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

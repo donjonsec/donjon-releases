@@ -1,0 +1,389 @@
+framework:
+  id: rhel_cis
+  name: CIS Red Hat Enterprise Linux 9 Benchmark
+  version: "2.0.0"
+  release_date: 2024-06-15
+  description: |
+    CIS Benchmark for Red Hat Enterprise Linux 9, providing prescriptive
+    guidance for establishing a secure configuration posture for RHEL 9
+    systems. Applicable to RHEL, CentOS Stream, AlmaLinux, and Rocky Linux.
+
+  sources:
+    - url: https://www.cisecurity.org/benchmark/red_hat_linux
+      type: webpage
+      check_interval: monthly
+
+  applicability:
+    - rhel-9
+    - centos-stream-9
+    - almalinux-9
+    - rocky-linux-9
+
+  profiles:
+    Level_1_Server:
+      name: Level 1 - Server
+      description: Base security for all RHEL servers
+    Level_2_Server:
+      name: Level 2 - Server
+      description: Defense-in-depth for sensitive workloads
+
+  controls:
+    # Control 1: Filesystem Configuration
+    RHEL-CIS-1:
+      name: Filesystem Configuration
+      description: Harden filesystem mounts and partition layout to limit attack surface
+      safeguards:
+        RHEL-CIS-1.1:
+          name: Ensure separate partition exists for /tmp
+          profile: [Level_1_Server]
+          audit_command: "findmnt --target /tmp"
+          expected_result: "/tmp is a separate mount point"
+          remediation: "Configure /etc/fstab with a dedicated /tmp partition or enable tmp.mount systemd unit"
+        RHEL-CIS-1.2:
+          name: Ensure nodev and nosuid options set on /tmp
+          profile: [Level_1_Server]
+          audit_command: "findmnt -n -o OPTIONS --target /tmp | grep -E 'nodev|nosuid'"
+          expected_result: "Both nodev and nosuid options present"
+          remediation: "Add nodev,nosuid to /tmp mount options in /etc/fstab and remount"
+        RHEL-CIS-1.3:
+          name: Ensure separate partition exists for /var
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "findmnt --target /var"
+          expected_result: "/var is a separate mount point"
+          remediation: "Create a dedicated /var partition during installation or migrate with LVM"
+        RHEL-CIS-1.4:
+          name: Ensure separate partition exists for /var/log
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "findmnt --target /var/log"
+          expected_result: "/var/log is a separate mount point"
+          remediation: "Create a dedicated /var/log partition to prevent log flooding from filling root"
+        RHEL-CIS-1.5:
+          name: Ensure separate partition exists for /var/log/audit
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "findmnt --target /var/log/audit"
+          expected_result: "/var/log/audit is a separate mount point"
+          remediation: "Create a dedicated /var/log/audit partition for audit log isolation"
+        RHEL-CIS-1.6:
+          name: Ensure separate partition exists for /home
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "findmnt --target /home"
+          expected_result: "/home is a separate mount point"
+          remediation: "Create a dedicated /home partition to isolate user data"
+        RHEL-CIS-1.7:
+          name: Ensure nodev option set on /home
+          profile: [Level_1_Server]
+          audit_command: "findmnt -n -o OPTIONS --target /home | grep nodev"
+          expected_result: "nodev option is present"
+          remediation: "Add nodev to /home mount options in /etc/fstab and remount"
+        RHEL-CIS-1.8:
+          name: Ensure noexec option set on /dev/shm
+          profile: [Level_1_Server]
+          audit_command: "findmnt -n -o OPTIONS --target /dev/shm | grep noexec"
+          expected_result: "noexec option is present"
+          remediation: "Add noexec to /dev/shm mount options in /etc/fstab and remount"
+
+    # Control 2: SELinux Configuration
+    RHEL-CIS-2:
+      name: SELinux Configuration
+      description: Configure SELinux to enforce mandatory access control policies
+      safeguards:
+        RHEL-CIS-2.1:
+          name: Ensure SELinux is installed
+          profile: [Level_1_Server]
+          audit_command: "rpm -q libselinux"
+          expected_result: "libselinux package is installed"
+          remediation: "dnf install libselinux"
+        RHEL-CIS-2.2:
+          name: Ensure SELinux is not disabled in bootloader configuration
+          profile: [Level_1_Server]
+          audit_command: "grubby --info=ALL | grep -E 'selinux=0|enforcing=0'"
+          expected_result: "No output (neither selinux=0 nor enforcing=0 found)"
+          remediation: "Remove selinux=0 and enforcing=0 from GRUB_CMDLINE_LINUX in /etc/default/grub and run grub2-mkconfig"
+        RHEL-CIS-2.3:
+          name: Ensure SELinux policy is targeted
+          profile: [Level_1_Server]
+          audit_command: "sestatus | grep 'Loaded policy name'"
+          expected_result: "Loaded policy name: targeted"
+          remediation: "Set SELINUXTYPE=targeted in /etc/selinux/config"
+        RHEL-CIS-2.4:
+          name: Ensure SELinux mode is enforcing
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "getenforce"
+          expected_result: "Enforcing"
+          remediation: "Set SELINUX=enforcing in /etc/selinux/config and run setenforce 1"
+        RHEL-CIS-2.5:
+          name: Ensure no unconfined services exist
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "ps -eZ | grep unconfined_service_t"
+          expected_result: "No output (no unconfined services)"
+          remediation: "Investigate and confine any unconfined services with appropriate SELinux policy modules"
+        RHEL-CIS-2.6:
+          name: Ensure setroubleshoot is not installed
+          profile: [Level_1_Server]
+          audit_command: "rpm -q setroubleshoot"
+          expected_result: "package setroubleshoot is not installed"
+          remediation: "dnf remove setroubleshoot"
+        RHEL-CIS-2.7:
+          name: Ensure MCS Translation Service (mcstrans) is not installed
+          profile: [Level_1_Server]
+          audit_command: "rpm -q mcstrans"
+          expected_result: "package mcstrans is not installed"
+          remediation: "dnf remove mcstrans"
+
+    # Control 3: Network Configuration
+    RHEL-CIS-3:
+      name: Network Configuration
+      description: Configure kernel network parameters to reduce attack surface
+      safeguards:
+        RHEL-CIS-3.1:
+          name: Ensure IP forwarding is disabled
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.ip_forward"
+          expected_result: "net.ipv4.ip_forward = 0"
+          remediation: "Set net.ipv4.ip_forward=0 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.2:
+          name: Ensure ICMP redirects are not accepted
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.conf.all.accept_redirects"
+          expected_result: "net.ipv4.conf.all.accept_redirects = 0"
+          remediation: "Set net.ipv4.conf.all.accept_redirects=0 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.3:
+          name: Ensure source routed packets are not accepted
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.conf.all.accept_source_route"
+          expected_result: "net.ipv4.conf.all.accept_source_route = 0"
+          remediation: "Set net.ipv4.conf.all.accept_source_route=0 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.4:
+          name: Ensure suspicious packets are logged
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.conf.all.log_martians"
+          expected_result: "net.ipv4.conf.all.log_martians = 1"
+          remediation: "Set net.ipv4.conf.all.log_martians=1 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.5:
+          name: Ensure broadcast ICMP requests are ignored
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.icmp_echo_ignore_broadcasts"
+          expected_result: "net.ipv4.icmp_echo_ignore_broadcasts = 1"
+          remediation: "Set net.ipv4.icmp_echo_ignore_broadcasts=1 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.6:
+          name: Ensure TCP SYN cookies are enabled
+          profile: [Level_1_Server]
+          audit_command: "sysctl net.ipv4.tcp_syncookies"
+          expected_result: "net.ipv4.tcp_syncookies = 1"
+          remediation: "Set net.ipv4.tcp_syncookies=1 in /etc/sysctl.d/ and run sysctl --system"
+        RHEL-CIS-3.7:
+          name: Ensure IPv6 router advertisements are not accepted
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "sysctl net.ipv6.conf.all.accept_ra"
+          expected_result: "net.ipv6.conf.all.accept_ra = 0"
+          remediation: "Set net.ipv6.conf.all.accept_ra=0 in /etc/sysctl.d/ and run sysctl --system"
+
+    # Control 4: Firewall Configuration
+    RHEL-CIS-4:
+      name: Firewall Configuration
+      description: Configure host-based firewall to restrict network traffic
+      safeguards:
+        RHEL-CIS-4.1:
+          name: Ensure firewalld is installed
+          profile: [Level_1_Server]
+          audit_command: "rpm -q firewalld"
+          expected_result: "firewalld package is installed"
+          remediation: "dnf install firewalld"
+        RHEL-CIS-4.2:
+          name: Ensure firewalld service is enabled and running
+          profile: [Level_1_Server]
+          audit_command: "systemctl is-enabled firewalld && systemctl is-active firewalld"
+          expected_result: "enabled and active"
+          remediation: "systemctl enable --now firewalld"
+        RHEL-CIS-4.3:
+          name: Ensure nftables is installed
+          profile: [Level_1_Server]
+          audit_command: "rpm -q nftables"
+          expected_result: "nftables package is installed"
+          remediation: "dnf install nftables"
+        RHEL-CIS-4.4:
+          name: Ensure default firewalld zone is not set to trusted
+          profile: [Level_1_Server]
+          audit_command: "firewall-cmd --get-default-zone"
+          expected_result: "Zone is not 'trusted' (e.g., public or drop)"
+          remediation: "firewall-cmd --set-default-zone=public"
+        RHEL-CIS-4.5:
+          name: Ensure loopback interface is configured
+          profile: [Level_1_Server]
+          audit_command: "firewall-cmd --zone=trusted --list-interfaces | grep lo"
+          expected_result: "lo interface is in the trusted zone"
+          remediation: "firewall-cmd --permanent --zone=trusted --add-interface=lo && firewall-cmd --reload"
+        RHEL-CIS-4.6:
+          name: Ensure default deny firewall policy
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "firewall-cmd --get-default-zone"
+          expected_result: "Default zone uses a deny-by-default policy (drop or block)"
+          remediation: "firewall-cmd --set-default-zone=drop"
+
+    # Control 5: SSH Server Configuration
+    RHEL-CIS-5:
+      name: SSH Server Configuration
+      description: Harden OpenSSH server to enforce secure remote access
+      safeguards:
+        RHEL-CIS-5.1:
+          name: Ensure SSH Protocol is set to 2
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep -i protocol"
+          expected_result: "protocol 2"
+          remediation: "Set Protocol 2 in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.2:
+          name: Ensure SSH LogLevel is set to INFO
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep loglevel"
+          expected_result: "loglevel INFO"
+          remediation: "Set LogLevel INFO in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.3:
+          name: Ensure SSH MaxAuthTries is set to 4 or less
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep maxauthtries"
+          expected_result: "maxauthtries 4 (or lower)"
+          remediation: "Set MaxAuthTries 4 in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.4:
+          name: Ensure SSH IgnoreRhosts is enabled
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep ignorerhosts"
+          expected_result: "ignorerhosts yes"
+          remediation: "Set IgnoreRhosts yes in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.5:
+          name: Ensure SSH HostbasedAuthentication is disabled
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep hostbasedauthentication"
+          expected_result: "hostbasedauthentication no"
+          remediation: "Set HostbasedAuthentication no in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.6:
+          name: Ensure SSH PermitRootLogin is disabled
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep permitrootlogin"
+          expected_result: "permitrootlogin no"
+          remediation: "Set PermitRootLogin no in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.7:
+          name: Ensure SSH PermitEmptyPasswords is disabled
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep permitemptypasswords"
+          expected_result: "permitemptypasswords no"
+          remediation: "Set PermitEmptyPasswords no in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.8:
+          name: Ensure SSH X11 forwarding is disabled
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "sshd -T | grep x11forwarding"
+          expected_result: "x11forwarding no"
+          remediation: "Set X11Forwarding no in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.9:
+          name: Ensure SSH idle timeout interval is configured
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep -E 'clientaliveinterval|clientalivecountmax'"
+          expected_result: "clientaliveinterval 300 (or less) and clientalivecountmax 3 (or less)"
+          remediation: "Set ClientAliveInterval 300 and ClientAliveCountMax 3 in /etc/ssh/sshd_config and restart sshd"
+        RHEL-CIS-5.10:
+          name: Ensure SSH LoginGraceTime is set to 60 seconds or less
+          profile: [Level_1_Server]
+          audit_command: "sshd -T | grep logingracetime"
+          expected_result: "logingracetime 60 (or less)"
+          remediation: "Set LoginGraceTime 60 in /etc/ssh/sshd_config and restart sshd"
+
+    # Control 6: System Maintenance - Auditing and Logging
+    RHEL-CIS-6:
+      name: System Maintenance - Auditing and Logging
+      description: Configure system auditing, logging, and scheduled tasks
+      safeguards:
+        RHEL-CIS-6.1:
+          name: Ensure auditd is installed
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "rpm -q audit"
+          expected_result: "audit package is installed"
+          remediation: "dnf install audit"
+        RHEL-CIS-6.2:
+          name: Ensure auditd service is enabled and running
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "systemctl is-enabled auditd && systemctl is-active auditd"
+          expected_result: "enabled and active"
+          remediation: "systemctl enable --now auditd"
+        RHEL-CIS-6.3:
+          name: Ensure audit log storage size is configured
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "grep max_log_file /etc/audit/auditd.conf"
+          expected_result: "max_log_file is set to an appropriate value (e.g., 8 MB or more)"
+          remediation: "Set max_log_file = 8 in /etc/audit/auditd.conf and restart auditd"
+        RHEL-CIS-6.4:
+          name: Ensure audit rules for identity changes are configured
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "auditctl -l | grep -E '/etc/passwd|/etc/shadow|/etc/group|/etc/gshadow|/etc/security/opasswd'"
+          expected_result: "Watch rules exist for identity files"
+          remediation: "Add -w /etc/passwd -p wa -k identity rules to /etc/audit/rules.d/identity.rules"
+        RHEL-CIS-6.5:
+          name: Ensure audit rules for permission changes are configured
+          profile: [Level_1_Server, Level_2_Server]
+          audit_command: "auditctl -l | grep -E 'chmod|chown|setxattr'"
+          expected_result: "Syscall rules exist for permission modification events"
+          remediation: "Add -a always,exit -F arch=b64 -S chmod,chown,fchmod,fchown -k perm_mod to audit rules"
+        RHEL-CIS-6.6:
+          name: Ensure rsyslog is installed and running
+          profile: [Level_1_Server]
+          audit_command: "rpm -q rsyslog && systemctl is-active rsyslog"
+          expected_result: "rsyslog installed and active"
+          remediation: "dnf install rsyslog && systemctl enable --now rsyslog"
+        RHEL-CIS-6.7:
+          name: Ensure cron daemon is enabled
+          profile: [Level_1_Server]
+          audit_command: "systemctl is-enabled crond"
+          expected_result: "enabled"
+          remediation: "systemctl enable --now crond"
+        RHEL-CIS-6.8:
+          name: Ensure crontab permissions are restricted
+          profile: [Level_1_Server]
+          audit_command: "stat -c '%a %U %G' /etc/crontab"
+          expected_result: "600 root root (or more restrictive)"
+          remediation: "chown root:root /etc/crontab && chmod 600 /etc/crontab"
+
+    # Control 7: User and Group Settings
+    RHEL-CIS-7:
+      name: User and Group Settings
+      description: Configure user authentication, password policy, and access restrictions
+      safeguards:
+        RHEL-CIS-7.1:
+          name: Ensure password expiration is 365 days or less (PASS_MAX_DAYS)
+          profile: [Level_1_Server]
+          audit_command: "grep ^PASS_MAX_DAYS /etc/login.defs"
+          expected_result: "PASS_MAX_DAYS 365 (or less)"
+          remediation: "Set PASS_MAX_DAYS 365 in /etc/login.defs"
+        RHEL-CIS-7.2:
+          name: Ensure minimum days between password changes is 1 or more (PASS_MIN_DAYS)
+          profile: [Level_1_Server]
+          audit_command: "grep ^PASS_MIN_DAYS /etc/login.defs"
+          expected_result: "PASS_MIN_DAYS 1 (or more)"
+          remediation: "Set PASS_MIN_DAYS 1 in /etc/login.defs"
+        RHEL-CIS-7.3:
+          name: Ensure password expiration warning days is 7 or more (PASS_WARN_AGE)
+          profile: [Level_1_Server]
+          audit_command: "grep ^PASS_WARN_AGE /etc/login.defs"
+          expected_result: "PASS_WARN_AGE 7 (or more)"
+          remediation: "Set PASS_WARN_AGE 7 in /etc/login.defs"
+        RHEL-CIS-7.4:
+          name: Ensure default user umask is 027 or more restrictive
+          profile: [Level_1_Server]
+          audit_command: "grep -E '^UMASK' /etc/login.defs"
+          expected_result: "UMASK 027 (or 077)"
+          remediation: "Set UMASK 027 in /etc/login.defs and /etc/profile.d/*.sh"
+        RHEL-CIS-7.5:
+          name: Ensure default user shell timeout is 900 seconds or less (TMOUT)
+          profile: [Level_1_Server]
+          audit_command: "grep -E '^TMOUT=' /etc/profile /etc/profile.d/*.sh /etc/bashrc 2>/dev/null"
+          expected_result: "TMOUT=900 (or less) and readonly/export"
+          remediation: "Add TMOUT=900; readonly TMOUT; export TMOUT to /etc/profile.d/tmout.sh"
+        RHEL-CIS-7.6:
+          name: Ensure root login is restricted to system console
+          profile: [Level_1_Server]
+          audit_command: "cat /etc/securetty 2>/dev/null"
+          expected_result: "Only local console devices listed (or file does not exist for systemd default)"
+          remediation: "Remove remote terminal entries from /etc/securetty or restrict via PAM"
+        RHEL-CIS-7.7:
+          name: Ensure access to the su command is restricted
+          profile: [Level_1_Server]
+          audit_command: "grep -E '^auth\\s+required\\s+pam_wheel.so' /etc/pam.d/su"
+          expected_result: "pam_wheel.so is configured with use_uid"
+          remediation: "Add 'auth required pam_wheel.so use_uid' to /etc/pam.d/su and add authorized users to wheel group"

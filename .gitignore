@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# Data (runtime generated - user-specific)
+data/evidence/
+data/results/
+data/logs/
+data/reports/
+data/archives/
+data/agents.db
+data/asset_inventory.db
+data/audit.db
+data/discovery.db
+data/exceptions.db
+data/remediation.db
+data/risk_register.db
+data/notifications.db
+data/scheduler.db
+
+# Test artifacts
+data/test_report.json
+data/test_report.xml
+data/test_run_log.json
+
+# Intel databases — distributed via GitHub Releases, not git
+# Download with: bash bin/sync-intel-db.sh
+data/intel_feeds.db
+data/vuln_db/vuln_intel.db
+data/threat_intel/cisa_kev.json
+data/threat_intel/epss_cache.json
+data/manifest.json
+
+# Credentials and secrets (sensitive)
+.env
+.env.*
+config/credentials.yaml
+config/credentials.json
+config/active/credentials.yaml
+config/active/.cred_key
+*.key
+*.pem
+
+# License admin private keys (NEVER commit these)
+tools/keys/
+keys/
+data/license.json
+data/ai_quota.json
+data/revoked.json
+
+# Exports (session-specific, may contain sensitive findings)
+exports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

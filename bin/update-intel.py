@@ -1,0 +1,609 @@
+#!/usr/bin/env python3
+"""
+Donjon Platform v7.0 - Intel Data Updater
+
+Standalone script to refresh all threat intelligence data.
+Run this on a connected machine, then copy the USB to an airgapped system.
+
+Usage:
+    python3 bin/update-intel.py                   # Incremental update (default, includes feeds)
+    python3 bin/update-intel.py --all             # Update everything: NVD + KEV + EPSS + feeds
+    python3 bin/update-intel.py --full             # Full NVD bulk download + all intel feeds
+    python3 bin/update-intel.py --incremental      # Only new/modified since last run
+    python3 bin/update-intel.py --year 2024        # Download a specific year
+    python3 bin/update-intel.py --kev-only         # Just CISA KEV catalog
+    python3 bin/update-intel.py --nvd-only         # Just NVD CVE cache (incremental)
+    python3 bin/update-intel.py --epss-only        # Just EPSS scores
+    python3 bin/update-intel.py --feeds            # Update all intel feeds (ExploitDB, OSV, etc.)
+    python3 bin/update-intel.py --feeds-only       # Only update intel feeds, skip NVD/KEV/EPSS
+    python3 bin/update-intel.py --status           # Show cache status
+    python3 bin/update-intel.py --check            # Check freshness, exit 1 if stale
+"""
+
+import sys
+import os
+import time
+import argparse
+from pathlib import Path
+
+def _nvd_rate_delay():
+    return 0.7 if os.environ.get('NVD_API_KEY') else 6.0
+
+# Resolve project root
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT / 'lib'))
+sys.path.insert(0, str(PROJECT_ROOT / 'scanners'))
+
+
+def load_env_file():
+    """Load API keys from .env file in project root (auto-detected)."""
+    env_path = PROJECT_ROOT / '.env'
+    if not env_path.exists():
+        return
+    with open(env_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+
+load_env_file()
+
+# Minimal banner
+def banner():
+    print()
+    print("  ============================================================")
+    print("   Donjon Platform v7.0 - Intel Data Updater")
+    print("  ============================================================")
+    print()
+
+
+def update_kev():
+    """Update CISA KEV catalog."""
+    from threat_intel import get_threat_intel
+    ti = get_threat_intel()
+    print("[1/4] Refreshing CISA KEV catalog...")
+    if ti.update_kev_catalog():
+        stats = ti.get_kev_stats()
+        print("  KEV: {} entries".format(stats.get('total_entries', '?')))
+        return True
+    else:
+        print("  KEV: FAILED (no network?)")
+        return False
+
+
+def update_nvd_full():
+    """Full NVD bulk download - all 250K+ CVEs by year."""
+    try:
+        from vuln_database import get_vuln_database
+    except ImportError:
+        print("  NVD: SKIPPED (vuln_database module not found)")
+        return False
+
+    vdb = get_vuln_database()
+
+    has_api_key = bool(os.environ.get('NVD_API_KEY'))
+    if has_api_key:
+        print("  NVD API key: ACTIVE (50 req/30s)")
+        print("  Estimated time: ~30-60 minutes")
+    else:
+        print("  NVD API key: none (5 req/30s - set NVD_API_KEY for 10x speed)")
+        print("  Estimated time: ~2-4 hours")
+
+    print()
+    print("[FULL] Downloading ALL CVEs from NVD (1999-present)...")
+    print("  This downloads ~250K+ CVEs. Progress shown per year.")
+    print()
+
+    download_start = time.time()
+
+    def progress_callback(year, page, total_so_far):
+        elapsed = time.time() - download_start
+        rate = total_so_far / elapsed if elapsed > 0 else 0
+        print("  Year {}: page {} | Total: {:,} CVEs | {:.0f} CVEs/min".format(
+            year, page, total_so_far, rate * 60))
+
+    try:
+        result = vdb.update_nvd_full(start_year=1999, callback=progress_callback)
+        print()
+        print("  Full download complete:")
+        print("    New CVEs cached: {:,}".format(result.get('new_cached', 0)))
+        print("    Already existed: {:,}".format(result.get('already_existed', 0)))
+        print("    Total in DB:     {:,}".format(result.get('total_in_db', 0)))
+        print("    Years processed: {}".format(result.get('years_processed', 0)))
+        print("    Elapsed:         {:.0f}s".format(result.get('elapsed_seconds', 0)))
+    except Exception as e:
+        print("  NVD full download: FAILED ({})".format(e))
+        return False
+
+    stats = vdb.get_statistics()
+    print("  NVD total: {:,} CVEs in cache ({:.1f} MB)".format(
+        stats.get('cached_cves', 0), stats.get('db_size_mb', 0)))
+    return True
+
+
+def update_nvd_incremental():
+    """Incremental NVD update - only new/modified CVEs since last run."""
+    try:
+        from vuln_database import get_vuln_database
+    except ImportError:
+        print("  NVD: SKIPPED (vuln_database module not found)")
+        return False
+
+    vdb = get_vuln_database()
+
+    has_api_key = bool(os.environ.get('NVD_API_KEY'))
+    if has_api_key:
+        print("  NVD API key: ACTIVE (50 req/30s)")
+    else:
+        print("  NVD API key: none (5 req/30s - set NVD_API_KEY for 10x speed)")
+
+    print("[INCREMENTAL] Fetching CVEs modified since last update...")
+
+    try:
+        result = vdb.update_nvd_incremental()
+        print("  Incremental update: {} modified CVEs fetched from {} total".format(
+            result.get('cached', 0), result.get('total_results', 0)))
+        print("  Period: since {}".format(result.get('since', 'unknown')))
+    except Exception as e:
+        print("  NVD incremental: FAILED ({})".format(e))
+        return False
+
+    stats = vdb.get_statistics()
+    print("  NVD total: {:,} CVEs in cache ({:.1f} MB)".format(
+        stats.get('cached_cves', 0), stats.get('db_size_mb', 0)))
+    return True
+
+
+def update_nvd_year(year):
+    """Download all CVEs for a specific year."""
+    try:
+        from vuln_database import get_vuln_database
+    except ImportError:
+        print("  NVD: SKIPPED (vuln_database module not found)")
+        return False
+
+    vdb = get_vuln_database()
+
+    has_api_key = bool(os.environ.get('NVD_API_KEY'))
+    if has_api_key:
+        print("  NVD API key: ACTIVE (50 req/30s)")
+    else:
+        print("  NVD API key: none (5 req/30s - set NVD_API_KEY for 10x speed)")
+
+    print("[YEAR] Downloading all CVEs for year {}...".format(year))
+
+    try:
+        result = vdb.update_nvd_year(year)
+        print("  Year {}: {}/{} CVEs cached".format(
+            year, result.get('cached', 0), result.get('total_results', 0)))
+    except Exception as e:
+        print("  NVD year {}: FAILED ({})".format(year, e))
+        return False
+
+    stats = vdb.get_statistics()
+    print("  NVD total: {:,} CVEs in cache ({:.1f} MB)".format(
+        stats.get('cached_cves', 0), stats.get('db_size_mb', 0)))
+    return True
+
+
+def update_nvd():
+    """Update NVD CVE cache (recent + high-profile) - legacy behavior."""
+    try:
+        from vuln_database import get_vuln_database
+    except ImportError:
+        print("  NVD: SKIPPED (vuln_database module not found)")
+        return False
+
+    vdb = get_vuln_database()
+
+    has_api_key = bool(os.environ.get('NVD_API_KEY'))
+    if has_api_key:
+        print("  NVD API key: ACTIVE (50 req/30s)")
+    else:
+        print("  NVD API key: none (5 req/30s - set NVD_API_KEY for 10x speed)")
+
+    # With API key: pull 90 days (NVD max ~90 days per query). Without: 14 days.
+    days = 90 if has_api_key else 14
+    print("[2/4] Downloading NVD CVEs (last {} days)...".format(days))
+    try:
+        recent = vdb.update_nvd_recent(days=days)
+        print("  NVD recent: {} CVEs cached from {} total".format(
+            recent.get('cached', 0), recent.get('total', 0)))
+    except Exception as e:
+        print("  NVD recent: FAILED ({})".format(e))
+
+    print("[3/4] Caching high-profile CVEs + keyword searches...")
+    famous_cves = [
+        'CVE-2021-44228', 'CVE-2021-45046',  # Log4Shell
+        'CVE-2017-0144',  # EternalBlue
+        'CVE-2014-0160',  # Heartbleed
+        'CVE-2021-26855', 'CVE-2021-34473',  # ProxyLogon/ProxyShell
+        'CVE-2024-3400',  # Palo Alto PAN-OS
+        'CVE-2023-4966',  # Citrix Bleed
+        'CVE-2023-22515',  # Confluence
+        'CVE-2023-34362',  # MOVEit
+        'CVE-2024-21887',  # Ivanti
+        'CVE-2023-46805',  # Ivanti
+        'CVE-2024-1709',  # ConnectWise ScreenConnect
+        'CVE-2023-27997',  # FortiGate
+        'CVE-2024-47575',  # FortiManager
+        'CVE-2023-20198',  # Cisco IOS XE
+        'CVE-2023-42793',  # JetBrains TeamCity
+        'CVE-2024-0012',  # Palo Alto PAN-OS
+        'CVE-2025-0282',  # Ivanti Connect Secure 2025
+        'CVE-2024-55591',  # FortiOS 2025
+    ]
+    cached = 0
+    for cve_id in famous_cves:
+        try:
+            result = vdb.lookup_cve(cve_id)
+            if result and result.get('found'):
+                cached += 1
+        except Exception:
+            pass
+    print("  Famous CVEs: {}/{} cached".format(cached, len(famous_cves)))
+
+    # Keyword searches for common enterprise products
+    keywords = [
+        'Microsoft Exchange', 'Log4j', 'VMware', 'Cisco IOS',
+        'WordPress', 'OpenSSL', 'Linux kernel', 'Active Directory',
+        'Apache HTTP', 'nginx', 'Fortinet', 'Palo Alto',
+        'Citrix', 'SolarWinds', 'Ivanti', 'Atlassian',
+        'Docker', 'Kubernetes', 'Jenkins', 'GitLab',
+        'Zoom', 'Chrome', 'Firefox', 'Windows SMB',
+        'Oracle Java', 'Adobe Reader', 'Grafana', 'Redis',
+        'PostgreSQL', 'MySQL', 'MongoDB', 'Elasticsearch',
+    ]
+    kw_total = 0
+    for kw in keywords:
+        try:
+            result = vdb.update_nvd_by_keyword(kw, max_results=200)
+            count = result.get('cached', 0)
+            kw_total += count
+            if count > 0:
+                print("    {}: {} CVEs".format(kw, count))
+            time.sleep(_nvd_rate_delay())
+        except Exception:
+            pass
+    print("  Keyword searches: {} CVEs from {} terms".format(kw_total, len(keywords)))
+
+    stats = vdb.get_statistics()
+    print("  NVD total: {} CVEs in cache".format(stats.get('cached_cves', '?')))
+    return True
+
+
+def update_epss():
+    """Pre-fetch EPSS scores for all cached CVEs."""
+    try:
+        from vuln_database import get_vuln_database
+        from threat_intel import get_threat_intel
+    except ImportError:
+        print("  EPSS: SKIPPED (modules not found)")
+        return False
+
+    ti = get_threat_intel()
+    vdb = get_vuln_database()
+
+    print("[4/4] Pre-fetching EPSS scores for cached CVEs...")
+
+    # Get all CVE IDs from vuln_intel.db
+    import sqlite3
+    db_path = vdb.db_path
+    if not db_path.exists():
+        print("  EPSS: No vuln_intel.db found")
+        return False
+
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.execute("SELECT cve_id FROM nvd_cves")
+    all_cves = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    if not all_cves:
+        print("  EPSS: No CVEs to query")
+        return False
+
+    # Batch query EPSS (API limit 100 per request)
+    total_fetched = 0
+    batch_size = 100
+    for i in range(0, len(all_cves), batch_size):
+        batch = all_cves[i:i + batch_size]
+        try:
+            results = ti.query_epss(batch)
+            total_fetched += len(results)
+            # Rate limit
+            if i + batch_size < len(all_cves):
+                time.sleep(1)
+        except Exception as e:
+            print("  EPSS batch {}: FAILED ({})".format(i // batch_size, e))
+
+    print("  EPSS: {} scores cached for {} CVEs".format(total_fetched, len(all_cves)))
+    return True
+
+
+def update_feeds():
+    """Update all multi-source intel feeds (ExploitDB, OSV, GitHub, CISA, MITRE, abuse.ch)."""
+    try:
+        from intel_feeds import IntelFeedManager
+    except ImportError:
+        print("  Intel Feeds: SKIPPED (intel_feeds module not found)")
+        return False
+
+    print("[FEEDS] Updating multi-source intelligence feeds...")
+    print("  Sources: ExploitDB, OSV, GitHub Advisories, CISA Alerts, MITRE ATT&CK, abuse.ch")
+    print()
+
+    try:
+        mgr = IntelFeedManager()
+        results = mgr.update_all()
+        total = results.get('_total', 0)
+        elapsed = results.get('_elapsed_seconds', 0)
+        print("  Intel Feeds: {:,} total records in {:.0f}s".format(total, elapsed))
+        return True
+    except Exception as e:
+        print("  Intel Feeds: FAILED ({})".format(e))
+        return False
+
+
+def show_status():
+    """Show current cache status with freshness indicators."""
+    from threat_intel import get_threat_intel
+
+    ti = get_threat_intel()
+    stale = ti.is_cache_stale()
+    kev_stats = ti.get_kev_stats()
+    epss_stats = ti.get_epss_stats()
+
+    print("  CISA KEV:")
+    if kev_stats.get('status') == 'loaded':
+        print("    Entries: {}".format(kev_stats.get('total_entries', '?')))
+        print("    Version: {}".format(kev_stats.get('catalog_version', '?')))
+        print("    Age: {:.1f} hours".format(kev_stats.get('cache_age_hours', 0)))
+        print("    Stale: {}".format(stale.get('kev_stale', True)))
+    else:
+        print("    Status: NOT LOADED")
+
+    print()
+    print("  EPSS:")
+    print("    Cached scores: {}".format(epss_stats.get('cached_scores', 0)))
+    print("    Stale: {}".format(stale.get('epss_stale', True)))
+
+    try:
+        from vuln_database import get_vuln_database
+        vdb = get_vuln_database()
+        stats = vdb.get_statistics()
+        print()
+        print("  NVD (vuln_intel.db):")
+        print("    CVEs cached: {:,}".format(stats.get('cached_cves', 0)))
+        db_size = vdb.db_path.stat().st_size if vdb.db_path.exists() else 0
+        print("    DB size: {:.1f} MB".format(db_size / 1048576))
+    except ImportError:
+        print()
+        print("  NVD: module not available")
+
+    # Intel Feeds status with staleness indicators
+    try:
+        from intel_feeds import IntelFeedManager
+        mgr = IntelFeedManager()
+        stats = mgr.get_stats()
+        print()
+        print("  Intel Feeds (intel_feeds.db):")
+        for table in ['exploitdb', 'osv_vulns', 'github_advisories',
+                       'cisa_alerts', 'mitre_attack', 'threat_indicators']:
+            count = stats.get(table, 0)
+            print("    {}: {:,}".format(table, count))
+        db_mb = stats.get('_db_size_mb', 0)
+        if db_mb:
+            print("    DB size: {:.1f} MB".format(db_mb))
+        meta = stats.get('_meta', {})
+        if meta:
+            print("    Last updates:")
+            for feed_name, info in sorted(meta.items()):
+                last = info.get('last_updated', 'never')
+                if last != 'never':
+                    from datetime import datetime as _dt, timezone as _tz
+                    try:
+                        dt = _dt.fromisoformat(last)
+                        age_hours = (_dt.now(_tz.utc) - dt).total_seconds() / 3600
+                        stale_marker = " (STALE)" if age_hours > 48 else ""
+                        print("      {}: {:.0f}h ago{}".format(feed_name, age_hours, stale_marker))
+                    except Exception:
+                        print("      {}: {}".format(feed_name, last))
+                else:
+                    print("      {}: never".format(feed_name))
+    except ImportError:
+        print()
+        print("  Intel Feeds: module not available")
+    except Exception as e:
+        print()
+        print("  Intel Feeds: error reading stats ({})".format(e))
+
+    # Compliance framework freshness
+    try:
+        from compliance import get_compliance_mapper
+        mapper = get_compliance_mapper()
+        freshness = mapper.check_framework_freshness()
+        stale_fw = [f for f in freshness if f.get('stale')]
+        print()
+        print("  Compliance Frameworks: {} loaded, {} stale".format(len(freshness), len(stale_fw)))
+        if stale_fw:
+            for f in stale_fw:
+                print("    WARNING: {} not updated in {:.0f} days".format(f['name'], f['file_age_days']))
+    except Exception:
+        pass
+
+
+def check_freshness():
+    """Check data freshness and exit with non-zero if any critical data is stale.
+
+    Thresholds: NVD >24h, KEV >48h, feeds >72h.
+    """
+    from threat_intel import get_threat_intel
+
+    ti = get_threat_intel()
+    stale_info = ti.is_cache_stale()
+    kev_stats = ti.get_kev_stats()
+    issues = []
+
+    # Check KEV staleness (>48h)
+    kev_age = kev_stats.get('cache_age_hours', 999)
+    if kev_age > 48:
+        issues.append("KEV catalog is {:.0f}h old (threshold: 48h)".format(kev_age))
+
+    # Check NVD staleness (>24h)
+    try:
+        from vuln_database import get_vuln_database
+        vdb = get_vuln_database()
+        stats = vdb.get_statistics()
+        if stats.get('cached_cves', 0) == 0:
+            issues.append("NVD cache is empty")
+    except Exception:
+        issues.append("NVD module not available")
+
+    # Check feed staleness (>72h)
+    try:
+        from intel_feeds import IntelFeedManager
+        mgr = IntelFeedManager()
+        feed_stats = mgr.get_stats()
+        meta = feed_stats.get('_meta', {})
+        from datetime import datetime as _dt, timezone as _tz
+        for feed_name, info in meta.items():
+            last = info.get('last_updated', 'never')
+            if last == 'never':
+                issues.append("Feed '{}' has never been updated".format(feed_name))
+            else:
+                try:
+                    dt = _dt.fromisoformat(last)
+                    age_hours = (_dt.now(_tz.utc) - dt).total_seconds() / 3600
+                    if age_hours > 72:
+                        issues.append("Feed '{}' is {:.0f}h old (threshold: 72h)".format(
+                            feed_name, age_hours))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    if issues:
+        print("STALE DATA DETECTED:")
+        for issue in issues:
+            print("  - {}".format(issue))
+        sys.exit(1)
+    else:
+        print("All data sources are fresh.")
+        sys.exit(0)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Update Donjon threat intelligence data')
+    parser.add_argument('--full', action='store_true',
+                       help='Full NVD bulk download (all 250K+ CVEs, 1999-present)')
+    parser.add_argument('--incremental', action='store_true',
+                       help='Incremental update (only CVEs modified since last run)')
+    parser.add_argument('--year', type=int, metavar='YYYY',
+                       help='Download all CVEs for a specific year')
+    parser.add_argument('--kev-only', action='store_true',
+                       help='Only update CISA KEV catalog')
+    parser.add_argument('--nvd-only', action='store_true',
+                       help='Only update NVD CVE cache')
+    parser.add_argument('--epss-only', action='store_true',
+                       help='Only update EPSS scores')
+    parser.add_argument('--feeds', action='store_true',
+                       help='Also update all intel feeds (ExploitDB, OSV, GitHub, CISA, MITRE, abuse.ch)')
+    parser.add_argument('--feeds-only', action='store_true',
+                       help='Only update intel feeds, skip NVD/KEV/EPSS')
+    parser.add_argument('--all', action='store_true',
+                       help='Update everything: NVD (incremental), KEV, EPSS, and all intel feeds')
+    parser.add_argument('--check', action='store_true',
+                       help='Check data freshness and exit with non-zero if stale')
+    parser.add_argument('--status', action='store_true',
+                       help='Show current cache status')
+    parser.add_argument('--api-key', type=str,
+                       help='NVD API key (or set NVD_API_KEY env var)')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                       help='Minimal output')
+
+    args = parser.parse_args()
+
+    # Set API key from arg if provided
+    if args.api_key:
+        os.environ['NVD_API_KEY'] = args.api_key
+
+    if not args.quiet:
+        banner()
+
+    if args.status:
+        show_status()
+        return
+
+    if args.check:
+        check_freshness()
+        return
+
+    start = time.time()
+
+    # Handle --all: update everything
+    if args.all:
+        update_kev()
+        update_nvd_incremental()
+        update_epss()
+        update_feeds()
+    # Handle --feeds-only: just update intel feeds and exit
+    elif args.feeds_only:
+        update_feeds()
+    # Handle new bulk download modes
+    elif args.full:
+        update_kev()
+        update_nvd_full()
+        update_epss()
+        update_feeds()
+    elif args.year:
+        update_nvd_year(args.year)
+        if args.feeds:
+            update_feeds()
+    elif args.incremental:
+        update_kev()
+        update_nvd_incremental()
+        update_epss()
+        if args.feeds:
+            update_feeds()
+    else:
+        # Default behavior: incremental if we have existing data, else legacy
+        specific = args.kev_only or args.nvd_only or args.epss_only
+
+        if args.kev_only or not specific:
+            update_kev()
+
+        if args.nvd_only:
+            # --nvd-only now defaults to incremental
+            update_nvd_incremental()
+        elif not specific:
+            update_nvd()
+
+        if args.epss_only or not specific:
+            update_epss()
+
+        # Always run feeds in default mode (no flags = update everything)
+        if args.feeds or not specific:
+            update_feeds()
+
+    elapsed = time.time() - start
+
+    if not args.quiet:
+        print()
+        print("  Done in {:.0f}s".format(elapsed))
+        print()
+        show_status()
+        print()
+
+
+if __name__ == '__main__':
+    main()

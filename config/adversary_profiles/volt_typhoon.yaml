@@ -1,0 +1,56 @@
+profile:
+  id: volt_typhoon
+  name: "Volt Typhoon (Bronze Silhouette)"
+  aliases: [Bronze Silhouette, Vanguard Panda, DEV-0391]
+  attribution: China (PLA)
+  motivation: espionage + pre-positioning
+  target_sectors: [critical_infrastructure, utilities, communications, transportation, maritime]
+  active_since: 2021
+
+  ttps:
+    - tactic: Initial Access
+      technique: Exploit Public-Facing Application - SOHO Routers
+      technique_id: T1190
+      simulation_check: check_soho_router_compromise
+      description: Exploits vulnerabilities in SOHO routers and edge devices to build operational relay networks
+    - tactic: Defense Evasion
+      technique: System Binary Proxy Execution - LOLBins
+      technique_id: T1218
+      simulation_check: check_lolbin_usage
+      description: Exclusively uses living-off-the-land binaries to avoid deploying custom malware
+    - tactic: Execution
+      technique: Command and Scripting Interpreter - PowerShell/cmd
+      technique_id: T1059
+      simulation_check: check_native_tool_abuse
+      description: Uses built-in tools like PowerShell, cmd, wmic, and netsh for all operational activity
+    - tactic: Defense Evasion
+      technique: Valid Accounts
+      technique_id: T1078
+      simulation_check: check_account_usage_anomalies
+      description: Operates using compromised legitimate accounts to blend with normal administrative activity
+    - tactic: Command and Control
+      technique: Application Layer Protocol - SOHO Proxy
+      technique_id: T1071
+      simulation_check: check_soho_proxy_c2
+      description: Routes C2 traffic through compromised SOHO routers to disguise traffic origin
+    - tactic: Credential Access
+      technique: OS Credential Dumping
+      technique_id: T1003
+      simulation_check: check_credential_dump_artifacts
+      description: Extracts credentials using ntds.dit theft and volume shadow copy techniques
+    - tactic: Defense Evasion
+      technique: Masquerading
+      technique_id: T1036
+      simulation_check: check_masquerading_indicators
+      description: Renames tools and processes to match legitimate system binaries and services
+    - tactic: Defense Evasion
+      technique: Indicator Removal
+      technique_id: T1070
+      simulation_check: check_log_clearing
+      description: Clears logs and removes forensic evidence to maintain long-term stealth
+
+  detection_priorities:
+    - LOLBin and living-off-the-land activity baselining and anomaly detection
+    - SOHO device firmware integrity and configuration monitoring
+    - Lateral movement detection using native Windows tools
+    - Long-dwell-time hunting with behavioral analytics

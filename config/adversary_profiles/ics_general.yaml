@@ -1,0 +1,57 @@
+profile:
+  id: ics_general
+  name: "ICS/SCADA General Threat Profile"
+  aliases: []
+  attribution: multiple
+  motivation: destruction + espionage
+  target_sectors: [manufacturing, energy, water, oil_gas, chemical]
+  active_since: 2010
+
+  ttps:
+    - tactic: Initial Access
+      technique: Internet Accessible HMI
+      technique_id: T0855
+      simulation_check: check_hmi_exposure
+      description: Discovers and accesses internet-exposed HMI panels lacking authentication or using defaults
+    - tactic: Lateral Movement
+      technique: Remote Access via VNC
+      technique_id: T0866
+      simulation_check: check_ics_remote_access
+      description: Uses VNC and other remote access tools to connect to ICS workstations and engineering stations
+    - tactic: Impair Process Control
+      technique: Modify Program - PLC Manipulation
+      technique_id: T0889
+      simulation_check: check_plc_program_integrity
+      description: Uploads modified ladder logic or firmware to PLCs to alter physical process behavior
+    - tactic: Initial Access
+      technique: Supply Chain Compromise
+      technique_id: T0831
+      simulation_check: check_ics_supply_chain
+      description: Compromises ICS vendor software or firmware update channels to gain access to OT networks
+    - tactic: Impair Process Control
+      technique: Modify Controller Tasking
+      technique_id: T0821
+      simulation_check: check_controller_task_changes
+      description: Changes controller task scheduling and parameters to disrupt industrial process timing
+    - tactic: Collection
+      technique: Theft of Operational Information
+      technique_id: T0882
+      simulation_check: check_ot_data_collection
+      description: Collects process data, network diagrams, and engineering schematics from OT environments
+    - tactic: Lateral Movement
+      technique: Remote Services
+      technique_id: T0886
+      simulation_check: check_ics_lateral_movement
+      description: Moves between IT and OT segments using shared credentials and bridged network connections
+    - tactic: Impact
+      technique: Denial of Control
+      technique_id: T0813
+      simulation_check: check_control_denial
+      description: Blocks operator access to control systems preventing manual intervention during incidents
+
+  detection_priorities:
+    - IT/OT network segmentation validation and monitoring
+    - PLC authentication enforcement and program change detection
+    - SCADA protocol monitoring for anomalous commands
+    - Safety instrumented system independence verification
+    - Engineering workstation access control and activity logging

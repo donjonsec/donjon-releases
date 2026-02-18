@@ -1,0 +1,56 @@
+profile:
+  id: scattered_spider
+  name: "Scattered Spider (LUCR-3/Muddled Libra)"
+  aliases: [UNC3944, LUCR-3, Muddled Libra, Starfraud]
+  attribution: Western cybercriminals
+  motivation: financial
+  target_sectors: [telecom, technology, hospitality, gaming, financial]
+  active_since: 2022
+
+  ttps:
+    - tactic: Initial Access
+      technique: MFA Phishing / SIM Swap
+      technique_id: T1566
+      simulation_check: check_mfa_bypass_resilience
+      description: Social-engineers help desk staff and uses SIM swapping to intercept MFA codes
+    - tactic: Persistence
+      technique: Create Account
+      technique_id: T1136
+      simulation_check: check_new_account_creation
+      description: Creates rogue admin accounts in cloud identity providers for persistent access
+    - tactic: Persistence
+      technique: Account Manipulation - Admin Policy
+      technique_id: T1098
+      simulation_check: check_admin_policy_changes
+      description: Modifies admin policies and federation settings to maintain privileged access
+    - tactic: Defense Evasion
+      technique: Valid Accounts - Cloud
+      technique_id: T1078
+      simulation_check: check_cloud_account_anomalies
+      description: Leverages compromised cloud credentials to blend in with legitimate activity
+    - tactic: Execution
+      technique: PowerShell / CLI Abuse
+      technique_id: T1059
+      simulation_check: check_scripting_execution
+      description: Uses PowerShell and cloud CLIs to execute commands across tenant environments
+    - tactic: Credential Access
+      technique: OS Credential Dumping
+      technique_id: T1003
+      simulation_check: check_credential_dump_artifacts
+      description: Dumps credentials from memory and credential stores on compromised endpoints
+    - tactic: Lateral Movement
+      technique: Remote Desktop / VPN Abuse
+      technique_id: T1021
+      simulation_check: check_remote_access_anomalies
+      description: Pivots through RDP sessions and VPN tunnels to move across the environment
+    - tactic: Exfiltration
+      technique: Exfiltration Over Web Service
+      technique_id: T1567
+      simulation_check: check_cloud_exfil_channels
+      description: Exfiltrates data through legitimate cloud storage services to evade detection
+
+  detection_priorities:
+    - MFA bypass and SIM swap detection
+    - New account creation monitoring in identity providers
+    - Cloud IAM anomaly detection and federation changes
+    - Help desk social engineering awareness

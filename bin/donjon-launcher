@@ -1,0 +1,2065 @@
+#!/usr/bin/env python3
+"""
+Donjon Platform v7.0 - Main Launcher
+Systems Thinking Security Assessment Platform
+
+v7.0: FAIR risk quantification, AI analysis, container/cloud/ASM scanning,
+      SBOM generation, executive dashboard, CI/CD integration, SARIF export.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# Resolve installation directory
+SCRIPT_DIR = Path(__file__).resolve().parent
+DONJON_HOME = SCRIPT_DIR.parent
+os.environ['DONJON_HOME'] = str(DONJON_HOME)
+
+# Add lib to path
+sys.path.insert(0, str(DONJON_HOME / 'lib'))
+sys.path.insert(0, str(DONJON_HOME / 'utilities'))
+sys.path.insert(0, str(DONJON_HOME / 'scanners'))
+
+# --- Pre-flight dependency check ---
+# Catch missing pip packages BEFORE they cause a cryptic traceback.
+_REQUIRED_PACKAGES = {
+    'yaml': 'pyyaml',
+    'requests': 'requests',
+    'dateutil': 'python-dateutil',
+}
+_missing = []
+for _mod, _pkg in _REQUIRED_PACKAGES.items():
+    try:
+        __import__(_mod)
+    except ImportError:
+        _missing.append(_pkg)
+
+if _missing:
+    print()
+    print("  [*] Installing missing packages:", ", ".join(_missing))
+    import subprocess
+    _req = DONJON_HOME / 'requirements.txt'
+    _rc = subprocess.call([sys.executable, '-m', 'pip', 'install', '-r', str(_req), '-q'])
+    if _rc != 0:
+        print(f"  [ERROR] pip install failed (exit {_rc}). Install manually:")
+        print(f"    pip install -r {_req}")
+        sys.exit(1)
+    print("  [OK] Packages installed. Continuing...")
+    print()
+# --- End pre-flight check ---
+
+from tui import tui, C, safe_input, set_non_interactive
+from tool_discovery import tool_discovery, ToolInfo
+from human_behavior import HumanBehavior
+from paths import paths
+from config import config
+
+# v6.0 imports - graceful fallback if modules not yet available
+try:
+    from platform_detect import get_platform_info
+    platform_info = get_platform_info()
+except ImportError:
+    platform_info = None
+
+try:
+    from evidence import get_evidence_manager
+except ImportError:
+    get_evidence_manager = None
+
+try:
+    from credential_manager import get_credential_manager
+except ImportError:
+    get_credential_manager = None
+
+try:
+    from threat_intel import get_threat_intel
+except ImportError:
+    get_threat_intel = None
+
+try:
+    from risk_quantification import get_risk_quantifier
+except ImportError:
+    get_risk_quantifier = None
+
+try:
+    from ai_analyzer import AIAnalyzer
+except ImportError:
+    AIAnalyzer = None
+
+try:
+    from sbom_generator import get_sbom_generator
+except ImportError:
+    get_sbom_generator = None
+
+try:
+    from cicd_integration import get_cicd_integrator
+except ImportError:
+    get_cicd_integrator = None
+
+try:
+    from vuln_database import get_vuln_database
+except ImportError:
+    get_vuln_database = None
+
+
+class DonjonLauncher:
+    """Main launcher for Donjon Platform."""
+
+    VERSION = "7.0"
+
+    def __init__(self):
+        self.behavior = HumanBehavior('normal')
+        self.tools_checked = False
+        self.platform = platform_info
+        self._banner_shown = False
+
+    def show_banner(self, force=False):
+        """Display the main banner. Skips if already shown unless force=True."""
+        if self._banner_shown and not force:
+            return
+        self._banner_shown = True
+        tui.clear()
+        subtitle = "Systems Thinking Security Assessment"
+        if self.platform:
+            subtitle += f" | {self.platform.os_name} {self.platform.architecture}"
+        tui.banner(
+            "DONJON PLATFORM",
+            subtitle,
+            self.VERSION
+        )
+
+    def check_prerequisites(self) -> bool:
+        """Check and optionally install prerequisites."""
+        tui.section("Checking Prerequisites", C.CYAN)
+        print()
+
+        # Discover tools
+        tool_discovery.discover_all()
+        print()
+
+        # Check required tools
+        required_missing = tool_discovery.get_required_missing()
+
+        if not required_missing:
+            tui.success("All required tools are available")
+            self.tools_checked = True
+            tui.section_end(C.CYAN)
+            return True
+
+        # Show missing tools
+        tui.warning(f"Missing {len(required_missing)} required tools:")
+        for name, tool in required_missing.items():
+            print(f"  {C.RED}{tui.CROSS}{C.RESET} {name}: {tool.description}")
+
+        print()
+        tui.section_end(C.CYAN)
+
+        # Offer to install
+        if tui.confirm("Would you like to install missing tools?", default=True):
+            return self.install_prerequisites(required_missing)
+
+        return False
+
+    def install_prerequisites(self, missing: dict) -> bool:
+        """Install missing prerequisites."""
+        tui.section("Installing Prerequisites", C.YELLOW)
+        print()
+
+        success_count = 0
+        for name, tool in missing.items():
+            if tool_discovery.install_tool(name):
+                success_count += 1
+
+        print()
+        tui.section_end(C.YELLOW)
+
+        if success_count == len(missing):
+            tui.success("All tools installed successfully")
+            self.tools_checked = True
+            return True
+        else:
+            tui.warning(f"Installed {success_count}/{len(missing)} tools")
+            return success_count > 0
+
+    def show_tool_status(self):
+        """Display detailed tool status."""
+        self.show_banner()
+        tui.section("Security Tool Inventory", C.CYAN)
+        print()
+
+        if not tool_discovery.discovered:
+            tool_discovery.discover_all()
+            print()
+
+        tool_discovery.display_status()
+
+        # Summary
+        available = tool_discovery.get_available()
+        missing = tool_discovery.get_missing()
+
+        print()
+        tui.info(f"Total: {len(available)} available, {len(missing)} missing")
+
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def show_main_menu(self):
+        """Display the main menu."""
+        options = [
+            ('1', f'{C.BRIGHT_RED}Red Team{C.RESET} - Attack Simulation', 'Offensive security testing, vulnerability exploitation'),
+            ('2', f'{C.BRIGHT_BLUE}Blue Team{C.RESET} - Detection & Defense', 'Security monitoring, threat detection, hardening'),
+            ('3', f'{C.BRIGHT_MAGENTA}Purple Team{C.RESET} - Integrated Assessment', 'Combined red/blue operations with gap analysis'),
+            ('---', '', ''),
+            ('4', 'Quick Scan', 'Fast security posture check (15-30 min)'),
+            ('5', 'Standard Assessment', 'Comprehensive scan with compliance (1-2 hours)'),
+            ('6', 'Deep Assessment', 'Full security audit with evidence (2-4 hours)'),
+            ('---', '', ''),
+            ('7', 'Compliance & Reports', 'Generate compliance reports and exports'),
+            ('8', 'Schedule Scans', 'Configure automated monthly assessments'),
+            ('9', 'Tool Status', 'View available security tools'),
+            ('---', '', ''),
+            ('w', f'{C.BRIGHT_CYAN}Windows Security{C.RESET}', 'Local Windows security assessment (air-gapped)'),
+            ('l', f'{C.BRIGHT_CYAN}Linux Security{C.RESET}', 'Local Linux security assessment (air-gapped)'),
+            ('d', f'{C.BRIGHT_GREEN}Dashboard{C.RESET}', 'Executive security dashboard'),
+            ('x', f'{C.BRIGHT_YELLOW}Export Data{C.RESET}', 'Export findings to security platforms (CEF, STIX, SARIF, etc.)'),
+            ('---', '', ''),
+            ('s', 'Settings', 'Configure platform settings'),
+            ('h', 'Help', 'View documentation and guides'),
+            ('q', 'Quit', 'Exit the platform'),
+        ]
+
+        return tui.menu("Main Menu", options, C.MAGENTA)
+
+    def show_red_team_menu(self):
+        """Red Team submenu."""
+        self.show_banner()
+        options = [
+            ('1', 'Network Reconnaissance', 'Discover hosts, ports, services'),
+            ('2', 'Vulnerability Scanning', 'Find exploitable weaknesses'),
+            ('3', 'Web Application Testing', 'OWASP Top 10, injection, XSS'),
+            ('4', 'Password Auditing', 'Test password strength and policies'),
+            ('5', 'Exploit Validation', 'Safely test if vulnerabilities are exploitable'),
+            ('---', '', ''),
+            ('6', 'ATT&CK Simulation', 'MITRE ATT&CK technique testing'),
+            ('7', 'Phishing Simulation', 'Test email security awareness'),
+            ('8', 'Social Engineering', 'Test human security controls'),
+            ('---', '', ''),
+            ('9', f'{C.BRIGHT_GREEN}OpenVAS Integration{C.RESET}', 'GVM/OpenVAS scanning and import'),
+            ('---', '', ''),
+            ('a', f'{C.BRIGHT_YELLOW}Adversary Emulation{C.RESET}', 'Simulate threat actor TTPs and score defenses'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        return tui.menu("Red Team Operations", options, C.RED)
+
+    def show_blue_team_menu(self):
+        """Blue Team submenu."""
+        self.show_banner()
+        options = [
+            ('1', 'Security Hardening Audit', 'CIS benchmarks, system hardening'),
+            ('2', 'Malware Detection', 'Scan for malware, rootkits, IOCs'),
+            ('3', 'Log Analysis', 'Review security logs for anomalies'),
+            ('4', 'File Integrity Check', 'Verify critical file integrity'),
+            ('5', 'Network Traffic Analysis', 'Analyze traffic for threats'),
+            ('---', '', ''),
+            ('6', 'Detection Rule Testing', 'Validate SIEM/IDS rules'),
+            ('7', 'Incident Response Drill', 'Practice IR procedures'),
+            ('8', 'Threat Hunting', 'Proactive threat search'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        return tui.menu("Blue Team Operations", options, C.BLUE)
+
+    def show_purple_team_menu(self):
+        """Purple Team submenu."""
+        self.show_banner()
+        options = [
+            ('1', 'Detection Gap Analysis', 'Find what blue team missed from red team'),
+            ('2', 'Control Effectiveness', 'Measure security control performance'),
+            ('3', 'Attack Path Mapping', 'Map potential attack chains'),
+            ('4', 'Coverage Assessment', 'ATT&CK technique coverage analysis'),
+            ('---', '', ''),
+            ('5', 'Full Purple Assessment', 'Complete red+blue+gap analysis'),
+            ('6', 'Continuous Validation', 'Ongoing security validation'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        return tui.menu("Purple Team Operations", options, C.MAGENTA)
+
+    def show_compliance_menu(self):
+        """Compliance and reporting submenu."""
+        self.show_banner()
+        options = [
+            ('1', 'Generate Audit Report', 'Full compliance audit with citations'),
+            ('2', 'NIST 800-53 Report', 'NIST SP 800-53 Rev 5 controls'),
+            ('3', 'HIPAA Report', 'Healthcare compliance assessment'),
+            ('4', 'PCI-DSS Report', 'Payment card industry compliance'),
+            ('5', 'SOC 2 Report', 'Service organization controls'),
+            ('6', 'ISO 27001 Report', 'Information security management'),
+            ('---', '', ''),
+            ('7', 'Export for GRC Platform', 'OSCAL, CSV, Drata, Vanta formats'),
+            ('8', 'View Past Reports', 'Browse generated reports'),
+            ('9', f'{C.BRIGHT_CYAN}Delta Report{C.RESET}', 'Compare two scan sessions side-by-side'),
+            ('t', f'{C.BRIGHT_CYAN}Trend Analysis{C.RESET}', 'View security trends over time'),
+            ('r', f'{C.BRIGHT_YELLOW}Risk Quantification{C.RESET}', 'FAIR risk analysis in dollar terms'),
+            ('a', f'{C.BRIGHT_YELLOW}AI Analysis{C.RESET}', 'AI-powered finding analysis'),
+            ('v', f'{C.BRIGHT_GREEN}Vuln Intelligence{C.RESET}', 'NVD/OWASP/CWE/ATT&CK database'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        return tui.menu("Compliance & Reports", options, C.GREEN)
+
+    def show_settings_menu(self):
+        """Settings submenu."""
+        self.show_banner()
+
+        # Show current settings
+        tui.section("Current Settings", C.CYAN)
+        tui.keyvalue({
+            'Installation': str(paths.home),
+            'Retention': f"{config.get_retention_days()} days",
+            'Scan Window': f"{config.get('scheduling.window_start', '18:00')} - {config.get('scheduling.window_end', '20:00')}",
+            'Behavior Profile': self.behavior.profile,
+        })
+        tui.section_end(C.CYAN)
+
+        options = [
+            ('1', 'Scan Timing', 'Configure scan windows and delays'),
+            ('2', 'Behavior Profile', 'Stealth, normal, fast, aggressive'),
+            ('3', 'Compliance Frameworks', 'Select frameworks to assess'),
+            ('4', 'Network Targets', 'Configure scan targets and exclusions'),
+            ('5', 'Notifications', 'Email alerts and reporting'),
+            ('---', '', ''),
+            ('6', 'View Full Config', 'Display current configuration'),
+            ('7', 'Reset to Defaults', 'Restore default settings'),
+            ('---', '', ''),
+            ('8', f'{C.BRIGHT_YELLOW}Manage Overrides{C.RESET}', 'False positive & severity override rules'),
+            ('9', f'{C.BRIGHT_YELLOW}Manage Credentials{C.RESET}', 'SSH/WinRM/SNMP credentials for auth scanning'),
+            ('c', f'{C.BRIGHT_GREEN}CI/CD Integration{C.RESET}', 'Generate pipeline configs and SARIF'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        return tui.menu("Settings", options, C.YELLOW)
+
+    def run_quick_scan(self):
+        """Run a quick security scan."""
+        self.show_banner()
+        tui.section("Quick Security Scan", C.GREEN)
+        print()
+        tui.info("Running quick security posture check...")
+        tui.info(f"Behavior profile: {self.behavior.profile}")
+        print()
+
+        # Warn about unprivileged scanning
+        if os.name != 'nt' and os.getuid() != 0:
+            tui.warning("Running without root privileges. Network scans will be limited.")
+            tui.info("For full results: sudo python3 bin/donjon-launcher quick")
+            print()
+
+        try:
+            from orchestrator import AssessmentOrchestrator
+            orchestrator = AssessmentOrchestrator()
+            results = orchestrator.run_full_assessment(assessment_type='quick')
+
+            print()
+            tui.success(f"Scan complete! Session: {results.get('session_id', 'N/A')}")
+            tui.info("Results saved to: data/evidence/evidence.db")
+            tui.info("View dashboard: python3 bin/donjon-launcher dashboard")
+            tui.info("Generate report: python3 bin/donjon-launcher risk")
+            tui.info(f"Total findings: {results.get('summary', {}).get('total_findings', 0)}")
+        except Exception as e:
+            tui.error(f"Scan failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_standard_assessment(self):
+        """Run a standard assessment."""
+        self.show_banner()
+        tui.section("Standard Assessment", C.CYAN)
+        print()
+        tui.info("Running comprehensive security assessment...")
+        tui.info("This will take 1-2 hours to complete.")
+        print()
+
+        if not tui.confirm("Continue with standard assessment?", default=True):
+            return
+
+        # Warn about unprivileged scanning
+        if os.name != 'nt' and os.getuid() != 0:
+            tui.warning("Running without root privileges. Network scans will be limited.")
+            tui.info("For full results: sudo python3 bin/donjon-launcher standard")
+            print()
+
+        try:
+            from orchestrator import AssessmentOrchestrator
+            orchestrator = AssessmentOrchestrator()
+            results = orchestrator.run_full_assessment(assessment_type='standard')
+
+            print()
+            tui.success(f"Assessment complete! Session: {results.get('session_id', 'N/A')}")
+        except Exception as e:
+            tui.error(f"Assessment failed: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_deep_assessment(self):
+        """Run a deep assessment."""
+        self.show_banner()
+        tui.section("Deep Security Assessment", C.MAGENTA)
+        print()
+        tui.info("Running full security audit with evidence collection...")
+        tui.info("This will take 2-4 hours to complete.")
+        tui.warning("Ensure you have authorization before proceeding.")
+        print()
+
+        if not tui.confirm("Continue with deep assessment?", default=False):
+            return
+
+        # Warn about unprivileged scanning
+        if os.name != 'nt' and os.getuid() != 0:
+            tui.warning("Running without root privileges. Network scans will be limited.")
+            tui.info("For full results: sudo python3 bin/donjon-launcher deep")
+            print()
+
+        try:
+            from orchestrator import AssessmentOrchestrator
+            orchestrator = AssessmentOrchestrator()
+            results = orchestrator.run_full_assessment(assessment_type='deep')
+
+            print()
+            tui.success(f"Audit complete! Session: {results.get('session_id', 'N/A')}")
+        except Exception as e:
+            tui.error(f"Audit failed: {e}")
+
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def generate_audit_report(self):
+        """Generate a full audit report."""
+        self.show_banner()
+        tui.section("Generating Audit Report", C.GREEN)
+        print()
+
+        try:
+            from audit_report import AuditReportGenerator
+
+            # Get output folder
+            from datetime import datetime
+            month_folder = datetime.now().strftime("%B-%Y")
+            default_folder = str(paths.reports / month_folder)
+
+            output_folder = tui.input("Output folder", default=default_folder)
+            output_path = Path(output_folder)
+            output_path.mkdir(parents=True, exist_ok=True)
+
+            tui.info(f"Generating reports to: {output_path}")
+            print()
+
+            generator = AuditReportGenerator()
+            generator.generate_all_reports(str(output_path))
+
+            print()
+            tui.success(f"Reports generated in: {output_path}")
+
+        except Exception as e:
+            tui.error(f"Report generation failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_delta_report(self):
+        """Compare two scan sessions."""
+        self.show_banner()
+        tui.section("Delta Report", C.CYAN)
+        print()
+
+        try:
+            from delta_report import DeltaReporter
+
+            # List available sessions
+            if get_evidence_manager:
+                em = get_evidence_manager()
+                sessions = em.get_all_sessions() if hasattr(em, 'get_all_sessions') else []
+                if sessions:
+                    tui.info("Recent sessions:")
+                    for s in sessions[:10]:
+                        sid = s.get('session_id', '?')
+                        stype = s.get('scan_type', '?')
+                        started = s.get('start_time', '?')
+                        print(f"  {C.CYAN}{sid[:12]}{C.RESET} | {stype} | {started}")
+                    print()
+
+            session_1 = tui.input("Baseline session ID (older)")
+            session_2 = tui.input("Compare session ID (newer)")
+
+            if session_1 and session_2:
+                reporter = DeltaReporter()
+                comparison = reporter.compare_sessions(session_1, session_2)
+
+                # Display summary
+                print()
+                tui.info("Delta Report Summary:")
+                new_count = len(comparison.get('new_findings', []))
+                resolved_count = len(comparison.get('resolved_findings', []))
+                persistent_count = len(comparison.get('persistent_findings', []))
+                changed_count = len(comparison.get('changed_severity', []))
+
+                print(f"  {C.RED}New findings:{C.RESET}        {new_count}")
+                print(f"  {C.GREEN}Resolved findings:{C.RESET}  {resolved_count}")
+                print(f"  {C.YELLOW}Persistent:{C.RESET}         {persistent_count}")
+                print(f"  {C.CYAN}Severity changed:{C.RESET}   {changed_count}")
+
+                # Offer HTML export
+                print()
+                if tui.confirm("Generate HTML delta report?", default=True):
+                    output_path = paths.reports / f"delta_{session_1[:8]}_{session_2[:8]}.html"
+                    reporter.generate_delta_html(comparison, str(output_path))
+                    tui.success(f"Delta report saved: {output_path}")
+            else:
+                tui.error("Both session IDs are required")
+
+        except ImportError:
+            tui.error("Delta report module not available")
+        except Exception as e:
+            tui.error(f"Delta report failed: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_trend_analysis(self):
+        """Show security trend analysis."""
+        self.show_banner()
+        tui.section("Trend Analysis", C.CYAN)
+        print()
+
+        try:
+            from delta_report import DeltaReporter
+
+            n = tui.input("Number of recent sessions to analyze", default="5")
+            n = int(n)
+
+            reporter = DeltaReporter()
+            trends = reporter.trend_analysis(last_n_sessions=n)
+
+            if trends:
+                risk_trend = trends.get('risk_trend', 'unknown')
+                trend_color = C.GREEN if risk_trend == 'decreasing' else (
+                    C.RED if risk_trend == 'increasing' else C.YELLOW
+                )
+                print(f"  Risk trend: {trend_color}{risk_trend}{C.RESET}")
+                print(f"  Mean time to remediate: {trends.get('mean_time_to_remediate', 'N/A')} days")
+
+                recurring = trends.get('top_recurring_findings', [])
+                if recurring:
+                    print(f"\n  Top recurring findings:")
+                    for finding in recurring[:5]:
+                        print(f"    - {finding}")
+
+                # ASCII chart
+                if hasattr(reporter, 'generate_trend_ascii'):
+                    print()
+                    print(reporter.generate_trend_ascii(trends))
+            else:
+                tui.info("Not enough data for trend analysis")
+
+        except ImportError:
+            tui.error("Delta report module not available")
+        except Exception as e:
+            tui.error(f"Trend analysis failed: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def show_help(self):
+        """Display help information."""
+        self.show_banner()
+        tui.section("Help & Documentation", C.CYAN)
+
+        print(f"""
+{C.BOLD}Donjon Platform v{self.VERSION}{C.RESET}
+Systems Thinking Security Assessment
+
+{C.YELLOW}Quick Start:{C.RESET}
+  1. Run 'Quick Scan' for a fast security check
+  2. Run 'Standard Assessment' for comprehensive testing
+  3. Generate reports for compliance evidence
+
+{C.YELLOW}Key Concepts:{C.RESET}
+  {C.RED}Red Team{C.RESET}   - Offensive testing, find vulnerabilities
+  {C.BLUE}Blue Team{C.RESET}  - Defensive testing, detect threats
+  {C.MAGENTA}Purple Team{C.RESET} - Integrated testing, close gaps
+
+{C.YELLOW}v7.0 New Features:{C.RESET}
+  Vuln Intel DB    - NVD/OWASP/CWE/CAPEC/ATT&CK intelligence
+  FAIR Risk Quant  - Dollar-quantified risk (replaces RiskLens)
+  AI Analysis      - Multi-backend AI finding analysis
+  Container Scan   - Docker/Podman security assessment
+  Cloud Scan       - AWS/Azure/GCP configuration audit
+  SBOM Generation  - CycloneDX/SPDX bill of materials
+  ASM Scanner      - Attack surface management
+  Exec Dashboard   - Terminal and HTML dashboards
+  CI/CD + SARIF    - Pipeline configs and security gates
+  Jira/ServiceNow  - Ticket creation integrations
+  Slack/Teams      - Webhook notifications
+
+{C.YELLOW}Files:{C.RESET}
+  Results:  {paths.results}
+  Reports:  {paths.reports}
+  Evidence: {paths.evidence}
+  Logs:     {paths.logs}
+
+{C.YELLOW}Documentation:{C.RESET}
+  CHANGELOG-v6.md        - v6.0 release notes
+  CHANGELOG-v7.md        - v7.0 release notes
+  README.txt             - Quick start guide
+  AUDITOR_GUIDE.md       - Guide for auditors
+  DESIGN_PHILOSOPHY.md   - Systems thinking approach
+
+{C.YELLOW}Commands:{C.RESET}
+  donjon-launcher          - This interactive menu
+  donjon quick             - Quick scan (CLI)
+  donjon check             - System check
+  donjon setup             - Run setup/install tools
+""")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def show_openvas_menu(self):
+        """OpenVAS/GVM Integration submenu."""
+        self.show_banner()
+        options = [
+            ('1', 'Run OpenVAS Scan', 'Launch GVM scan against targets'),
+            ('2', 'Import OpenVAS Report', 'Import XML report from existing scan'),
+            ('3', 'Sync Findings', 'Merge OpenVAS results with local DB'),
+            ('4', 'Configure Connection', 'Set GVM daemon host/port/credentials'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to Red Team menu'),
+        ]
+        return tui.menu("OpenVAS Integration", options, C.GREEN)
+
+    def handle_openvas(self):
+        """Handle OpenVAS menu."""
+        while True:
+            choice = self.show_openvas_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                self.run_openvas_scan()
+            elif choice == '2':
+                self.import_openvas_report()
+            elif choice == '3':
+                self.sync_openvas_findings()
+            elif choice == '4':
+                tui.info("Configure GVM connection in config/active/config.yaml")
+                tui.info("Keys: openvas.host, openvas.port, openvas.username, openvas.password")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_openvas_scan(self):
+        """Run an OpenVAS scan."""
+        self.show_banner()
+        tui.section("OpenVAS/GVM Scan", C.GREEN)
+        try:
+            from openvas_scanner import OpenVASScanner
+            scanner = OpenVASScanner()
+            if not scanner.gvm_available:
+                tui.error("OpenVAS/GVM not detected on this system")
+                tui.info("Install GVM: https://greenbone.github.io/docs/latest/")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+
+            tui.info(f"GVM mode: {scanner.gvm_mode}")
+            targets_input = tui.input("Target(s)", default="auto-detect")
+            if targets_input == "auto-detect":
+                from network import get_scan_targets
+                targets = get_scan_targets()
+            else:
+                targets = [t.strip() for t in targets_input.split(',')]
+
+            if not targets:
+                tui.error("No targets available")
+            else:
+                tui.info(f"Scanning: {targets}")
+                results = scanner.scan(targets=targets, scan_type='standard')
+                summary = scanner.get_summary()
+                tui.success(f"OpenVAS scan complete: {summary.get('findings_count', 0)} findings")
+        except ImportError:
+            tui.error("OpenVAS scanner module not available")
+        except Exception as e:
+            tui.error(f"OpenVAS scan failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def import_openvas_report(self):
+        """Import an OpenVAS XML report."""
+        self.show_banner()
+        tui.section("Import OpenVAS Report", C.GREEN)
+        try:
+            from openvas_scanner import OpenVASScanner
+            xml_path = tui.input("Path to OpenVAS XML report")
+            if xml_path and Path(xml_path).exists():
+                scanner = OpenVASScanner()
+                results = scanner.import_openvas_report(xml_path)
+                imported = len(results.get('findings', []))
+                tui.success(f"Imported {imported} findings from OpenVAS report")
+            else:
+                tui.error("File not found")
+        except ImportError:
+            tui.error("OpenVAS scanner module not available")
+        except Exception as e:
+            tui.error(f"Import failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def sync_openvas_findings(self):
+        """Sync findings between OpenVAS and local DB."""
+        self.show_banner()
+        tui.section("Sync OpenVAS Findings", C.GREEN)
+        try:
+            from openvas_scanner import OpenVASScanner
+            scanner = OpenVASScanner()
+            if not scanner.gvm_available:
+                tui.error("OpenVAS/GVM not detected")
+            else:
+                tui.info("Syncing findings...")
+                results = scanner.sync_findings()
+                tui.success(f"Sync complete: {results.get('synced', 0)} findings merged")
+        except ImportError:
+            tui.error("OpenVAS scanner module not available")
+        except Exception as e:
+            tui.error(f"Sync failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def handle_red_team(self):
+        """Handle Red Team menu."""
+        while True:
+            choice = self.show_red_team_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                self.run_scanner('network_scanner')
+            elif choice == '2':
+                self.run_scanner('vulnerability_scanner')
+            elif choice == '3':
+                self.run_scanner('web_scanner')
+            elif choice == '9':
+                self.handle_openvas()
+            elif choice == 'a' or choice == 'A':
+                self.run_adversary_emulation()
+            else:
+                tui.warning("This feature is planned for a future release.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def handle_blue_team(self):
+        """Handle Blue Team menu."""
+        while True:
+            choice = self.show_blue_team_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                self.run_scanner('compliance_scanner')
+            elif choice == '2':
+                self.run_scanner('malware_scanner')
+            else:
+                tui.warning("This feature is planned for a future release.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def handle_purple_team(self):
+        """Handle Purple Team menu."""
+        while True:
+            choice = self.show_purple_team_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '5':
+                self.run_deep_assessment()
+            else:
+                tui.warning("This feature is planned for a future release.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def handle_compliance(self):
+        """Handle Compliance menu."""
+        while True:
+            choice = self.show_compliance_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                self.generate_audit_report()
+            elif choice == '8':
+                self.view_reports()
+            elif choice == '9':
+                self.run_delta_report()
+            elif choice == 't' or choice == 'T':
+                self.run_trend_analysis()
+            elif choice == 'r' or choice == 'R':
+                self.run_risk_quantification()
+            elif choice == 'a' or choice == 'A':
+                self.run_ai_analysis()
+            elif choice == 'v' or choice == 'V':
+                self.run_vuln_intelligence()
+            else:
+                tui.warning("This feature is planned for a future release.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def handle_settings(self):
+        """Handle Settings menu."""
+        while True:
+            choice = self.show_settings_menu()
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '2':
+                self.set_behavior_profile()
+            elif choice == '6':
+                self.view_config()
+            elif choice == '8':
+                self.manage_overrides()
+            elif choice == '9':
+                self.manage_credentials()
+            elif choice == 'c' or choice == 'C':
+                self.manage_cicd()
+            else:
+                tui.warning("This feature is planned for a future release.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def set_behavior_profile(self):
+        """Set the behavior profile."""
+        self.show_banner()
+        options = [
+            ('1', 'Stealth', 'Very slow, maximum evasion - for testing detection'),
+            ('2', 'Normal (Recommended)', 'Balanced speed and stealth'),
+            ('3', 'Fast', 'Quick but still human-like'),
+            ('4', 'Aggressive', 'Minimal delays - speed priority'),
+        ]
+
+        choice = tui.menu("Select Behavior Profile", options, C.YELLOW)
+
+        profiles = {'1': 'stealth', '2': 'normal', '3': 'fast', '4': 'aggressive'}
+        if choice in profiles:
+            self.behavior = HumanBehavior(profiles[choice])
+            tui.success(f"Profile set to: {profiles[choice]}")
+        else:
+            tui.info("Profile unchanged")
+
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def view_config(self):
+        """View current configuration."""
+        self.show_banner()
+        tui.section("Current Configuration", C.CYAN)
+
+        config_path = paths.config / 'active' / 'config.yaml'
+        if config_path.exists():
+            print(config_path.read_text())
+        else:
+            tui.warning("No configuration file found")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def view_reports(self):
+        """View generated reports."""
+        self.show_banner()
+        tui.section("Generated Reports", C.GREEN)
+
+        import os
+        reports_dir = paths.reports
+
+        if not reports_dir.exists():
+            tui.warning("No reports directory found")
+        else:
+            for item in sorted(reports_dir.iterdir(), reverse=True)[:10]:
+                if item.is_dir():
+                    count = len(list(item.glob('*')))
+                    print(f"  {C.CYAN}{tui.TRIANGLE}{C.RESET} {item.name}/ ({count} files)")
+                else:
+                    size = item.stat().st_size / 1024
+                    print(f"  {C.DIM}{tui.BULLET}{C.RESET} {item.name} ({size:.1f} KB)")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def manage_overrides(self):
+        """Manage finding overrides (false positives, severity changes)."""
+        self.show_banner()
+        tui.section("Finding Overrides", C.YELLOW)
+
+        if get_evidence_manager is None:
+            tui.error("Evidence manager not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        em = get_evidence_manager()
+
+        while True:
+            print()
+            overrides = em.get_overrides()
+
+            if overrides:
+                tui.info(f"Active overrides: {len(overrides)}")
+                print()
+                for i, override in enumerate(overrides, 1):
+                    rule = override.get('match_rule', {})
+                    action = override.get('action', '?')
+                    reason = override.get('reason', '')
+                    expires = override.get('expires_at', 'never')
+                    rule_desc = rule.get('title', rule.get('cve', str(rule)))
+                    action_color = C.RED if action == 'false_positive' else C.YELLOW
+                    print(f"  {i}. [{action_color}{action}{C.RESET}] {rule_desc}")
+                    print(f"     Reason: {reason} | Expires: {expires}")
+            else:
+                tui.info("No overrides configured")
+
+            print()
+            options = [
+                ('1', 'Add Override', 'Create new false positive or severity override'),
+                ('2', 'Delete Override', 'Remove an existing override'),
+                ('3', 'Delete Expired', 'Clean up expired overrides'),
+                ('---', '', ''),
+                ('b', 'Back', 'Return to settings'),
+            ]
+            choice = tui.menu("Override Management", options, C.YELLOW)
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                self._add_override(em)
+            elif choice == '2':
+                if overrides:
+                    idx = tui.input("Override number to delete")
+                    try:
+                        idx = int(idx) - 1
+                        if 0 <= idx < len(overrides):
+                            em.delete_override(overrides[idx]['override_id'])
+                            tui.success("Override deleted")
+                        else:
+                            tui.error("Invalid number")
+                    except (ValueError, KeyError):
+                        tui.error("Invalid input")
+                else:
+                    tui.info("No overrides to delete")
+            elif choice == '3':
+                # Delete expired overrides
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                deleted = 0
+                for ov in overrides:
+                    exp = ov.get('expires_at')
+                    if exp and exp != 'never' and exp < now:
+                        em.delete_override(ov['override_id'])
+                        deleted += 1
+                tui.success(f"Deleted {deleted} expired overrides")
+
+        tui.section_end(C.YELLOW)
+
+    def _add_override(self, em):
+        """Interactive override creation."""
+        print()
+        tui.info("Create a new finding override")
+        print()
+
+        # Action type
+        action_options = [
+            ('1', 'False Positive', 'Mark matching findings as false positives'),
+            ('2', 'Severity Change', 'Override severity level'),
+            ('3', 'Accepted Risk', 'Acknowledge and accept the risk'),
+        ]
+        action_choice = tui.menu("Override Action", action_options, C.YELLOW)
+        actions = {'1': 'false_positive', '2': 'severity_change', '3': 'accepted_risk'}
+        action = actions.get(action_choice)
+        if not action:
+            return
+
+        # Match rule
+        print()
+        tui.info("Define match criteria (leave blank to skip):")
+        title = tui.input("Finding title (or substring)", default="")
+        cve = tui.input("CVE ID (e.g. CVE-2024-1234)", default="")
+        asset = tui.input("Asset IP", default="")
+        scanner = tui.input("Scanner name", default="")
+
+        match_rule = {}
+        if title:
+            match_rule['title'] = title
+        if cve:
+            match_rule['cve'] = cve
+        if asset:
+            match_rule['asset'] = asset
+        if scanner:
+            match_rule['scanner'] = scanner
+
+        if not match_rule:
+            tui.error("At least one match criterion required")
+            return
+
+        # New severity (if severity change)
+        new_severity = None
+        if action == 'severity_change':
+            new_severity = tui.input("New severity (CRITICAL/HIGH/MEDIUM/LOW/INFO)")
+
+        # Reason
+        reason = tui.input("Reason for override")
+        if not reason:
+            tui.error("Reason is required")
+            return
+
+        # Expiration
+        expires_input = tui.input("Expires in days (0 = never)", default="0")
+        try:
+            expires_days = int(expires_input) if expires_input != "0" else None
+        except ValueError:
+            expires_days = None
+
+        em.add_override(match_rule, action, reason,
+                       new_severity=new_severity, expires_days=expires_days)
+        tui.success("Override created")
+
+    def manage_credentials(self):
+        """Manage credentials for authenticated scanning."""
+        self.show_banner()
+        tui.section("Credential Management", C.YELLOW)
+
+        if get_credential_manager is None:
+            tui.error("Credential manager not available")
+            tui.info("Ensure lib/credential_manager.py is installed")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        cm = get_credential_manager()
+
+        while True:
+            print()
+            creds = cm.list_credentials() if hasattr(cm, 'list_credentials') else []
+
+            if creds:
+                tui.info(f"Stored credentials: {len(creds)}")
+                print()
+                for i, cred in enumerate(creds, 1):
+                    ctype = cred.get('type', '?')
+                    name = cred.get('name', '?')
+                    target = cred.get('target_pattern', '*')
+                    print(f"  {i}. [{C.CYAN}{ctype}{C.RESET}] {name} -> {target}")
+            else:
+                tui.info("No credentials configured")
+
+            print()
+            options = [
+                ('1', 'Add SSH Credential', 'SSH password or key authentication'),
+                ('2', 'Add SNMP Community', 'SNMP community string'),
+                ('3', 'Test Credential', 'Verify connectivity with stored credential'),
+                ('4', 'Remove Credential', 'Delete a stored credential'),
+                ('---', '', ''),
+                ('b', 'Back', 'Return to settings'),
+            ]
+            choice = tui.menu("Credential Management", options, C.YELLOW)
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                name = tui.input("Credential name (e.g. 'linux-servers')")
+                target = tui.input("Target pattern (IP, CIDR, or *)", default="*")
+                username = tui.input("Username")
+                key_or_pass = tui.input("Key file path (or leave blank for password)", default="")
+                if key_or_pass:
+                    cm.add_credential(name, 'ssh_key', target,
+                                     username=username, key_file=key_or_pass)
+                else:
+                    import getpass
+                    password = getpass.getpass("Password: ")
+                    cm.add_credential(name, 'ssh_password', target,
+                                     username=username, password=password)
+                tui.success(f"Credential '{name}' added")
+            elif choice == '2':
+                name = tui.input("Credential name")
+                target = tui.input("Target pattern", default="*")
+                community = tui.input("SNMP community string")
+                cm.add_credential(name, 'snmp', target, community=community)
+                tui.success(f"SNMP credential '{name}' added")
+            elif choice == '3':
+                if creds:
+                    idx = tui.input("Credential number to test")
+                    target_ip = tui.input("Target IP to test against")
+                    try:
+                        idx = int(idx) - 1
+                        if 0 <= idx < len(creds):
+                            result = cm.test_credential(target_ip, creds[idx])
+                            if result:
+                                tui.success("Credential test successful")
+                            else:
+                                tui.error("Credential test failed")
+                    except (ValueError, IndexError):
+                        tui.error("Invalid input")
+                else:
+                    tui.info("No credentials to test")
+            elif choice == '4':
+                if creds:
+                    idx = tui.input("Credential number to remove")
+                    try:
+                        idx = int(idx) - 1
+                        if 0 <= idx < len(creds) and hasattr(cm, 'remove_credential'):
+                            cm.remove_credential(creds[idx].get('name'))
+                            tui.success("Credential removed")
+                    except (ValueError, IndexError):
+                        tui.error("Invalid input")
+
+        tui.section_end(C.YELLOW)
+
+    def show_dashboard(self):
+        """Show executive security dashboard."""
+        self.show_banner()
+        try:
+            from executive_dashboard import ExecutiveDashboard
+            dashboard = ExecutiveDashboard()
+            dashboard.display_terminal_dashboard()
+
+            print()
+            if tui.confirm("Export as HTML?", default=False):
+                output = dashboard.export_html_dashboard()
+                if output:
+                    tui.success(f"Dashboard exported: {output}")
+        except ImportError:
+            tui.error("Dashboard module not available")
+        except Exception as e:
+            tui.error(f"Dashboard failed: {e}")
+
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_risk_quantification(self):
+        """Run FAIR risk quantification."""
+        self.show_banner()
+        tui.section("FAIR Risk Quantification", C.YELLOW)
+        print()
+
+        if get_risk_quantifier is None:
+            tui.error("Risk quantification module not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        rq = get_risk_quantifier()
+
+        # Set business context
+        tui.info("Business Context (press Enter for defaults):")
+        industry = tui.input("Industry", default="default")
+        rq.set_business_context(industry=industry)
+
+        tui.info("Analyzing open findings...")
+        print()
+
+        try:
+            org_risk = rq.quantify_organization()
+
+            tui.info("Organization Risk Summary:")
+            print(f"  Total ALE (10th): ${org_risk.get('total_ale_10th', 0):,.0f}")
+            print(f"  {C.BOLD}Total ALE (50th): ${org_risk.get('total_ale_50th', 0):,.0f}{C.RESET}")
+            print(f"  Total ALE (90th): ${org_risk.get('total_ale_90th', 0):,.0f}")
+            print(f"  Data Quality: {org_risk.get('avg_data_quality', 0):.0f}%")
+
+            if org_risk.get('avg_data_quality', 0) < 50:
+                tui.warning("ESTIMATE ONLY - configure asset business context for accuracy")
+
+            print()
+            top = rq.get_top_risks(5)
+            if top:
+                tui.info("Top 5 Risks:")
+                for i, r in enumerate(top, 1):
+                    f = r.get('finding', {})
+                    print(f"  {i}. [{f.get('severity', '?')}] {f.get('title', '?')[:50]} "
+                          f"- ALE: ${r.get('ale_50th', 0):,.0f}")
+
+            print()
+            if tui.confirm("Generate risk report (HTML)?", default=True):
+                from reporter import ReportGenerator
+                reporter = ReportGenerator()
+                output = reporter.generate_risk_report()
+                tui.success(f"Risk report saved: {output}")
+        except Exception as e:
+            tui.error(f"Risk quantification failed: {e}")
+
+        tui.section_end(C.YELLOW)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_ai_analysis(self):
+        """Run AI-powered analysis."""
+        self.show_banner()
+        tui.section("AI-Powered Analysis", C.CYAN)
+        print()
+
+        if AIAnalyzer is None:
+            tui.error("AI analyzer module not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # Check deployment mode
+        provider = 'template'
+        if self.platform and self.platform.is_portable:
+            tui.info("Portable mode: using template backend (no external API calls)")
+        else:
+            options = [
+                ('1', 'Template (Default)', 'Rule-based analysis, no LLM needed'),
+                ('2', 'Ollama (Local)', 'Local LLM, full data access'),
+                ('3', 'OpenAI-compatible', 'External API (data sanitized)'),
+            ]
+            choice = tui.menu("AI Backend", options, C.CYAN)
+            if choice == '2':
+                provider = 'ollama'
+            elif choice == '3':
+                provider = 'openai'
+
+        ai = AIAnalyzer(provider=provider)
+
+        # Get latest session
+        if get_evidence_manager:
+            em = get_evidence_manager()
+            sessions = em.get_all_sessions() if hasattr(em, 'get_all_sessions') else []
+            if sessions:
+                latest = sessions[0]
+                session_id = latest.get('session_id', '')
+                findings = em.get_findings_for_session(session_id) if hasattr(em, 'get_findings_for_session') else []
+
+                if findings:
+                    print()
+                    tui.info(f"Analyzing {len(findings)} findings from {session_id[:20]}...")
+                    print()
+
+                    summary = ai.generate_executive_summary({
+                        'session_id': session_id,
+                        'summary': {'total_findings': len(findings)},
+                    })
+                    print(summary)
+
+                    print()
+                    if tui.confirm("Generate full AI report (HTML)?", default=True):
+                        from reporter import ReportGenerator
+                        reporter = ReportGenerator()
+                        output = reporter.generate_ai_enhanced_report(session_id)
+                        tui.success(f"AI report saved: {output}")
+                else:
+                    tui.info("No findings to analyze. Run a scan first.")
+            else:
+                tui.info("No sessions found. Run a scan first.")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_vuln_intelligence(self):
+        """Vulnerability intelligence database interface."""
+        self.show_banner()
+        tui.section("Vulnerability Intelligence Database", C.GREEN)
+        print()
+
+        if get_vuln_database is None:
+            tui.error("Vulnerability database module not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        vdb = get_vuln_database()
+
+        while True:
+            # Show stats
+            stats = vdb.get_statistics()
+            tui.info(f"Cached CVEs: {stats.get('cached_cves', 0)} | "
+                     f"KEV: {stats.get('kev_entries', 0)} | "
+                     f"OWASP: {stats.get('owasp_top_10_categories', 0)} | "
+                     f"CWE Top 25: {stats.get('cwe_top_25_entries', 0)} | "
+                     f"CAPEC: {stats.get('capec_patterns', 0)} | "
+                     f"ATT&CK: {stats.get('attack_techniques', 0)}")
+            print()
+
+            options = [
+                ('1', 'Lookup CVE', 'Query NVD for CVE details with full enrichment'),
+                ('2', 'Lookup CWE', 'Get CWE details with OWASP/CAPEC/ATT&CK cross-refs'),
+                ('3', 'Search All Sources', 'Search across NVD, OWASP, CWE, CAPEC, ATT&CK'),
+                ('4', 'OWASP Top 10 2021', 'View OWASP Top 10 web security risks'),
+                ('5', 'CWE Top 25 2024', 'View most dangerous software weaknesses'),
+                ('---', '', ''),
+                ('6', 'Update Database', 'Download recent CVEs from NVD + refresh KEV'),
+                ('7', 'Data Sources', 'View all intelligence sources and their status'),
+                ('8', 'Database Stats', 'Full database statistics'),
+                ('---', '', ''),
+                ('b', 'Back', 'Return to compliance menu'),
+            ]
+            choice = tui.menu("Vulnerability Intelligence", options, C.GREEN)
+
+            if choice == 'b' or choice == '':
+                break
+            elif choice == '1':
+                cve_id = tui.input("CVE ID (e.g. CVE-2021-44228)")
+                if cve_id:
+                    tui.info(f"Looking up {cve_id}...")
+                    cve = vdb.lookup_cve(cve_id)
+                    if cve:
+                        print(f"\n  {C.BOLD}{cve['cve_id']}{C.RESET}")
+                        print(f"  CVSS v3.1: {cve.get('cvss_v31_score', 'N/A')} ({cve.get('cvss_v31_severity', 'N/A')})")
+                        print(f"  Published: {cve.get('published', 'N/A')}")
+                        print(f"  CWEs: {', '.join(cve.get('cwe_ids', []))}")
+                        print(f"  OWASP: {', '.join(cve.get('owasp_categories', []))}")
+                        top25 = cve.get('cwe_top25', [])
+                        if top25:
+                            top25_str = ', '.join('#{} {}'.format(c['rank'], c['cwe_id']) for c in top25)
+                            print(f"  CWE Top 25: {top25_str}")
+                        capec = cve.get('capec_patterns', [])
+                        if capec:
+                            capec_str = ', '.join(p['name'] for p in capec)
+                            print(f"  CAPEC Attacks: {capec_str}")
+                        attack = cve.get('attack_techniques', [])
+                        if attack:
+                            attack_str = ', '.join('{} {}'.format(t['id'], t['name']) for t in attack)
+                            print(f"  ATT&CK: {attack_str}")
+                        print(f"  KEV Status: {'IN KEV' if cve.get('kev_status') else 'Not in KEV'}")
+                        print(f"  EPSS Score: {cve.get('epss_score', 0):.4f}")
+                        print(f"  Priority: {cve.get('effective_priority', 0):.2f}/10")
+                        desc = cve.get('description', '')
+                        if desc:
+                            print(f"\n  {desc[:300]}{'...' if len(desc) > 300 else ''}")
+                        if cve.get('_stale_cache'):
+                            print(f"\n  {C.YELLOW}(cached data - NVD API unreachable){C.RESET}")
+                    else:
+                        tui.warning(f"CVE not found (NVD API may be unreachable)")
+            elif choice == '2':
+                cwe_id = tui.input("CWE ID (e.g. CWE-79 or 79)")
+                if cwe_id:
+                    cwe = vdb.lookup_cwe(cwe_id)
+                    if cwe:
+                        print(f"\n  {C.BOLD}{cwe['cwe_id']}{C.RESET}: {cwe.get('name', 'N/A')}")
+                        print(f"  Top 25: {'#' + str(cwe['top_25_rank']) if cwe.get('in_top_25') else 'Not ranked'}")
+                        print(f"  OWASP: {', '.join(cwe.get('owasp_categories', [])) or 'None'}")
+                        capec = cwe.get('capec_patterns', [])
+                        if capec:
+                            print(f"  CAPEC Attacks:")
+                            for p in capec:
+                                print(f"    - {p['id']}: {p['name']} [{p['severity']}]")
+                        attack = cwe.get('attack_techniques', [])
+                        if attack:
+                            print(f"  ATT&CK Techniques:")
+                            for t in attack:
+                                print(f"    - {t['id']}: {t['name']} [{t['tactic']}]")
+            elif choice == '3':
+                query = tui.input("Search query")
+                if query:
+                    results = vdb.search(query)
+                    total = sum(len(v) for v in results.values())
+                    print(f"\n  Found {total} results:")
+                    if results['cwes']:
+                        print(f"\n  {C.BOLD}CWE Matches:{C.RESET}")
+                        for c in results['cwes'][:5]:
+                            print(f"    #{c['rank']} {c['cwe_id']}: {c['name']}")
+                    if results['owasp']:
+                        print(f"\n  {C.BOLD}OWASP Matches:{C.RESET}")
+                        for o in results['owasp'][:5]:
+                            print(f"    {o['id']}: {o['name']}")
+                    if results['capec']:
+                        print(f"\n  {C.BOLD}CAPEC Matches:{C.RESET}")
+                        for p in results['capec'][:5]:
+                            print(f"    {p['id']}: {p['name']}")
+                    if results['attack']:
+                        print(f"\n  {C.BOLD}ATT&CK Matches:{C.RESET}")
+                        for t in results['attack'][:5]:
+                            print(f"    {t['id']}: {t['name']} [{t['tactic']}]")
+                    if results['cves']:
+                        print(f"\n  {C.BOLD}CVE Matches (cached):{C.RESET}")
+                        for c in results['cves'][:5]:
+                            print(f"    {c['cve_id']}: CVSS {c.get('cvss_v31_score', '?')} - {c.get('description', '')[:60]}...")
+            elif choice == '4':
+                print()
+                for oid, owasp in vdb.get_owasp_top_10().items():
+                    print(f"  {C.BOLD}{oid}{C.RESET}: {owasp['name']}")
+                    print(f"    Risk: {owasp['risk_level']} | CWEs: {len(owasp['cwes'])}")
+                    print(f"    {owasp['description'][:80]}...")
+                    print()
+            elif choice == '5':
+                print()
+                for entry in vdb.get_cwe_top_25():
+                    owasp = entry['owasp'] or 'N/A'
+                    print(f"  #{entry['rank']:2d} {entry['cwe_id']}: {entry['name'][:55]}")
+                    print(f"      Score: {entry['score']} | KEV: {entry['kev_count']} | OWASP: {owasp}")
+                print()
+            elif choice == '6':
+                days = tui.input("Download CVEs from last N days", default="7")
+                try:
+                    days = int(days)
+                except ValueError:
+                    days = 7
+                tui.info(f"Updating vulnerability intelligence (last {days} days)...")
+                results = vdb.update_all(days=days)
+                kev = results.get('kev', {})
+                nvd = results.get('nvd', {})
+                tui.success(f"KEV: {kev.get('entries', 0)} entries | "
+                           f"NVD: {nvd.get('cached', 0)} CVEs cached from {nvd.get('total_results', 0)} results")
+            elif choice == '7':
+                print()
+                for src in vdb.get_data_sources():
+                    status_color = C.GREEN if src['status'] in ('loaded', 'available', 'online') else C.YELLOW
+                    print(f"  {status_color}{tui.CHECK}{C.RESET} {src['name']}: {src['status']} ({src['type']})")
+                    print(f"    {src['description']}")
+                    if 'entries' in src:
+                        print(f"    Entries: {src['entries']}")
+                    print()
+            elif choice == '8':
+                print()
+                for k, v in vdb.get_statistics().items():
+                    print(f"  {k}: {v}")
+
+            print()
+            input(f"{C.DIM}Press Enter to continue...{C.RESET}")
+            self.show_banner()
+            tui.section("Vulnerability Intelligence Database", C.GREEN)
+            print()
+
+        tui.section_end(C.GREEN)
+
+    def manage_cicd(self):
+        """CI/CD integration management."""
+        self.show_banner()
+        tui.section("CI/CD Integration", C.GREEN)
+
+        if get_cicd_integrator is None:
+            tui.error("CI/CD integration module not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        ci = get_cicd_integrator()
+
+        options = [
+            ('1', 'Generate GitHub Actions', 'Create security scan workflow'),
+            ('2', 'Generate GitLab CI', 'Create .gitlab-ci.yml'),
+            ('3', 'Generate Jenkins Pipeline', 'Create Jenkinsfile'),
+            ('4', 'Export SARIF', 'Export findings in SARIF format'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to settings'),
+        ]
+
+        choice = tui.menu("CI/CD Integration", options, C.GREEN)
+
+        if choice == '1':
+            config_yaml = ci.generate_github_actions()
+            print(config_yaml)
+            if tui.confirm("Save to .github/workflows/security-scan.yml?", default=True):
+                output = ci.save_pipeline_config('github')
+                tui.success(f"Saved: {output}")
+        elif choice == '2':
+            config_yaml = ci.generate_gitlab_ci()
+            print(config_yaml)
+        elif choice == '3':
+            config_yaml = ci.generate_jenkins_pipeline()
+            print(config_yaml)
+        elif choice == '4':
+            if get_evidence_manager:
+                em = get_evidence_manager()
+                findings = em.get_findings_by_severity(status='open')
+                if findings:
+                    output = ci.export_sarif(findings)
+                    tui.success(f"SARIF exported: {output}")
+                else:
+                    tui.info("No findings to export")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_scanner(self, scanner_name: str):
+        """Run a specific scanner."""
+        self.show_banner()
+        tui.section(f"Running {scanner_name}", C.CYAN)
+
+        try:
+            scanner_path = DONJON_HOME / 'scanners' / f'{scanner_name}.py'
+            if scanner_path.exists():
+                import subprocess
+                subprocess.run([sys.executable, str(scanner_path)])
+            else:
+                tui.error(f"Scanner not found: {scanner_name}")
+        except Exception as e:
+            tui.error(f"Scanner failed: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_adversary_emulation(self):
+        """Run adversary emulation against a threat actor profile."""
+        self.show_banner()
+        tui.section("Adversary Emulation", C.YELLOW)
+        print()
+
+        try:
+            from adversary_scanner import AdversaryScanner
+        except ImportError:
+            tui.error("Adversary scanner module not available.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # Show available profiles grouped by attribution
+        profiles = AdversaryScanner.ADVERSARY_PROFILES
+        categories = {}
+        for key, prof in profiles.items():
+            cat = prof.get('category', prof.get('attribution', 'Other'))
+            categories.setdefault(cat, []).append((key, prof.get('name', key)))
+
+        tui.info("Available adversary profiles:")
+        print()
+        idx = 1
+        profile_map = {}
+        for cat, items in sorted(categories.items()):
+            print("  {}{}{} ({})".format(C.BOLD, cat, C.RESET, len(items)))
+            for key, name in sorted(items, key=lambda x: x[1]):
+                print("    {:>2d}. {} ({})".format(idx, name, key))
+                profile_map[str(idx)] = key
+                idx += 1
+            print()
+
+        print("  {:>2d}. {}Run ALL profiles{}".format(idx, C.BRIGHT_YELLOW, C.RESET))
+        profile_map[str(idx)] = '__all__'
+        print()
+
+        selection = tui.input("Profile number", default="1")
+        profile_key = profile_map.get(selection)
+        if not profile_key:
+            tui.warning("Invalid selection")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # Create session
+        em = get_evidence_manager() if get_evidence_manager else None
+        session_id = em.start_session(
+            scan_type='adversary_emulation',
+            target_networks=['localhost'],
+            metadata={'profile': profile_key}
+        ) if em else "adversary-emulation"
+
+        scanner = AdversaryScanner(session_id)
+
+        if profile_key == '__all__':
+            tui.info("Running all {} adversary profiles...".format(len(profiles)))
+            print()
+            for pkey in sorted(profiles.keys()):
+                tui.info("Emulating: {} ({})".format(profiles[pkey]['name'], pkey))
+                result = scanner.scan(targets=['localhost'], profile=pkey)
+                scorecards = result.get('scorecards', [])
+                sc = scorecards[0] if scorecards else {}
+                grade = sc.get('grade', '?')
+                rate = sc.get('detection_rate', '?')
+                color = {
+                    'A': C.BRIGHT_GREEN, 'B': C.GREEN, 'C': C.YELLOW,
+                    'D': C.RED, 'F': C.BRIGHT_RED,
+                }.get(grade, '')
+                print("  -> {}{} ({}){}\n".format(color, grade, rate, C.RESET))
+        else:
+            prof_name = profiles.get(profile_key, {}).get('name', profile_key)
+            tui.info("Emulating: {}".format(prof_name))
+            print()
+            result = scanner.scan(targets=['localhost'], profile=profile_key)
+
+            # Display scorecards
+            print()
+            for sc in result.get('scorecards', []):
+                print(AdversaryScanner.format_scorecard(sc))
+
+        if em:
+            em.end_session(session_id, scanner.get_summary())
+
+        tui.section_end(C.YELLOW)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def _check_config_mode_conflicts(self):
+        """Warn if config enables features unavailable in current deployment mode."""
+        if not self.platform:
+            return
+        mode = self.platform.deployment_mode
+        warnings = []
+        cfg = config.get('cloud', {})
+        if cfg.get('aws', {}).get('enabled') or cfg.get('azure', {}).get('enabled') or cfg.get('gcp', {}).get('enabled'):
+            if mode == 'portable':
+                warnings.append("Cloud scanning enabled in config but deployment mode is 'portable' (no cloud credentials expected)")
+        if config.get('scheduling', {}).get('enabled') and mode == 'portable':
+            warnings.append("Scheduled scans enabled in config but deployment mode is 'portable' (no background scheduler)")
+        db_backend = os.environ.get('DONJON_DB_BACKEND', 'sqlite')
+        if db_backend == 'postgres' and mode == 'portable':
+            warnings.append("PostgreSQL backend configured but deployment mode is 'portable' (using SQLite)")
+        for w in warnings:
+            tui.warning(w)
+        if warnings:
+            print()
+
+    def run(self):
+        """Main run loop."""
+        # Initial setup
+        self.show_banner()
+
+        # EULA click-wrap acceptance (required for contract enforceability)
+        from eula import check_eula_accepted, prompt_eula_acceptance_tui
+        if not check_eula_accepted():
+            if not prompt_eula_acceptance_tui():
+                tui.error("You must accept the EULA to use the software.")
+                return
+
+        self._check_config_mode_conflicts()
+
+        # Check prerequisites
+        if not self.check_prerequisites():
+            if not tui.confirm("Continue without all required tools?", default=False):
+                print("Exiting. Run setup to install required tools.")
+                return
+
+        # Main loop
+        while True:
+            self.show_banner(force=True)
+            choice = self.show_main_menu()
+
+            if choice == 'q' or choice == 'Q':
+                tui.info("Goodbye!")
+                break
+            elif choice == '1':
+                self.handle_red_team()
+            elif choice == '2':
+                self.handle_blue_team()
+            elif choice == '3':
+                self.handle_purple_team()
+            elif choice == '4':
+                self.run_quick_scan()
+            elif choice == '5':
+                self.run_standard_assessment()
+            elif choice == '6':
+                self.run_deep_assessment()
+            elif choice == '7':
+                self.handle_compliance()
+            elif choice == '8':
+                tui.info("Scheduling coming soon...")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            elif choice == '9':
+                self.show_tool_status()
+            elif choice == 'w' or choice == 'W':
+                self.run_windows_scan()
+            elif choice == 'l' or choice == 'L':
+                self.run_linux_scan()
+            elif choice == 'd' or choice == 'D':
+                self.show_dashboard()
+            elif choice == 'x' or choice == 'X':
+                self.export_data()
+            elif choice == 's' or choice == 'S':
+                self.handle_settings()
+            elif choice == 'h' or choice == 'H':
+                self.show_help()
+            else:
+                tui.warning("Invalid option")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_windows_scan(self):
+        """Run a local Windows security assessment."""
+        if sys.platform != 'win32':
+            tui.error("Windows scanner is only available on Windows systems.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        try:
+            from windows_scanner import WindowsScanner
+        except ImportError:
+            tui.error("Windows scanner module not available.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        self.show_banner()
+        tui.section("Windows Security Assessment", C.CYAN)
+
+        # Show offline data status
+        offline = WindowsScanner.verify_offline_data()
+        tui.info("Offline data: {}".format('READY' if offline['ready'] else 'INCOMPLETE'))
+        for k, v in offline.get('details', {}).items():
+            tui.info("  {}: {}".format(k, v))
+
+        options = [
+            ('1', 'Quick Scan', 'Core checks: Defender, BitLocker, Firewall, Network, Hardening (2-5 min)'),
+            ('2', 'Standard Scan', 'All 10 check categories (5-10 min)'),
+            ('3', 'Deep Scan', 'All checks with extended event log analysis (10-15 min)'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        choice = tui.menu("Scan Type", options, C.CYAN)
+
+        scan_type_map = {'1': 'quick', '2': 'standard', '3': 'deep'}
+        scan_type = scan_type_map.get(choice)
+
+        if not scan_type:
+            return
+
+        # Start scan
+        em = get_evidence_manager() if get_evidence_manager else None
+        session_id = em.start_session(
+            scan_type=f'windows_{scan_type}',
+            target_networks=['localhost'],
+            metadata={'scanner': 'windows', 'scan_type': scan_type}
+        ) if em else f"windows-{scan_type}"
+
+        tui.info("Starting {} Windows security scan...".format(scan_type))
+        tui.info("Session: {}".format(session_id))
+        print()
+
+        scanner = WindowsScanner(session_id)
+        results = scanner.scan(scan_type=scan_type)
+
+        # Display summary
+        print()
+        tui.section("Scan Results", C.CYAN)
+        summary = results.get('summary', {})
+        tui.keyvalue({
+            'Admin': str(results.get('is_admin', False)),
+            'Checks Completed': str(results.get('checks_completed', 0)),
+            'Checks Skipped': str(results.get('checks_skipped', 0)),
+            'Total Findings': str(summary.get('findings_count', 0)),
+        })
+
+        sev_counts = summary.get('findings_by_severity', {})
+        for sev in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+            count = sev_counts.get(sev, 0)
+            if count > 0:
+                color = {'CRITICAL': C.BRIGHT_RED, 'HIGH': C.RED, 'MEDIUM': C.YELLOW,
+                         'LOW': C.BLUE, 'INFO': C.DIM}.get(sev, '')
+                tui.info(f"  {color}{sev}: {count}{C.RESET}")
+
+        tui.section_end(C.CYAN)
+        if em:
+            em.end_session(session_id, summary)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_linux_scan(self):
+        """Run a local Linux security assessment."""
+        if sys.platform != 'linux':
+            tui.error("Linux scanner is only available on Linux systems.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        try:
+            from linux_scanner import LinuxScanner
+        except ImportError:
+            tui.error("Linux scanner module not available.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        self.show_banner()
+        tui.section("Linux Security Assessment", C.CYAN)
+
+        # Show offline data status
+        offline = LinuxScanner.verify_offline_data()
+        tui.info("Offline data: {}".format('READY' if offline['ready'] else 'INCOMPLETE'))
+        for k, v in offline.get('details', {}).items():
+            tui.info("  {}: {}".format(k, v))
+
+        options = [
+            ('1', 'Quick Scan', 'Core checks: AV, Encryption, Audit, Firewall, Network, Hardening (2-5 min)'),
+            ('2', 'Standard Scan', 'All 11 check categories (5-10 min)'),
+            ('3', 'Deep Scan', 'All checks with SUID/SGID, model files, world-writable scan (10-15 min)'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+
+        choice = tui.menu("Scan Type", options, C.CYAN)
+
+        scan_type_map = {'1': 'quick', '2': 'standard', '3': 'deep'}
+        scan_type = scan_type_map.get(choice)
+
+        if not scan_type:
+            return
+
+        # Start scan
+        em = get_evidence_manager() if get_evidence_manager else None
+        session_id = em.start_session(
+            scan_type=f'linux_{scan_type}',
+            target_networks=['localhost'],
+            metadata={'scanner': 'linux', 'scan_type': scan_type}
+        ) if em else f"linux-{scan_type}"
+
+        tui.info("Starting {} Linux security scan...".format(scan_type))
+        tui.info("Session: {}".format(session_id))
+        print()
+
+        scanner = LinuxScanner(session_id)
+        results = scanner.scan(scan_type=scan_type)
+
+        # Display summary
+        print()
+        tui.section("Scan Results", C.CYAN)
+        summary = results.get('summary', {})
+        tui.keyvalue({
+            'Root': str(results.get('is_root', False)),
+            'Checks Completed': str(results.get('checks_completed', 0)),
+            'Checks Skipped': str(results.get('checks_skipped', 0)),
+            'Total Findings': str(summary.get('findings_count', 0)),
+        })
+
+        sev_counts = summary.get('findings_by_severity', {})
+        for sev in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+            count = sev_counts.get(sev, 0)
+            if count > 0:
+                color = {'CRITICAL': C.BRIGHT_RED, 'HIGH': C.RED, 'MEDIUM': C.YELLOW,
+                         'LOW': C.BLUE, 'INFO': C.DIM}.get(sev, '')
+                tui.info(f"  {color}{sev}: {count}{C.RESET}")
+
+        tui.section_end(C.CYAN)
+        if em:
+            em.end_session(session_id, summary)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def export_data(self):
+        """Export findings to security platforms."""
+        self.show_banner()
+        tui.section("Export Data to Security Platforms", C.YELLOW)
+        print()
+
+        try:
+            from export import ExportManager
+        except ImportError:
+            tui.error("Export module not available")
+            tui.info("Ensure lib/export.py is installed")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        if get_evidence_manager is None:
+            tui.error("Evidence manager not available")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        em = get_evidence_manager()
+        exporter = ExportManager()
+
+        # List available sessions
+        sessions = em.get_all_sessions() if hasattr(em, 'get_all_sessions') else []
+        if not sessions:
+            tui.info("No scan sessions found. Run a scan first.")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        tui.info("Recent sessions:")
+        for i, s in enumerate(sessions[:10], 1):
+            sid = s.get('session_id', '?')
+            stype = s.get('scan_type', '?')
+            started = s.get('start_time', '?')[:19]  # Truncate timestamp
+            status = s.get('status', '?')
+            print(f"  {i}. {C.CYAN}{sid[:20]}{C.RESET} | {stype:15s} | {started} | {status}")
+
+        print()
+        session_input = tui.input("Session number or ID to export", default="1")
+
+        # Parse session selection
+        try:
+            idx = int(session_input) - 1
+            if 0 <= idx < len(sessions):
+                session_id = sessions[idx]['session_id']
+            else:
+                tui.error("Invalid session number")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+        except ValueError:
+            # Assume it's a session ID
+            session_id = session_input
+
+        # Check if session has findings
+        findings = em.get_findings_for_session(session_id) if hasattr(em, 'get_findings_for_session') else []
+        if not findings:
+            tui.warning(f"No findings found for session {session_id}")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        tui.info(f"Found {len(findings)} findings in session {session_id[:20]}")
+        print()
+
+        # Show available formats
+        tui.info("Available export formats:")
+        formats = exporter.get_supported_formats()
+        format_list = list(formats.keys())
+
+        for i, (fmt, desc) in enumerate(formats.items(), 1):
+            print(f"  {i:2d}. {C.CYAN}{fmt:20s}{C.RESET} - {desc}")
+
+        print()
+        print(f"  {C.BOLD}0.{C.RESET}  Export ALL formats")
+        print()
+
+        format_input = tui.input("Format number(s) to export (comma-separated, or 0 for all)", default="0")
+
+        # Parse format selection
+        selected_formats = []
+        if format_input.strip() == '0':
+            selected_formats = None  # Export all
+            tui.info("Exporting to ALL formats")
+        else:
+            try:
+                indices = [int(x.strip()) - 1 for x in format_input.split(',')]
+                for idx in indices:
+                    if 0 <= idx < len(format_list):
+                        selected_formats.append(format_list[idx])
+                    else:
+                        tui.warning(f"Skipping invalid format number: {idx + 1}")
+
+                if not selected_formats:
+                    tui.error("No valid formats selected")
+                    safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                    return
+
+                tui.info(f"Exporting to: {', '.join(selected_formats)}")
+            except ValueError:
+                tui.error("Invalid input. Use comma-separated numbers.")
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+
+        print()
+
+        # Perform export
+        try:
+            tui.info("Exporting findings...")
+            results = exporter.export_all(session_id, formats=selected_formats)
+
+            print()
+            tui.success(f"Export complete! Generated {len(results)} files:")
+            print()
+
+            for fmt, output_path in results.items():
+                file_size = output_path.stat().st_size / 1024  # KB
+                print(f"  {C.GREEN}{tui.CHECK}{C.RESET} {fmt:20s} -> {output_path.name} ({file_size:.1f} KB)")
+
+            print()
+            tui.info(f"Output directory: {output_path.parent}")
+
+            print()
+            tui.info(f"{C.BOLD}Next Steps:{C.RESET}")
+            print(f"  {C.CYAN}CEF/LEEF/Syslog:{C.RESET}  Send to SIEM via syslog or import")
+            print(f"  {C.CYAN}STIX:{C.RESET}            Import into threat intel platform")
+            print(f"  {C.CYAN}Splunk HEC:{C.RESET}      POST to HTTP Event Collector")
+            print(f"  {C.CYAN}Sentinel:{C.RESET}        Upload to Azure Log Analytics workspace")
+            print(f"  {C.CYAN}CSV:{C.RESET}             Import into ServiceNow/Jira")
+            print(f"  {C.CYAN}SARIF:{C.RESET}           Upload to GitHub Security tab")
+
+        except Exception as e:
+            tui.error(f"Export failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+        tui.section_end(C.YELLOW)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+
+def main():
+    """Entry point."""
+    # Windows terminal color support
+    if sys.platform == 'win32':
+        try:
+            import colorama
+            colorama.init()
+        except ImportError:
+            # Enable ANSI on Windows 10+ without colorama
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+            except Exception:
+                pass
+
+    # Handle --non-interactive / --batch flag before anything else
+    if '--non-interactive' in sys.argv or '--batch' in sys.argv:
+        set_non_interactive(True)
+        sys.argv = [a for a in sys.argv if a not in ('--non-interactive', '--batch')]
+
+    launcher = DonjonLauncher()
+
+    # Handle CLI arguments
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+
+        if cmd in ('--help', '-h', 'help'):
+            print(f"""
+Donjon Platform v{launcher.VERSION}
+Usage: donjon-launcher [command]
+
+Commands:
+  (none)     Interactive menu
+  quick      Run quick scan
+  standard   Run standard assessment
+  deep       Run deep assessment
+  tools      Show tool status
+  delta      Compare two scan sessions
+  dashboard  Show executive dashboard
+  risk       Run FAIR risk quantification
+  vulndb     Vulnerability intelligence database
+  winscan    Windows security assessment (local, air-gapped)
+  linscan    Linux security assessment (local, air-gapped)
+  adversary  Adversary emulation (interactive profile selection)
+  help       Show this help
+
+Options:
+  --non-interactive  Run without prompts (CI/headless mode)
+  --batch            Alias for --non-interactive
+
+Examples:
+  donjon-launcher                        # Interactive mode
+  donjon-launcher quick                  # Quick scan
+  donjon-launcher --non-interactive tools # Headless tool check
+  donjon-launcher tools                  # Check available tools
+  donjon-launcher delta                  # Compare scan sessions
+""")
+            return
+
+        elif cmd == 'quick':
+            launcher.run_quick_scan()
+            return
+
+        elif cmd == 'standard':
+            launcher.run_standard_assessment()
+            return
+
+        elif cmd == 'deep':
+            launcher.run_deep_assessment()
+            return
+
+        elif cmd == 'tools':
+            launcher.show_tool_status()
+            return
+
+        elif cmd == 'delta':
+            launcher.run_delta_report()
+            return
+
+        elif cmd == 'dashboard':
+            launcher.show_dashboard()
+            return
+
+        elif cmd == 'risk':
+            launcher.run_risk_quantification()
+            return
+
+        elif cmd == 'vulndb':
+            launcher.run_vuln_intelligence()
+            return
+
+        elif cmd == 'winscan':
+            launcher.run_windows_scan()
+            return
+
+        elif cmd == 'linscan':
+            launcher.run_linux_scan()
+            return
+
+        elif cmd == 'adversary':
+            launcher.run_adversary_emulation()
+            return
+
+    # Interactive mode
+    try:
+        launcher.run()
+    except KeyboardInterrupt:
+        print(f"\n{C.YELLOW}Interrupted. Goodbye!{C.RESET}")
+
+
+if __name__ == "__main__":
+    main()
