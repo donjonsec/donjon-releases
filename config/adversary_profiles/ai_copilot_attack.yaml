@@ -1,0 +1,47 @@
+profile:
+  id: ai_copilot_attack
+  name: "Microsoft Copilot Compromise"
+  aliases: []
+  attribution: technique_based
+  motivation: data_exfiltration
+  target_sectors: [any_m365_organization]
+  active_since: 2024
+
+  ttps:
+    - tactic: Initial Access
+      technique: Indirect Prompt Injection via Documents
+      technique_id: AML.T0051.001
+      simulation_check: check_prompt_injection_docs
+      description: Embeds hidden instructions in SharePoint documents and emails that Copilot processes as commands
+    - tactic: Collection
+      technique: LLM Data Leakage (EchoLeak)
+      technique_id: AML.T0057
+      simulation_check: check_llm_data_leakage
+      description: Exploits EchoLeak (CVE-2025-32711) to extract sensitive data through Copilot responses
+    - tactic: Execution
+      technique: Plugin and Connector Compromise
+      technique_id: AML.T0053
+      simulation_check: check_copilot_plugin_security
+      description: Abuses Copilot plugins and Graph connectors to access unauthorized data sources and APIs
+    - tactic: Collection
+      technique: Email Collection via Copilot
+      technique_id: T1114
+      simulation_check: check_copilot_email_access
+      description: Uses Copilot to search and summarize email contents bypassing traditional access controls
+    - tactic: Collection
+      technique: Data from Information Repositories via Copilot
+      technique_id: T1213
+      simulation_check: check_copilot_repo_access
+      description: Leverages Copilot to query SharePoint, OneDrive, and Teams for sensitive data at scale
+    - tactic: Defense Evasion
+      technique: LLM Jailbreak - Content Filter Bypass
+      technique_id: AML.T0054
+      simulation_check: check_jailbreak_attempts
+      description: Uses prompt engineering techniques to bypass Copilot content filters and safety guardrails
+
+  detection_priorities:
+    - M365 DLP policies covering Copilot interactions and outputs
+    - Sensitivity labels enforced on documents accessible to Copilot
+    - Copilot audit log monitoring for unusual query patterns
+    - Conditional access policies restricting AI feature access
+    - Plugin and connector permission reviews and least-privilege enforcement

@@ -1,0 +1,56 @@
+profile:
+  id: sandworm
+  name: "Sandworm (APT44/Seashell Blizzard)"
+  aliases: [APT44, Seashell Blizzard, Voodoo Bear, IRIDIUM, Telebots]
+  attribution: Russia (GRU Unit 74455)
+  motivation: destruction
+  target_sectors: [power_grid, water, ics_ot, government, telecom]
+  active_since: 2009
+
+  ttps:
+    - tactic: Initial Access
+      technique: Exploit Public-Facing Application
+      technique_id: T1190
+      simulation_check: check_public_app_vulns
+      description: Exploits internet-facing infrastructure including mail servers, VPNs, and web applications
+    - tactic: Execution
+      technique: Command and Scripting Interpreter
+      technique_id: T1059
+      simulation_check: check_scripting_execution
+      description: Uses PowerShell, Python, and bash scripts for payload delivery and system manipulation
+    - tactic: Impact
+      technique: Data Destruction - Wipers
+      technique_id: T1485
+      simulation_check: check_wiper_indicators
+      description: Deploys destructive wipers (NotPetya, WhisperGate, CaddyWiper) to render systems inoperable
+    - tactic: Impact
+      technique: Service Stop - ICS Disruption
+      technique_id: T1489
+      simulation_check: check_ics_service_disruption
+      description: Stops critical ICS/SCADA services to cause operational disruption to physical processes
+    - tactic: Defense Evasion
+      technique: Impair Defenses
+      technique_id: T1562
+      simulation_check: check_defense_impairment
+      description: Disables security tools and logging to operate undetected during destructive operations
+    - tactic: Lateral Movement
+      technique: Remote Services
+      technique_id: T1021
+      simulation_check: check_lateral_movement_indicators
+      description: Moves laterally using stolen credentials, PSExec, and WMI for enterprise-wide deployment
+    - tactic: Defense Evasion
+      technique: Obfuscated Files or Information
+      technique_id: T1027
+      simulation_check: check_obfuscation_indicators
+      description: Uses heavy obfuscation and custom packers to evade endpoint detection
+    - tactic: Impact
+      technique: Endpoint Denial of Service
+      technique_id: T1499
+      simulation_check: check_dos_indicators
+      description: Overwhelms endpoints and network infrastructure to deny availability of critical services
+
+  detection_priorities:
+    - ICS/OT network segmentation validation and monitoring
+    - Wiper malware behavioral detection (MBR/VBR overwrites, mass file deletion)
+    - Lateral movement velocity detection across enterprise segments
+    - Public-facing application hardening and exploit detection

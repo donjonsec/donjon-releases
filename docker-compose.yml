@@ -1,0 +1,121 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: donjon-postgres
+    environment:
+      POSTGRES_DB: donjon
+      POSTGRES_USER: donjon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env file}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # No host port exposure — containers reach postgres via bridge network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U donjon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - donjon
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # API Server
+  api:
+    build:
+      context: .
+      target: api
+    container_name: donjon-api
+    environment:
+      DONJON_DB_BACKEND: postgres
+      DONJON_DB_URL: postgresql://donjon:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env file}@postgres:5432/donjon
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      DONJON_API_KEYS: ${DONJON_API_KEYS:-}
+      DONJON_HOME: /app
+    ports:
+      - "8443:8443"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./tools:/app/tools:ro
+      - ./config:/app/config:ro
+    networks:
+      - donjon
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Scheduler and Background Worker
+  scheduler:
+    build:
+      context: .
+      target: worker
+    container_name: donjon-scheduler
+    environment:
+      DONJON_DB_BACKEND: postgres
+      DONJON_DB_URL: postgresql://donjon:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env file}@postgres:5432/donjon
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      DONJON_HOME: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./tools:/app/tools:ro
+      - ./config:/app/config:ro
+    networks:
+      - donjon
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  donjon:
+    driver: bridge

@@ -1,0 +1,56 @@
+profile:
+  id: lockbit
+  name: "LockBit 3.0 (Bitwise Spider)"
+  aliases: [Bitwise Spider, LockBit Black, LockBit Green]
+  attribution: Russia-linked RaaS
+  motivation: financial
+  target_sectors: [manufacturing, healthcare, education, government, financial]
+  active_since: 2019
+
+  ttps:
+    - tactic: Initial Access
+      technique: External Remote Services - RDP
+      technique_id: T1133
+      simulation_check: check_external_rdp_exposure
+      description: Gains initial access through exposed RDP services using purchased or brute-forced credentials
+    - tactic: Credential Access
+      technique: Brute Force
+      technique_id: T1110
+      simulation_check: check_brute_force_indicators
+      description: Conducts credential brute-forcing against RDP, VPN, and other remote access portals
+    - tactic: Impact
+      technique: Data Encrypted for Impact
+      technique_id: T1486
+      simulation_check: check_ransomware_indicators
+      description: Deploys LockBit ransomware with intermittent encryption for speed and maximum disruption
+    - tactic: Impact
+      technique: Inhibit System Recovery - Backup Deletion
+      technique_id: T1490
+      simulation_check: check_backup_integrity
+      description: Deletes volume shadow copies and destroys backup infrastructure before encryption
+    - tactic: Impact
+      technique: Service Stop
+      technique_id: T1489
+      simulation_check: check_service_tampering
+      description: Stops security services, databases, and backup agents to maximize encryption coverage
+    - tactic: Credential Access
+      technique: OS Credential Dumping
+      technique_id: T1003
+      simulation_check: check_credential_dump_artifacts
+      description: Dumps credentials using Mimikatz and built-in tools for privilege escalation
+    - tactic: Lateral Movement
+      technique: Remote Services - RDP / SMB
+      technique_id: T1021
+      simulation_check: check_lateral_movement_rdp_smb
+      description: Spreads laterally using stolen credentials over RDP and SMB to maximize blast radius
+    - tactic: Exfiltration
+      technique: Double Extortion Exfiltration
+      technique_id: T1567
+      simulation_check: check_data_exfil_volume
+      description: Exfiltrates sensitive data before encryption to leverage double-extortion pressure
+
+  detection_priorities:
+    - RDP exposure monitoring and brute force detection
+    - Volume shadow copy and backup integrity monitoring
+    - Lateral movement detection across RDP and SMB protocols
+    - Data exfiltration volume anomaly detection pre-encryption

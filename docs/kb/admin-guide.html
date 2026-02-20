@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrator Guide - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html" class="active"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#installation"><span class="nav-icon">&#x1F4E6;</span> Installation</a>
+        <a href="#configuration"><span class="nav-icon">&#x2699;</span> Configuration</a>
+        <a href="#license-management"><span class="nav-icon">&#x1F511;</span> License Management</a>
+        <a href="#user-management"><span class="nav-icon">&#x1F465;</span> User Management</a>
+        <a href="#backup"><span class="nav-icon">&#x1F4BE;</span> Backup &amp; Recovery</a>
+        <a href="#updates"><span class="nav-icon">&#x1F504;</span> Updating</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">Administrator Guide</span>
+        </div>
+
+        <h1>Administrator Guide</h1>
+        <p>This guide covers installation, deployment, configuration, license management, and platform administration for Donjon Platform v7.0.</p>
+
+        <!-- Installation -->
+        <h2 id="installation">Installation and Deployment</h2>
+
+        <h3 id="install-windows">Windows Deployment</h3>
+        <p>The recommended way to launch on Windows is with the PowerShell launcher or the batch file.</p>
+
+        <h4>Option A: Batch File (simplest)</h4>
+<pre><code><span class="cmt">REM Navigate to the platform directory</span>
+cd C:\path\to\donjon-platform
+
+<span class="cmt">REM Run setup (first time only)</span>
+bin\setup-windows.bat
+
+<span class="cmt">REM Launch</span>
+bin\donjon-launcher.bat</code></pre>
+
+        <h4>Option B: PowerShell Launcher</h4>
+<pre><code><span class="cmt"># Set execution policy (first time only)</span>
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+<span class="cmt"># Launch</span>
+.\bin\donjon-launcher.ps1</code></pre>
+
+        <p>The PowerShell launcher (<code>donjon-launcher.ps1</code>) performs automatic bootstrapping:</p>
+        <ol>
+            <li>Detects Python (venv first, then system <code>python</code>/<code>python3</code>, then <code>py -3</code> launcher)</li>
+            <li>Creates a virtual environment if one does not exist</li>
+            <li>Installs dependencies from <code>requirements.txt</code></li>
+            <li>Creates data directories (<code>data/results</code>, <code>data/evidence</code>, <code>data/reports</code>, <code>data/logs</code>)</li>
+            <li>Sets <code>PYTHONPATH</code> to include <code>lib/</code></li>
+            <li>Launches the platform</li>
+        </ol>
+
+        <h3 id="install-linux">Linux / macOS Deployment</h3>
+<pre><code><span class="cmt"># Clone</span>
+git clone https://github.com/DonjonSec/donjon-platform.git
+cd donjon-platform
+
+<span class="cmt"># Setup</span>
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+<span class="cmt"># Populate vulnerability intelligence</span>
+python3 bin/update-intel.py --quick     <span class="cmt"># Fast: KEV + EPSS + 14-day NVD (~2 min)</span>
+<span class="cmt"># OR full database with NVD API key (~2 hrs, 800K+ entries):</span>
+NVD_API_KEY=your-key python3 bin/update-intel.py
+
+<span class="cmt"># Launch</span>
+python3 bin/donjon-launcher</code></pre>
+
+        <h3 id="install-docker">Docker Deployment</h3>
+<pre><code><span class="cmt"># Build the image</span>
+docker build -t donjon:7.0 .
+
+<span class="cmt"># Run with persistent data volume</span>
+docker run -d \
+    --name donjon \
+    -p 8443:8443 \
+    -v donjon-data:/app/data \
+    donjon:7.0
+
+<span class="cmt"># View logs</span>
+docker logs -f donjon</code></pre>
+
+        <h3 id="install-airgap">Air-Gapped / USB Deployment</h3>
+        <p>Donjon is designed for air-gapped environments. The platform auto-detects USB deployment mode.</p>
+
+        <ol class="steps">
+            <li>
+                <strong>Prepare on a connected machine</strong>
+                <p>Clone the repository, install dependencies, and populate the vulnerability intelligence database.</p>
+            </li>
+            <li>
+                <strong>Copy to USB drive</strong>
+                <p>Copy the entire <code>donjon-platform</code> directory (including <code>venv/</code> and <code>data/vuln_db/</code>) to a USB drive.</p>
+            </li>
+            <li>
+                <strong>Run on the air-gapped machine</strong>
+                <p>Plug in the USB drive and launch directly. Cloud scanning is automatically disabled. AI defaults to the template backend (no network required).</p>
+<pre><code><span class="cmt"># Linux/macOS</span>
+python3 /media/USB_DRIVE/donjon-platform/bin/donjon-launcher
+
+<span class="cmt"># Windows</span>
+E:\donjon-platform\bin\donjon-launcher.bat</code></pre>
+            </li>
+        </ol>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Air-Gap License Activation</div>
+            <p>For paid tiers in air-gapped environments, generate the machine fingerprint on the target machine, then use the offline license activation tool on a connected machine. See <a href="#license-airgap">Air-Gap License Activation</a> below.</p>
+        </div>
+
+        <!-- Configuration -->
+        <h2 id="configuration">Configuration</h2>
+
+        <h3>Configuration File</h3>
+        <p>The main configuration file is <code>config/active/config.yaml</code>.</p>
+
+<pre><code><span class="cmt"># AI backend configuration</span>
+<span class="var">ai</span>:
+  <span class="var">provider</span>: <span class="str">'template'</span>        <span class="cmt"># template | ollama | openai</span>
+  <span class="var">sanitize_external</span>: <span class="num">true</span>     <span class="cmt"># Strip IPs/hostnames for external LLMs</span>
+  <span class="var">ollama_url</span>: <span class="str">'http://localhost:11434'</span>
+  <span class="var">openai_model</span>: <span class="str">'gpt-4'</span>
+
+<span class="cmt"># Risk quantification</span>
+<span class="var">risk</span>:
+  <span class="var">industry</span>: <span class="str">'technology'</span>      <span class="cmt"># Maps to IBM/Ponemon benchmarks</span>
+  <span class="var">monte_carlo_iterations</span>: <span class="num">10000</span>
+
+<span class="cmt"># Compliance frameworks to assess</span>
+<span class="var">compliance</span>:
+  <span class="var">frameworks</span>:
+    - <span class="str">'NIST-800-53'</span>
+    - <span class="str">'HIPAA'</span>
+    - <span class="str">'PCI-DSS-v4'</span>
+    - <span class="str">'ISO27001-2022'</span>
+
+<span class="cmt"># CI/CD security gate thresholds</span>
+<span class="var">cicd</span>:
+  <span class="var">security_gate</span>:
+    <span class="var">max_critical</span>: <span class="num">0</span>
+    <span class="var">max_high</span>: <span class="num">5</span></code></pre>
+
+        <h3 id="env-vars">Environment Variables</h3>
+        <table>
+            <thead><tr><th>Variable</th><th>Description</th><th>Default</th></tr></thead>
+            <tbody>
+                <tr><td><code>DONJON_HOME</code></td><td>Platform root directory</td><td>Auto-detected</td></tr>
+                <tr><td><code>PYTHONPATH</code></td><td>Python module search path</td><td>Set by launcher</td></tr>
+                <tr><td><code>NVD_API_KEY</code></td><td>NVD API key for faster intel downloads</td><td>None</td></tr>
+                <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key for AI backend</td><td>None</td></tr>
+                <tr><td><code>DONJON_DB_URL</code></td><td>Database connection string</td><td>SQLite (local file)</td></tr>
+                <tr><td><code>DONJON_LOG_LEVEL</code></td><td>Logging level</td><td>INFO</td></tr>
+                <tr><td><code>GITHUB_ACTIONS</code></td><td>Triggers CI/CD mode when present</td><td>None</td></tr>
+                <tr><td><code>GITLAB_CI</code></td><td>Triggers CI/CD mode when present</td><td>None</td></tr>
+            </tbody>
+        </table>
+
+        <h3 id="database-setup">Database Setup</h3>
+
+        <h4>SQLite (Default)</h4>
+        <p>Donjon uses SQLite by default, with databases stored in the <code>data/</code> directory. No configuration required.</p>
+        <ul>
+            <li><code>data/evidence/evidence.db</code> &mdash; Scan sessions, findings, evidence</li>
+            <li><code>data/vuln_db/vuln_intel.db</code> &mdash; Vulnerability intelligence (803K+ entries)</li>
+        </ul>
+
+        <h4>PostgreSQL (Enterprise)</h4>
+        <p>Enterprise tier supports PostgreSQL for multi-user environments:</p>
+<pre><code><span class="cmt"># Set the database URL</span>
+export DONJON_DB_URL="postgresql://donjon:password@db-server:5432/donjon"
+
+<span class="cmt"># Or in config.yaml</span>
+<span class="var">database</span>:
+  <span class="var">url</span>: <span class="str">'postgresql://donjon:password@db-server:5432/donjon'</span></code></pre>
+
+        <h3 id="ai-config">AI Provider Configuration</h3>
+
+        <details>
+            <summary>Template Backend (Default)</summary>
+            <div class="details-content">
+                <p>The template backend uses pre-built analysis templates and requires no external services. It works completely offline and is the default for portable/USB deployments.</p>
+<pre><code><span class="var">ai</span>:
+  <span class="var">provider</span>: <span class="str">'template'</span></code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>Ollama Backend (Local LLM)</summary>
+            <div class="details-content">
+                <p>Ollama runs a local LLM. No data leaves your machine.</p>
+<pre><code><span class="cmt"># Install Ollama and pull a model</span>
+ollama pull llama3
+
+<span class="cmt"># Configure Donjon</span>
+<span class="var">ai</span>:
+  <span class="var">provider</span>: <span class="str">'ollama'</span>
+  <span class="var">ollama_url</span>: <span class="str">'http://localhost:11434'</span>
+  <span class="var">ollama_model</span>: <span class="str">'llama3'</span></code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>OpenAI Backend</summary>
+            <div class="details-content">
+                <p>Uses any OpenAI-compatible API. Data sanitization automatically strips IP addresses and hostnames before sending to external APIs.</p>
+<pre><code><span class="var">ai</span>:
+  <span class="var">provider</span>: <span class="str">'openai'</span>
+  <span class="var">sanitize_external</span>: <span class="num">true</span>  <span class="cmt"># Always enable for external APIs</span>
+  <span class="var">openai_model</span>: <span class="str">'gpt-4'</span>
+
+<span class="cmt"># Set API key via environment variable</span>
+export OPENAI_API_KEY="sk-..."</code></pre>
+            </div>
+        </details>
+
+        <h3 id="notifications-config">Notification Channels</h3>
+        <p>Configure alert delivery channels via the API or dashboard:</p>
+        <table>
+            <thead><tr><th>Channel</th><th>Community</th><th>Pro+</th></tr></thead>
+            <tbody>
+                <tr><td>Email</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+                <tr><td>Webhook</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+                <tr><td>Slack</td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td></tr>
+                <tr><td>Microsoft Teams</td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td></tr>
+                <tr><td>SMS</td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td></tr>
+            </tbody>
+        </table>
+
+        <!-- License Management -->
+        <h2 id="license-management">License Management</h2>
+
+        <h3>Tier Overview</h3>
+        <table class="tier-table">
+            <thead><tr><th>Tier</th><th>License Required</th><th>Key Features</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-tier-community">Community</span></td>
+                    <td>No (free)</td>
+                    <td>7 core scanners, quick/standard depth, CSV/JSON export, 10 AI queries/day, 1 user</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-tier-pro">Pro</span></td>
+                    <td>Yes (signed)</td>
+                    <td>All scanners, all depths, all exports, unlimited AI, scheduled scans, 25 users</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-tier-enterprise">Enterprise</span></td>
+                    <td>Yes (signed)</td>
+                    <td>Everything in Pro + SSO, RBAC, multi-tenant, audit log export, priority support, unlimited users</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-tier-managed">Managed (MSSP/MSP)</span></td>
+                    <td>Yes (signed)</td>
+                    <td>Everything in Enterprise + client provisioning, per-client dashboards, consolidated rollup, bulk scan orchestration, cross-client reporting, usage metering API, license sub-allocation, per-client branding, scan template library, unlimited clients</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Activating a License</h3>
+        <ol class="steps">
+            <li>
+                <strong>Obtain a license file</strong>
+                <p>Purchase a license at <a href="https://donjonsec.com">donjonsec.com</a>. You will receive a <code>license.json</code> file.</p>
+            </li>
+            <li>
+                <strong>Place the license file</strong>
+                <p>Copy <code>license.json</code> to <code>data/license.json</code> in your platform directory.</p>
+            </li>
+            <li>
+                <strong>Verify activation</strong>
+                <p>Restart the platform or call the license API:</p>
+<pre><code>GET /api/v1/license
+<span class="cmt"># Response shows tier, organization, expiry, and validation status</span></code></pre>
+            </li>
+        </ol>
+
+        <p>You can also activate via the API:</p>
+<pre><code>POST /api/v1/license/activate
+Content-Type: application/json
+
+{
+    "license_data": { <span class="cmt">/* full license.json contents */</span> }
+}</code></pre>
+
+        <h3>Machine Fingerprinting</h3>
+        <p>Licenses can be bound to a specific machine via fingerprinting. The fingerprint is a SHA-256 hash combining:</p>
+        <ul>
+            <li>MAC address (first available NIC)</li>
+            <li>Hostname</li>
+            <li>Platform identifier (OS + architecture)</li>
+            <li>Processor string</li>
+            <li>OS machine ID (Linux: <code>/etc/machine-id</code>; Windows: <code>MachineGuid</code> from registry)</li>
+        </ul>
+        <p>Format: <code>sha256:&lt;64-char-hex-digest&gt;</code></p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Fingerprint Generation</div>
+            <p>To view the fingerprint for the current machine, use the API: <code>GET /api/v1/license</code> (includes the current machine fingerprint in the response).</p>
+        </div>
+
+        <h3>License Renewal and Transfer</h3>
+        <ul>
+            <li><strong>Renewal:</strong> Replace <code>data/license.json</code> with the new file and restart the platform or call <code>POST /api/v1/license/activate</code>.</li>
+            <li><strong>Transfer:</strong> Contact <a href="https://donjonsec.com">donjonsec.com</a> support with your current license ID and the new machine fingerprint.</li>
+        </ul>
+
+        <h3 id="license-airgap">Air-Gap License Activation</h3>
+        <ol class="steps">
+            <li>
+                <strong>Generate fingerprint on target machine</strong>
+                <p>Launch Donjon and note the machine fingerprint from the license page or run the fingerprint tool.</p>
+            </li>
+            <li>
+                <strong>Request license on connected machine</strong>
+                <p>Submit the fingerprint to <a href="https://donjonsec.com">donjonsec.com</a> for a machine-bound license.</p>
+            </li>
+            <li>
+                <strong>Transfer license file</strong>
+                <p>Copy the received <code>license.json</code> to the air-gapped machine's <code>data/</code> directory via USB or approved media.</p>
+            </li>
+            <li>
+                <strong>Restart Donjon</strong>
+                <p>The platform verifies the license using dual ML-DSA-65 + Ed25519 signatures locally. No network call is required.</p>
+            </li>
+        </ol>
+
+        <h3>License Verification Process</h3>
+        <p>When the platform loads a license file, it performs these checks in order:</p>
+        <ol>
+            <li><strong>Signature verification</strong> &mdash; Dual ML-DSA-65 (post-quantum) + Ed25519 (classical) signatures must both pass (v2 format). Legacy v1 uses HMAC-SHA256.</li>
+            <li><strong>Expiry check</strong> &mdash; License must not be expired (or have no expiry for perpetual licenses).</li>
+            <li><strong>Machine fingerprint</strong> &mdash; If the license carries a fingerprint, it must match the current machine.</li>
+            <li><strong>Revocation check</strong> &mdash; License ID must not appear in the local <code>data/revoked.json</code> list.</li>
+            <li><strong>Tier validation</strong> &mdash; The tier field must be a recognized value (community, pro, enterprise, managed).</li>
+        </ol>
+        <p>If any check fails, the platform falls back to Community tier with a warning in the log.</p>
+
+        <!-- User Management -->
+        <h2 id="user-management">User Management</h2>
+        <table>
+            <thead><tr><th>Tier</th><th>Max Users</th><th>SSO</th><th>RBAC</th></tr></thead>
+            <tbody>
+                <tr><td>Community</td><td>1</td><td>No</td><td>No</td></tr>
+                <tr><td>Pro</td><td>25</td><td>No</td><td>No</td></tr>
+                <tr><td>Enterprise</td><td>Unlimited</td><td>SAML/OIDC</td><td>Yes</td></tr>
+                <tr><td>Managed</td><td>Unlimited</td><td>SAML/OIDC</td><td>Yes</td></tr>
+            </tbody>
+        </table>
+
+        <h3>API Key Authentication</h3>
+        <p>The REST API uses API key authentication. Generate and manage keys through the dashboard or configuration.</p>
+<pre><code><span class="cmt"># Include the API key in requests</span>
+curl -H "X-API-Key: your-api-key" https://localhost:8443/api/v1/stats</code></pre>
+
+        <!-- Backup and Recovery -->
+        <h2 id="backup">Backup and Recovery</h2>
+
+        <h3>What to Back Up</h3>
+        <table>
+            <thead><tr><th>Path</th><th>Contents</th><th>Priority</th></tr></thead>
+            <tbody>
+                <tr><td><code>data/evidence/</code></td><td>SQLite evidence database (scans, findings)</td><td><strong class="status-error">Critical</strong></td></tr>
+                <tr><td><code>data/license.json</code></td><td>License file</td><td><strong class="status-error">Critical</strong></td></tr>
+                <tr><td><code>config/active/config.yaml</code></td><td>Platform configuration</td><td><strong class="status-warn">High</strong></td></tr>
+                <tr><td><code>data/reports/</code></td><td>Generated reports</td><td><strong class="status-info">Medium</strong></td></tr>
+                <tr><td><code>data/vuln_db/</code></td><td>Vulnerability intelligence database</td><td><strong style="color:var(--accent-yellow);">Low</strong> (can regenerate)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Backup Procedure</h3>
+<pre><code><span class="cmt"># Stop the platform before backing up the database</span>
+
+<span class="cmt"># Linux/macOS</span>
+tar -czf donjon-backup-$(date +%Y%m%d).tar.gz \
+    data/evidence/ \
+    data/license.json \
+    config/active/config.yaml \
+    data/reports/
+
+<span class="cmt"># Windows (PowerShell)</span>
+Compress-Archive -Path data\evidence, data\license.json, `
+    config\active\config.yaml, data\reports `
+    -DestinationPath "donjon-backup-$(Get-Date -Format yyyyMMdd).zip"</code></pre>
+
+        <h3>Recovery</h3>
+        <ol>
+            <li>Install Donjon on the target machine</li>
+            <li>Extract the backup archive into the platform directory</li>
+            <li>Restart the platform</li>
+            <li>If the license is machine-bound, request a transfer from support</li>
+        </ol>
+
+        <!-- Updating -->
+        <h2 id="updates">Updating the Platform</h2>
+<pre><code><span class="cmt"># Pull the latest version</span>
+git pull origin main
+
+<span class="cmt"># Update dependencies</span>
+source venv/bin/activate   <span class="cmt"># or venv\Scripts\activate on Windows</span>
+pip install -r requirements.txt
+
+<span class="cmt"># Update vulnerability intelligence</span>
+python3 bin/update-intel.py --quick
+
+<span class="cmt"># Restart the platform</span>
+python3 bin/donjon-launcher</code></pre>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Back Up Before Updating</div>
+            <p>Always back up your <code>data/</code> directory before updating. While updates are designed to be non-destructive, backing up ensures you can recover from any issues.</p>
+        </div>
+
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+profile:
+  id: lazarus
+  name: "Lazarus Group (Hidden Cobra/Diamond Sleet)"
+  aliases: [Hidden Cobra, Diamond Sleet, ZINC, Guardians of Peace]
+  attribution: North Korea (RGB)
+  motivation: financial + espionage
+  target_sectors: [financial, cryptocurrency, defense, technology, entertainment]
+  active_since: 2007
+
+  ttps:
+    - tactic: Initial Access
+      technique: Drive-by Compromise (Watering Hole)
+      technique_id: T1189
+      simulation_check: check_watering_hole_indicators
+      description: Compromises websites frequented by targets to deliver exploits via strategic web compromise
+    - tactic: Initial Access
+      technique: Spearphishing Attachment
+      technique_id: T1566
+      simulation_check: check_phishing_resilience
+      description: Sends tailored phishing emails with trojanized job offers and recruitment documents
+    - tactic: Execution
+      technique: Command and Scripting Interpreter - Custom Malware
+      technique_id: T1059
+      simulation_check: check_custom_malware_execution
+      description: Deploys custom malware families including DTrack, BLINDINGCAN, and AppleJeus
+    - tactic: Collection
+      technique: Data from Local System
+      technique_id: T1005
+      simulation_check: check_local_data_staging
+      description: Collects cryptocurrency wallet files, financial data, and intellectual property from endpoints
+    - tactic: Exfiltration
+      technique: Exfiltration Over Web Service
+      technique_id: T1567
+      simulation_check: check_cloud_exfil_channels
+      description: Exfiltrates stolen data through cloud storage and custom web service channels
+    - tactic: Defense Evasion
+      technique: Obfuscated Files or Information
+      technique_id: T1027
+      simulation_check: check_obfuscation_indicators
+      description: Uses multi-layer packing, encryption, and steganography to hide payloads
+    - tactic: Persistence
+      technique: Boot or Logon Autostart Execution
+      technique_id: T1547
+      simulation_check: check_autostart_persistence
+      description: Installs persistence via registry run keys, startup folders, and scheduled tasks
+    - tactic: Impact
+      technique: Data Encrypted for Impact
+      technique_id: T1486
+      simulation_check: check_ransomware_indicators
+      description: Deploys ransomware (e.g., WannaCry) as either distraction or revenue generation
+
+  detection_priorities:
+    - Cryptocurrency wallet and exchange platform monitoring
+    - Custom malware family signature and behavioral detection
+    - Watering hole compromise detection on industry-relevant sites
+    - Supply chain security for development tool packages (npm, PyPI)

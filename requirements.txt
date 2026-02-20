@@ -1,0 +1,12 @@
+# Core dependencies (pinned to known-good versions)
+pyyaml==6.0.3
+psutil==6.1.1
+
+# Post-quantum cryptography (NIST FIPS 204 ML-DSA-65 + Ed25519 classical)
+dilithium-py==1.4.0       # ML-DSA-65 post-quantum digital signatures
+cryptography==45.0.3      # Ed25519 classical signatures + general crypto primitives
+
+# Optional dependencies for containerized/multi-user deployment
+psycopg2-binary==2.9.10   # PostgreSQL support (optional, for container mode)
+flask==3.1.2               # Web framework (optional, stdlib http.server works as fallback)
+gunicorn==23.0.0           # Production WSGI server (optional, Linux/container mode only)

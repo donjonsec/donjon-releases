@@ -1,0 +1,14 @@
+{
+  "name": "donjon-license-server",
+  "version": "7.0.0",
+  "private": true,
+  "description": "Donjon 7.0 License Server - Cloudflare Python Worker",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  }
+}

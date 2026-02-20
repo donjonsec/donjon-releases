@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Guide - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<!-- Top Bar -->
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html" class="active"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#getting-started"><span class="nav-icon">&#x1F680;</span> Getting Started</a>
+        <a href="#first-scan"><span class="nav-icon">&#x1F50D;</span> First Scan</a>
+        <a href="#scan-results"><span class="nav-icon">&#x1F4CA;</span> Scan Results</a>
+        <a href="#findings"><span class="nav-icon">&#x1F4CB;</span> Working with Findings</a>
+        <a href="#export"><span class="nav-icon">&#x1F4E4;</span> Export &amp; Reporting</a>
+        <a href="#ai-analysis"><span class="nav-icon">&#x1F916;</span> AI Analysis</a>
+        <a href="#compliance"><span class="nav-icon">&#x2611;</span> Compliance Mapping</a>
+        <a href="#dashboard"><span class="nav-icon">&#x1F4BB;</span> Dashboard</a>
+        <a href="#keyboard-shortcuts"><span class="nav-icon">&#x2328;</span> Keyboard Shortcuts</a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <!-- Breadcrumbs -->
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">User Guide</span>
+        </div>
+
+        <h1>User Guide</h1>
+        <p>This guide covers everything you need to operate the Donjon Platform as an end user, from launching the platform through generating compliance reports.</p>
+
+        <!-- Getting Started -->
+        <h2 id="getting-started">Getting Started</h2>
+
+        <h3>Installation</h3>
+        <p>Donjon supports three deployment modes. The platform auto-detects its environment on launch.</p>
+
+        <table>
+            <thead><tr><th>Mode</th><th>Detection</th><th>Cloud</th><th>AI</th><th>TUI</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Portable (USB)</strong></td><td>USB mount detected</td><td>Disabled</td><td>Template only</td><td>Full</td></tr>
+                <tr><td><strong>Installed</strong></td><td>Default (fixed system)</td><td>All providers</td><td>All backends</td><td>Full</td></tr>
+                <tr><td><strong>CI/CD</strong></td><td>CI env vars detected</td><td>All providers</td><td>All backends</td><td>Headless</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Linux / macOS</h4>
+<pre><code><span class="cmt"># Clone the repository</span>
+git clone https://github.com/DonjonSec/donjon-platform.git
+cd donjon-platform
+
+<span class="cmt"># Set up Python environment</span>
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+<span class="cmt"># Populate vulnerability intelligence (optional, recommended)</span>
+python3 bin/update-intel.py --quick     <span class="cmt"># ~2 min: KEV + EPSS + 14-day NVD</span>
+
+<span class="cmt"># Launch</span>
+python3 bin/donjon-launcher</code></pre>
+
+        <h4>Windows</h4>
+<pre><code><span class="cmt">REM Clone the repository</span>
+git clone https://github.com/DonjonSec/donjon-platform.git
+cd donjon-platform
+
+<span class="cmt">REM Run setup (creates venv, installs deps)</span>
+bin\setup-windows.bat
+
+<span class="cmt">REM Populate vulnerability intelligence (optional)</span>
+python3 bin\update-intel.py --quick
+
+<span class="cmt">REM Launch</span>
+bin\donjon-launcher.bat</code></pre>
+
+        <div class="callout callout-info">
+            <div class="callout-title">PowerShell Alternative</div>
+            <p>You can also use <code>bin\donjon-launcher.ps1</code> on Windows. If you get an execution policy error, run: <code>Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code></p>
+        </div>
+
+        <h3>First Launch</h3>
+        <p>On first launch, the PowerShell launcher will automatically:</p>
+        <ol class="steps">
+            <li><strong>Detect Python</strong> &mdash; Checks venv, system Python, and the <code>py</code> launcher in order.</li>
+            <li><strong>Bootstrap environment</strong> &mdash; Creates a virtual environment and installs dependencies if missing.</li>
+            <li><strong>Create data directories</strong> &mdash; Sets up <code>data/results</code>, <code>data/evidence</code>, <code>data/reports</code>, and <code>data/logs</code>.</li>
+            <li><strong>Launch the TUI</strong> &mdash; Opens the terminal user interface with the main menu.</li>
+        </ol>
+
+        <!-- Running Your First Scan -->
+        <h2 id="first-scan">Running Your First Scan</h2>
+        <p>Follow these steps to execute your first vulnerability scan.</p>
+
+        <ol class="steps">
+            <li>
+                <strong>Select "Scan Center" from the main menu</strong>
+                <p>The TUI main menu presents all available operations. Navigate to the Scan Center tab to configure and launch scans.</p>
+            </li>
+            <li>
+                <strong>Choose a scanner type</strong>
+                <p>Community tier includes 7 core scanners: <code>network</code>, <code>vulnerability</code>, <code>web</code>, <code>ssl</code>, <code>windows</code>, <code>linux</code>, and <code>compliance</code>. Pro and above unlock all scanner types.</p>
+            </li>
+            <li>
+                <strong>Enter target(s)</strong>
+                <p>Specify one or more IP addresses, hostnames, or CIDR ranges. Community tier is limited to 16 targets per scan.</p>
+            </li>
+            <li>
+                <strong>Select scan depth</strong>
+                <p>Choose <strong>Quick</strong> (fast, fewer checks) or <strong>Standard</strong> (thorough). Deep scans require Pro tier or above.</p>
+            </li>
+            <li>
+                <strong>Launch the scan</strong>
+                <p>The platform starts scanning and displays real-time progress. Findings appear as they are discovered.</p>
+            </li>
+            <li>
+                <strong>Review results</strong>
+                <p>When the scan completes, a summary is displayed with finding counts by severity. Detailed results are stored in the evidence database.</p>
+            </li>
+        </ol>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Authorization Required</div>
+            <p>Only scan networks and systems you have explicit written authorization to test. Unauthorized scanning may violate laws and regulations.</p>
+        </div>
+
+        <!-- Understanding Scan Results -->
+        <h2 id="scan-results">Understanding Scan Results</h2>
+
+        <h3>Severity Levels</h3>
+        <table>
+            <thead><tr><th>Severity</th><th>CVSS Range</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong class="status-error">CRITICAL</strong></td><td>9.0 - 10.0</td><td>Immediate exploitation risk. Requires urgent remediation.</td></tr>
+                <tr><td><strong class="status-warn">HIGH</strong></td><td>7.0 - 8.9</td><td>Significant risk. Should be addressed within days.</td></tr>
+                <tr><td><strong class="status-info">MEDIUM</strong></td><td>4.0 - 6.9</td><td>Moderate risk. Plan remediation within weeks.</td></tr>
+                <tr><td><strong style="color: var(--accent-yellow);">LOW</strong></td><td>0.1 - 3.9</td><td>Minor risk. Address during regular maintenance.</td></tr>
+                <tr><td><strong style="color: var(--text-muted);">INFO</strong></td><td>0.0</td><td>Informational only. No direct security impact.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Intelligence Enrichment</h3>
+        <p>Each finding is automatically enriched with data from 7 intelligence sources (803K+ entries):</p>
+        <ul>
+            <li><strong>CVSS Score</strong> &mdash; Common Vulnerability Scoring System severity rating</li>
+            <li><strong>EPSS Score</strong> &mdash; Exploit Prediction Scoring System (probability of exploitation in 30 days)</li>
+            <li><strong>CISA KEV</strong> &mdash; Whether the CVE is on the Known Exploited Vulnerabilities catalog</li>
+            <li><strong>SSVC Decision</strong> &mdash; Stakeholder-Specific Vulnerability Categorization (Act/Attend/Track)</li>
+            <li><strong>Exploit References</strong> &mdash; Links to Exploit-DB, Metasploit, and Nuclei templates</li>
+        </ul>
+
+        <h3>FAIR Risk Quantification</h3>
+        <p>Donjon v7.0 includes FAIR risk quantification that translates findings into dollar-denominated risk estimates:</p>
+        <ul>
+            <li>Monte Carlo simulation (10,000 iterations) for Annualized Loss Expectancy (ALE)</li>
+            <li>Maps EPSS, KEV, and CVSS scores to FAIR loss factors</li>
+            <li>Industry benchmarks from IBM/Ponemon 2025 for 8 verticals</li>
+            <li>Results shown as ranges (10th/50th/90th percentile), never point estimates</li>
+            <li>Data quality score (0-100%) accompanies every estimate</li>
+        </ul>
+
+        <!-- Working with Findings -->
+        <h2 id="findings">Working with Findings</h2>
+
+        <h3>Viewing Findings</h3>
+        <p>All findings are stored in the SQLite evidence database. You can browse findings through:</p>
+        <ul>
+            <li><strong>TUI Dashboard</strong> &mdash; Interactive terminal-based findings browser</li>
+            <li><strong>Web Dashboard</strong> &mdash; HTML dashboard at <code>https://localhost:8443</code></li>
+            <li><strong>API</strong> &mdash; <code>GET /api/v1/findings</code> for programmatic access</li>
+        </ul>
+
+        <h3>Triaging Findings</h3>
+        <p>Findings can be triaged using the following workflow:</p>
+        <ol>
+            <li>Review severity, CVSS, EPSS, and KEV status to prioritize</li>
+            <li>Check SSVC decision (Act / Attend / Track) for stakeholder guidance</li>
+            <li>Use AI analysis for remediation recommendations</li>
+            <li>Assign to remediation tracking</li>
+            <li>Create risk exceptions for accepted risks (with approval workflow)</li>
+        </ol>
+
+        <h3>Remediation Tracking</h3>
+        <p>The platform includes a built-in remediation tracker accessible via the API:</p>
+<pre><code><span class="cmt"># Create a remediation item</span>
+POST /api/v1/remediation
+{
+    "finding_id": "f-12345",
+    "assignee": "security-team",
+    "priority": "high",
+    "due_date": "2026-03-01"
+}
+
+<span class="cmt"># Update status</span>
+PUT /api/v1/remediation/&lt;id&gt;
+{
+    "status": "in_progress",
+    "notes": "Patch scheduled for next maintenance window"
+}</code></pre>
+
+        <!-- Export and Reporting -->
+        <h2 id="export">Export and Reporting</h2>
+
+        <h3>Available Formats</h3>
+        <table>
+            <thead><tr><th>Format</th><th>Community</th><th>Pro+</th><th>Use Case</th></tr></thead>
+            <tbody>
+                <tr><td><code>CSV</code></td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td>Spreadsheet analysis, data import</td></tr>
+                <tr><td><code>JSON</code></td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td>Programmatic processing, API integration</td></tr>
+                <tr><td><code>HTML</code></td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td><td>Client-ready reports with branding</td></tr>
+                <tr><td><code>PDF</code></td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td><td>Executive reports, compliance evidence</td></tr>
+                <tr><td><code>SARIF</code></td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td><td>GitHub/GitLab security dashboard integration</td></tr>
+                <tr><td><code>XML</code></td><td class="cross">&#x2014;</td><td class="check">&#x2713;</td><td>SIEM import, legacy system integration</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Exporting via API</h3>
+<pre><code><span class="cmt"># Export a scan session</span>
+GET /api/v1/scans/&lt;session_id&gt;/export?format=csv
+
+<span class="cmt"># Bulk export via POST</span>
+POST /api/v1/export
+{
+    "format": "sarif",
+    "session_ids": ["sess-001", "sess-002"],
+    "include_evidence": true
+}</code></pre>
+
+        <h3>Report Types</h3>
+        <ul>
+            <li><strong>Executive Report</strong> &mdash; High-level summary with risk posture and recommendations (<code>GET /api/v1/reports/executive</code>)</li>
+            <li><strong>Compliance Report</strong> &mdash; Framework-specific compliance status (<code>GET /api/v1/reports/compliance/&lt;framework&gt;</code>)</li>
+            <li><strong>Delta Report</strong> &mdash; Trend analysis comparing scans across sessions</li>
+            <li><strong>Risk Matrix</strong> &mdash; Visual risk heatmap (<code>GET /api/v1/risks/matrix</code>)</li>
+        </ul>
+
+        <!-- AI-Powered Analysis -->
+        <h2 id="ai-analysis">AI-Powered Analysis</h2>
+
+        <h3>AI Backends</h3>
+        <table>
+            <thead><tr><th>Backend</th><th>Requirements</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Template</strong></td><td>None (default)</td><td>Pre-built analysis templates. Works offline, no LLM needed.</td></tr>
+                <tr><td><strong>Ollama</strong></td><td>Local Ollama instance</td><td>Local LLM inference. No data leaves your machine.</td></tr>
+                <tr><td><strong>OpenAI</strong></td><td>API key</td><td>OpenAI-compatible API. Data sanitization strips IPs/hostnames.</td></tr>
+            </tbody>
+        </table>
+
+        <h3>AI Capabilities</h3>
+        <ul>
+            <li><strong>Finding Analysis</strong> &mdash; Explain what a finding means and its potential impact</li>
+            <li><strong>Triage Assistance</strong> &mdash; Prioritize a list of findings by risk</li>
+            <li><strong>Remediation Guidance</strong> &mdash; Generate step-by-step fix instructions</li>
+            <li><strong>Scan Summary</strong> &mdash; Auto-generate executive summaries (Pro+ only)</li>
+            <li><strong>Free-Form Query</strong> &mdash; Ask any question about your findings or security posture</li>
+        </ul>
+
+        <div class="callout callout-info">
+            <div class="callout-title">AI Quota</div>
+            <p>Community tier is limited to 10 AI queries per day. The quota resets at midnight UTC. Pro tier and above have unlimited AI queries.</p>
+        </div>
+
+        <h3>Using AI via the API</h3>
+<pre><code><span class="cmt"># Analyze a specific finding</span>
+POST /api/v1/ai/analyze
+{
+    "finding": {
+        "title": "SQL Injection in Login Form",
+        "severity": "CRITICAL",
+        "cvss_score": 9.8
+    }
+}
+
+<span class="cmt"># Ask a free-form question</span>
+POST /api/v1/ai/query
+{
+    "question": "What is the most critical finding and how should I fix it?",
+    "context": { "session_id": "sess-001" }
+}</code></pre>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">AI Disclaimer</div>
+            <p>All AI output is tagged "AI-Generated - Verify Before Acting". AI analysis is advisory and should be validated by qualified security professionals before implementation.</p>
+        </div>
+
+        <!-- Compliance Mapping -->
+        <h2 id="compliance">Compliance Mapping</h2>
+
+        <h3>Supported Frameworks</h3>
+        <p>Donjon maps findings to 10+ compliance frameworks. Community tier supports 3 frameworks simultaneously; Pro and above support unlimited frameworks.</p>
+        <ul>
+            <li>NIST 800-53</li>
+            <li>HIPAA</li>
+            <li>PCI-DSS v4</li>
+            <li>ISO 27001:2022</li>
+            <li>SOC 1/2 Type II</li>
+            <li>CMMC</li>
+            <li>FedRAMP</li>
+            <li>GDPR</li>
+            <li>SOX</li>
+        </ul>
+
+        <h3>Generating Compliance Reports</h3>
+<pre><code><span class="cmt"># Get compliance report for a specific framework</span>
+GET /api/v1/reports/compliance/NIST-800-53
+
+<span class="cmt"># Response includes control mappings, status, and evidence</span>
+{
+    "framework": "NIST-800-53",
+    "controls_assessed": 142,
+    "controls_passing": 118,
+    "controls_failing": 24,
+    "compliance_score": 83.1,
+    "findings_by_control": [ ... ]
+}</code></pre>
+
+        <!-- Dashboard Overview -->
+        <h2 id="dashboard">Dashboard Overview</h2>
+
+        <h3>Web Dashboard</h3>
+        <p>The web dashboard runs on <code>https://localhost:8443</code> and provides a comprehensive view of your security posture. It features five main tabs:</p>
+        <ul>
+            <li><strong>Scan Center</strong> &mdash; Configure and launch scans, view active scans and history</li>
+            <li><strong>Schedules</strong> &mdash; Manage scheduled/recurring scans (Pro+)</li>
+            <li><strong>Notifications</strong> &mdash; Configure alert channels (email, webhook, Slack, Teams)</li>
+            <li><strong>AI Assistant</strong> &mdash; Interactive AI analysis interface</li>
+            <li><strong>Settings</strong> &mdash; License, configuration, and platform management</li>
+        </ul>
+
+        <h3>Platform Stats</h3>
+        <p>The <code>GET /api/v1/stats</code> endpoint returns a comprehensive overview:</p>
+        <ul>
+            <li>Total scans run, findings count, findings by severity</li>
+            <li>Active scan sessions</li>
+            <li>AI query usage and quota</li>
+            <li>License tier and status</li>
+            <li>Platform health and uptime</li>
+        </ul>
+
+        <!-- Keyboard Shortcuts -->
+        <h2 id="keyboard-shortcuts">Keyboard Shortcuts and TUI Navigation</h2>
+
+        <h3>TUI Navigation</h3>
+        <table>
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+                <tr><td><kbd>Tab</kbd></td><td>Switch between sections</td></tr>
+                <tr><td><kbd>&#x2191;</kbd> / <kbd>&#x2193;</kbd></td><td>Navigate menu items</td></tr>
+                <tr><td><kbd>Enter</kbd></td><td>Select / Confirm</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Back / Cancel</td></tr>
+                <tr><td><kbd>q</kbd></td><td>Quit application</td></tr>
+                <tr><td><kbd>?</kbd></td><td>Show help</td></tr>
+                <tr><td><kbd>/</kbd></td><td>Search / Filter</td></tr>
+                <tr><td><kbd>r</kbd></td><td>Refresh current view</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Scan Controls</h3>
+        <table>
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+                <tr><td><kbd>s</kbd></td><td>Start a new scan</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>c</kbd></td><td>Cancel running scan</td></tr>
+                <tr><td><kbd>e</kbd></td><td>Export results</td></tr>
+                <tr><td><kbd>d</kbd></td><td>View finding details</td></tr>
+                <tr><td><kbd>a</kbd></td><td>AI analysis of selected finding</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

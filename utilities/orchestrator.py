@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""
+Donjon v7.0 - Assessment Orchestrator
+Coordinates full security assessments with human-paced execution.
+Includes container, cloud, and risk quantification phases.
+"""
+
+import sys
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).parent.parent / 'lib'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'scanners'))
+
+from paths import paths
+from config import config
+from evidence import get_evidence_manager
+from logger import get_logger
+from network import get_scan_targets
+
+from network_scanner import NetworkScanner
+from vulnerability_scanner import VulnerabilityScanner
+from web_scanner import WebScanner
+from ssl_scanner import SSLScanner
+from compliance_scanner import ComplianceScanner
+
+try:
+    from asset_manager import get_asset_manager
+except ImportError:
+    get_asset_manager = None
+
+try:
+    from credential_scanner import CredentialScanner
+    from credential_manager import get_credential_manager
+except ImportError:
+    CredentialScanner = None
+    get_credential_manager = None
+
+try:
+    from openvas_scanner import OpenVASScanner
+except ImportError:
+    OpenVASScanner = None
+
+try:
+    from container_scanner import ContainerScanner
+except ImportError:
+    ContainerScanner = None
+
+try:
+    from cloud_scanner import CloudScanner
+except ImportError:
+    CloudScanner = None
+
+try:
+    from risk_quantification import get_risk_quantifier
+except ImportError:
+    get_risk_quantifier = None
+
+try:
+    from ai_analyzer import AIAnalyzer
+except ImportError:
+    AIAnalyzer = None
+
+try:
+    from windows_scanner import WindowsScanner
+except ImportError:
+    WindowsScanner = None
+
+try:
+    from linux_scanner import LinuxScanner
+except ImportError:
+    LinuxScanner = None
+
+try:
+    from vuln_database import get_vuln_database
+except ImportError:
+    get_vuln_database = None
+
+try:
+    from adversary_scanner import AdversaryScanner
+except ImportError:
+    AdversaryScanner = None
+
+
+class AssessmentOrchestrator:
+    """Orchestrates complete security assessments."""
+
+    def __init__(self):
+        self.paths = paths
+        self.config = config
+        self.evidence = get_evidence_manager()
+        self.logger = get_logger('orchestrator')
+        self.session_id: Optional[str] = None
+
+    def run_full_assessment(self, targets: List[str] = None,
+                            assessment_type: str = 'standard',
+                            frameworks: List[str] = None) -> Dict:
+        """
+        Run a complete security assessment.
+
+        Args:
+            targets: Networks/hosts to assess (auto-detect if not provided)
+            assessment_type: 'quick', 'standard', or 'deep'
+            frameworks: Compliance frameworks to assess
+
+        Returns:
+            Complete assessment results
+        """
+        # Get targets
+        if not targets:
+            targets = get_scan_targets()
+            if not targets:
+                self.logger.error("No targets configured or detected")
+                return {'error': 'No targets available'}
+
+        # Get frameworks
+        if not frameworks:
+            frameworks = self.config.get_frameworks()
+
+        # Start session
+        self.session_id = self.evidence.start_session(
+            scan_type=f'full_assessment_{assessment_type}',
+            target_networks=targets,
+            metadata={
+                'assessment_type': assessment_type,
+                'frameworks': frameworks,
+                'started_by': 'orchestrator'
+            }
+        )
+
+        self.logger.info(f"Starting {assessment_type} assessment")
+        self.logger.info(f"Session: {self.session_id}")
+        self.logger.info(f"Targets: {targets}")
+        self.logger.info(f"Frameworks: {frameworks}")
+
+        results = {
+            'session_id': self.session_id,
+            'assessment_type': assessment_type,
+            'targets': targets,
+            'frameworks': frameworks,
+            'start_time': datetime.now(timezone.utc).isoformat(),
+            'phases': {},
+            'summary': {}
+        }
+
+        try:
+            # Phase 1: Network Discovery and Port Scanning
+            self.logger.info("=" * 50)
+            self.logger.info("PHASE 1: Network Discovery and Port Scanning")
+            self.logger.info("=" * 50)
+
+            network_scanner = NetworkScanner(self.session_id)
+            results['phases']['network'] = network_scanner.scan(
+                targets=targets,
+                scan_type=assessment_type
+            )
+            results['phases']['network']['summary'] = network_scanner.get_summary()
+
+            # Get discovered hosts for next phases
+            discovered_hosts = [
+                h['ip'] for h in results['phases']['network'].get('hosts', [])
+            ]
+
+            if not discovered_hosts:
+                self.logger.warning("No hosts discovered, using original targets")
+                discovered_hosts = targets
+
+            # Register assets in inventory
+            if get_asset_manager is not None:
+                try:
+                    am = get_asset_manager()
+                    am.update_from_scan(
+                        self.session_id,
+                        results['phases']['network']
+                    )
+                    inventory = am.get_inventory_summary()
+                    results['asset_inventory'] = inventory
+                    self.logger.info(f"Asset inventory: {inventory.get('total_assets', 0)} assets")
+                except Exception as e:
+                    self.logger.warning(f"Asset registration error: {e}")
+
+            # Phase 1.5: Credentialed Scanning (if credentials configured)
+            if CredentialScanner is not None and get_credential_manager is not None:
+                try:
+                    cm = get_credential_manager()
+                    cred_targets = [h for h in discovered_hosts if cm.has_credentials_for(h)]
+                    if cred_targets:
+                        self.logger.info("=" * 50)
+                        self.logger.info("PHASE 1.5: Credentialed Scanning")
+                        self.logger.info("=" * 50)
+
+                        cred_scanner = CredentialScanner(self.session_id)
+                        results['phases']['credential'] = cred_scanner.scan(
+                            targets=cred_targets,
+                            scan_type=assessment_type
+                        )
+                        results['phases']['credential']['summary'] = cred_scanner.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"Credentialed scanning skipped: {e}")
+
+            # Phase 2: Vulnerability Assessment
+            self.logger.info("=" * 50)
+            self.logger.info("PHASE 2: Vulnerability Assessment")
+            self.logger.info("=" * 50)
+
+            vuln_scanner = VulnerabilityScanner(self.session_id)
+            results['phases']['vulnerability'] = vuln_scanner.scan(
+                targets=discovered_hosts,
+                scan_type=assessment_type
+            )
+            results['phases']['vulnerability']['summary'] = vuln_scanner.get_summary()
+
+            # Phase 2.5: OpenVAS Integration (if available)
+            if OpenVASScanner is not None:
+                try:
+                    openvas = OpenVASScanner(self.session_id)
+                    if openvas.gvm_available and openvas.gvm_mode in ('gmp', 'cli'):
+                        self.logger.info("=" * 50)
+                        self.logger.info("PHASE 2.5: OpenVAS/GVM Scanning")
+                        self.logger.info("=" * 50)
+
+                        results['phases']['openvas'] = openvas.scan(
+                            targets=discovered_hosts,
+                            scan_type=assessment_type
+                        )
+                        results['phases']['openvas']['summary'] = openvas.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"OpenVAS scanning skipped: {e}")
+
+            # Phase 3: Web Application Scanning
+            self.logger.info("=" * 50)
+            self.logger.info("PHASE 3: Web Application Scanning")
+            self.logger.info("=" * 50)
+
+            web_scanner = WebScanner(self.session_id)
+            results['phases']['web'] = web_scanner.scan(
+                targets=discovered_hosts,
+                scan_type=assessment_type
+            )
+            results['phases']['web']['summary'] = web_scanner.get_summary()
+
+            # Phase 4: SSL/TLS Assessment
+            self.logger.info("=" * 50)
+            self.logger.info("PHASE 4: SSL/TLS Assessment")
+            self.logger.info("=" * 50)
+
+            ssl_scanner = SSLScanner(self.session_id)
+            results['phases']['ssl'] = ssl_scanner.scan(
+                targets=discovered_hosts,
+                scan_type=assessment_type
+            )
+            results['phases']['ssl']['summary'] = ssl_scanner.get_summary()
+
+            # Phase 5: Compliance Assessment
+            self.logger.info("=" * 50)
+            self.logger.info("PHASE 5: Compliance Assessment")
+            self.logger.info("=" * 50)
+
+            compliance_scanner = ComplianceScanner(self.session_id)
+            results['phases']['compliance'] = compliance_scanner.scan(
+                frameworks=frameworks
+            )
+            results['phases']['compliance']['summary'] = compliance_scanner.get_summary()
+
+            # Phase 5.5: Windows Security Assessment (if on Windows)
+            if WindowsScanner is not None and sys.platform == 'win32':
+                try:
+                    self.logger.info("=" * 50)
+                    self.logger.info("PHASE 5.5: Windows Security Assessment")
+                    self.logger.info("=" * 50)
+
+                    win_scanner = WindowsScanner(self.session_id)
+                    results['phases']['windows'] = win_scanner.scan(
+                        scan_type=assessment_type
+                    )
+                    results['phases']['windows']['summary'] = win_scanner.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"Windows security assessment skipped: {e}")
+
+            # Phase 5.6: Linux Security Assessment (if on Linux)
+            if LinuxScanner is not None and sys.platform == 'linux':
+                try:
+                    self.logger.info("=" * 50)
+                    self.logger.info("PHASE 5.6: Linux Security Assessment")
+                    self.logger.info("=" * 50)
+
+                    linux_scanner = LinuxScanner(self.session_id)
+                    results['phases']['linux'] = linux_scanner.scan(
+                        scan_type=assessment_type
+                    )
+                    results['phases']['linux']['summary'] = linux_scanner.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"Linux security assessment skipped: {e}")
+
+            # Phase 6: Container Security (optional)
+            if ContainerScanner is not None:
+                try:
+                    self.logger.info("=" * 50)
+                    self.logger.info("PHASE 6: Container Security")
+                    self.logger.info("=" * 50)
+
+                    container_scanner = ContainerScanner(self.session_id)
+                    results['phases']['container'] = container_scanner.scan(
+                        targets=discovered_hosts,
+                        scan_type=assessment_type
+                    )
+                    results['phases']['container']['summary'] = container_scanner.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"Container scanning skipped: {e}")
+
+            # Phase 7: Cloud Security (optional, disabled in portable mode)
+            if CloudScanner is not None:
+                try:
+                    cloud_scanner = CloudScanner(self.session_id)
+                    if any([cloud_scanner.aws_available, cloud_scanner.azure_available,
+                            cloud_scanner.gcp_available]):
+                        self.logger.info("=" * 50)
+                        self.logger.info("PHASE 7: Cloud Security")
+                        self.logger.info("=" * 50)
+
+                        results['phases']['cloud'] = cloud_scanner.scan(
+                            scan_type=assessment_type
+                        )
+                        results['phases']['cloud']['summary'] = cloud_scanner.get_summary()
+                except Exception as e:
+                    self.logger.warning(f"Cloud scanning skipped: {e}")
+
+            # Phase 8: Risk Quantification (optional)
+            if get_risk_quantifier is not None:
+                try:
+                    self.logger.info("=" * 50)
+                    self.logger.info("PHASE 8: Risk Quantification (FAIR)")
+                    self.logger.info("=" * 50)
+
+                    rq = get_risk_quantifier()
+                    org_risk = rq.quantify_organization(self.session_id)
+                    results['risk_quantification'] = org_risk
+                    self.logger.info(f"Total ALE (50th): ${org_risk.get('total_ale_50th', 0):,.0f}")
+                except Exception as e:
+                    self.logger.warning(f"Risk quantification skipped: {e}")
+
+            # Phase 9: Vulnerability Intelligence Enrichment (optional)
+            if get_vuln_database is not None:
+                try:
+                    self.logger.info("=" * 50)
+                    self.logger.info("PHASE 9: Vulnerability Intelligence Enrichment")
+                    self.logger.info("=" * 50)
+
+                    vdb = get_vuln_database()
+                    findings = self.evidence.get_findings_for_session(self.session_id)
+                    if findings:
+                        enriched = vdb.enrich_findings_batch(findings)
+                        enriched_count = sum(
+                            1 for f in enriched if f.get('vuln_intel')
+                        )
+                        results['vuln_enrichment'] = {
+                            'total_findings': len(findings),
+                            'enriched': enriched_count,
+                        }
+                        self.logger.info(
+                            f"Enriched {enriched_count}/{len(findings)} findings "
+                            f"with NVD/OWASP/CWE/CAPEC/ATT&CK intelligence"
+                        )
+                except Exception as e:
+                    self.logger.warning(f"Vulnerability enrichment skipped: {e}")
+
+            # Phase 10: Adversary Emulation (deep assessments only)
+            if AdversaryScanner is not None and assessment_type == 'deep':
+                try:
+                    adv_cfg = self.config.get('adversary', {})
+                    if adv_cfg.get('enabled', True):
+                        self.logger.info("=" * 50)
+                        self.logger.info("PHASE 10: Adversary Emulation")
+                        self.logger.info("=" * 50)
+
+                        adv_scanner = AdversaryScanner(self.session_id)
+                        profile = adv_cfg.get('default_profile', 'scattered_spider')
+                        results['phases']['adversary'] = adv_scanner.scan(
+                            targets=discovered_hosts,
+                            profile=profile,
+                        )
+                        results['phases']['adversary']['summary'] = adv_scanner.get_summary()
+                        scorecard = results['phases']['adversary'].get('scorecard', {})
+                        self.logger.info(
+                            "Adversary emulation: {} detection rate, grade {}".format(
+                                scorecard.get('detection_rate', 'N/A'),
+                                scorecard.get('grade', 'N/A'),
+                            )
+                        )
+                except Exception as e:
+                    self.logger.warning("Adversary emulation skipped: {}".format(e))
+
+            # Generate overall summary
+            results['end_time'] = datetime.now(timezone.utc).isoformat()
+            results['summary'] = self._generate_overall_summary(results)
+
+            # End session
+            self.evidence.end_session(self.session_id, results['summary'])
+
+            self.logger.info("=" * 50)
+            self.logger.info("ASSESSMENT COMPLETE")
+            self.logger.info("=" * 50)
+            self.logger.info(f"Session: {self.session_id}")
+            self.logger.info(f"Total findings: {results['summary']['total_findings']}")
+
+        except Exception as e:
+            self.logger.error(f"Assessment failed: {e}")
+            results['error'] = str(e)
+            results['end_time'] = datetime.now(timezone.utc).isoformat()
+            self.evidence.end_session(self.session_id, {'error': str(e)})
+
+        return results
+
+    def _generate_overall_summary(self, results: Dict) -> Dict:
+        """Generate overall assessment summary."""
+        summary = {
+            'total_hosts_scanned': 0,
+            'total_ports_found': 0,
+            'total_findings': 0,
+            'findings_by_severity': {
+                'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0
+            },
+            'compliance_rate': 0.0,
+            'phases_completed': len(results.get('phases', {}))
+        }
+
+        # Aggregate from phases
+        for phase_name, phase_data in results.get('phases', {}).items():
+            phase_summary = phase_data.get('summary', {})
+
+            if phase_name == 'network':
+                summary['total_hosts_scanned'] = phase_summary.get('total_hosts', 0)
+                summary['total_ports_found'] = phase_summary.get('total_ports', 0)
+
+            # Aggregate findings
+            findings_count = phase_summary.get('findings_count', 0)
+            summary['total_findings'] += findings_count
+
+            for sev, count in phase_summary.get('findings_by_severity', {}).items():
+                summary['findings_by_severity'][sev] = summary['findings_by_severity'].get(sev, 0) + count
+
+            if phase_name == 'compliance':
+                summary['compliance_rate'] = phase_data.get('summary', {}).get('overall_compliance_rate', 0)
+
+        return summary
+
+    def run_quick_scan(self, targets: List[str] = None) -> Dict:
+        """Run a quick security scan."""
+        return self.run_full_assessment(targets, 'quick')
+
+    def run_deep_assessment(self, targets: List[str] = None,
+                             frameworks: List[str] = None) -> Dict:
+        """Run a comprehensive deep assessment."""
+        return self.run_full_assessment(targets, 'deep', frameworks)
+
+
+def run_assessment(assessment_type: str = 'standard', targets: List[str] = None,
+                   frameworks: List[str] = None) -> Dict:
+    """Convenience function to run an assessment."""
+    orchestrator = AssessmentOrchestrator()
+    return orchestrator.run_full_assessment(targets, assessment_type, frameworks)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run security assessment')
+    parser.add_argument('--type', choices=['quick', 'standard', 'deep'],
+                       default='standard', help='Assessment type')
+    parser.add_argument('--targets', nargs='+', help='Target networks/hosts')
+    parser.add_argument('--frameworks', nargs='+', help='Compliance frameworks')
+
+    args = parser.parse_args()
+
+    orchestrator = AssessmentOrchestrator()
+    results = orchestrator.run_full_assessment(
+        targets=args.targets,
+        assessment_type=args.type,
+        frameworks=args.frameworks
+    )
+
+    print(f"\nAssessment complete!")
+    print(f"Session: {results.get('session_id')}")
+    print(f"Summary: {results.get('summary')}")

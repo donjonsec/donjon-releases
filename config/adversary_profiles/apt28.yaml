@@ -1,0 +1,56 @@
+profile:
+  id: apt28
+  name: "APT28 (Fancy Bear/Forest Blizzard)"
+  aliases: [Fancy Bear, Forest Blizzard, Sofacy, Pawn Storm, Strontium]
+  attribution: Russia (GRU Unit 26165)
+  motivation: espionage
+  target_sectors: [government, military, media, defense, energy]
+  active_since: 2004
+
+  ttps:
+    - tactic: Initial Access
+      technique: Spearphishing Attachment / Link
+      technique_id: T1566
+      simulation_check: check_phishing_resilience
+      description: Sends highly targeted spearphishing emails with weaponized documents or credential-harvesting links
+    - tactic: Initial Access
+      technique: Exploit Public-Facing Application
+      technique_id: T1190
+      simulation_check: check_public_app_vulns
+      description: Exploits vulnerabilities in web-facing applications, VPNs, and mail servers for initial foothold
+    - tactic: Credential Access
+      technique: OS Credential Dumping
+      technique_id: T1003
+      simulation_check: check_credential_dump_artifacts
+      description: Uses Mimikatz and custom tools to extract credentials from LSASS and SAM database
+    - tactic: Execution
+      technique: Command and Scripting Interpreter
+      technique_id: T1059
+      simulation_check: check_scripting_execution
+      description: Executes malicious scripts via PowerShell, VBScript, and batch files on compromised hosts
+    - tactic: Command and Control
+      technique: Application Layer Protocol
+      technique_id: T1071
+      simulation_check: check_c2_web_traffic
+      description: Uses HTTP/HTTPS and DNS for C2 communications with custom implants like X-Agent
+    - tactic: Defense Evasion
+      technique: Valid Accounts
+      technique_id: T1078
+      simulation_check: check_account_usage_anomalies
+      description: Harvests and reuses legitimate credentials to operate under the radar
+    - tactic: Credential Access
+      technique: Brute Force
+      technique_id: T1110
+      simulation_check: check_brute_force_indicators
+      description: Conducts password spraying against cloud services, OWA, and VPN portals at scale
+    - tactic: Collection
+      technique: Input Capture
+      technique_id: T1056
+      simulation_check: check_keylogger_artifacts
+      description: Deploys keyloggers and credential-intercepting tools on compromised endpoints
+
+  detection_priorities:
+    - Email gateway spearphishing detection and URL sandboxing
+    - Public-facing application vulnerability management and WAF tuning
+    - Password spray detection across cloud and on-premise authentication
+    - Credential dumping tool signatures and LSASS access monitoring

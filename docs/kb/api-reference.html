@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Reference - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html" class="active"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#authentication"><span class="nav-icon">&#x1F511;</span> Authentication</a>
+        <a href="#endpoints"><span class="nav-icon">&#x1F4E1;</span> Endpoints</a>
+        <a href="#health"><span class="nav-icon">&#x1F49A;</span> Health &amp; Stats</a>
+        <a href="#scans"><span class="nav-icon">&#x1F50D;</span> Scans</a>
+        <a href="#findings"><span class="nav-icon">&#x1F4CB;</span> Findings</a>
+        <a href="#assets"><span class="nav-icon">&#x1F4BB;</span> Assets</a>
+        <a href="#remediation"><span class="nav-icon">&#x1F6E0;</span> Remediation</a>
+        <a href="#risks"><span class="nav-icon">&#x1F4CA;</span> Risks</a>
+        <a href="#ai"><span class="nav-icon">&#x1F916;</span> AI</a>
+        <a href="#compliance-api"><span class="nav-icon">&#x2611;</span> Reports</a>
+        <a href="#schedules"><span class="nav-icon">&#x1F553;</span> Schedules</a>
+        <a href="#notifications"><span class="nav-icon">&#x1F514;</span> Notifications</a>
+        <a href="#license-api"><span class="nav-icon">&#x1F512;</span> License</a>
+        <a href="#errors"><span class="nav-icon">&#x26A0;</span> Error Codes</a>
+        <a href="#rate-limiting"><span class="nav-icon">&#x23F1;</span> Rate Limiting</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">API Reference</span>
+        </div>
+
+        <h1>API Reference</h1>
+        <p>The Donjon REST API runs on <code>https://localhost:8443</code> and provides full programmatic access to all platform capabilities. All endpoints return JSON unless otherwise noted.</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Base URL</div>
+            <p><code>https://localhost:8443/api/v1</code></p>
+        </div>
+
+        <!-- Authentication -->
+        <h2 id="authentication">Authentication</h2>
+        <p>API requests require an API key passed via the <code>X-API-Key</code> header. The dashboard (<code>GET /</code>) does not require authentication.</p>
+
+<pre><code><span class="cmt"># Include the API key in every request</span>
+curl -H <span class="str">"X-API-Key: your-api-key-here"</span> \
+     https://localhost:8443/api/v1/stats</code></pre>
+
+        <p>Unauthenticated requests receive a <code>401 Unauthorized</code> response:</p>
+<pre><code>{
+  <span class="str">"error"</span>: <span class="num">true</span>,
+  <span class="str">"message"</span>: <span class="str">"Authentication required"</span>
+}</code></pre>
+
+        <!-- Endpoints Overview -->
+        <h2 id="endpoints">Endpoints Overview</h2>
+        <p>All endpoints are prefixed with <code>/api/v1</code>. The API uses standard HTTP methods and returns JSON responses.</p>
+
+        <!-- Health & Stats -->
+        <h2 id="health">Health and Stats</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/health</span>
+            <span class="endpoint-desc">Health check</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/stats</span>
+            <span class="endpoint-desc">Platform statistics and overview</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/scanners</span>
+            <span class="endpoint-desc">List available scanners for current tier</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/network/local</span>
+            <span class="endpoint-desc">Local network information</span>
+        </div>
+
+        <h4>Example: GET /api/v1/stats</h4>
+<pre><code><span class="cmt">// Response</span>
+{
+  <span class="str">"total_scans"</span>: <span class="num">42</span>,
+  <span class="str">"total_findings"</span>: <span class="num">187</span>,
+  <span class="str">"findings_by_severity"</span>: {
+    <span class="str">"CRITICAL"</span>: <span class="num">3</span>,
+    <span class="str">"HIGH"</span>: <span class="num">15</span>,
+    <span class="str">"MEDIUM"</span>: <span class="num">48</span>,
+    <span class="str">"LOW"</span>: <span class="num">72</span>,
+    <span class="str">"INFO"</span>: <span class="num">49</span>
+  },
+  <span class="str">"tier"</span>: <span class="str">"community"</span>,
+  <span class="str">"uptime_seconds"</span>: <span class="num">3600</span>
+}</code></pre>
+
+        <!-- Scans -->
+        <h2 id="scans">Scans</h2>
+
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/scans</span>
+            <span class="endpoint-desc">Start a new scan</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/scans</span>
+            <span class="endpoint-desc">List all scan sessions</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/scans/{session_id}</span>
+            <span class="endpoint-desc">Get scan session details</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/scans/{session_id}/findings</span>
+            <span class="endpoint-desc">Get findings for a session</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/scans/{session_id}/export</span>
+            <span class="endpoint-desc">Export scan results</span>
+        </div>
+
+        <h4>Example: Start a Scan</h4>
+<pre><code><span class="cmt">// POST /api/v1/scans</span>
+{
+  <span class="str">"scanner"</span>: <span class="str">"network"</span>,
+  <span class="str">"targets"</span>: [<span class="str">"192.168.1.0/24"</span>],
+  <span class="str">"scan_type"</span>: <span class="str">"quick"</span>
+}
+
+<span class="cmt">// Response</span>
+{
+  <span class="str">"session_id"</span>: <span class="str">"sess-a1b2c3d4"</span>,
+  <span class="str">"scanner"</span>: <span class="str">"network"</span>,
+  <span class="str">"status"</span>: <span class="str">"running"</span>,
+  <span class="str">"started_at"</span>: <span class="str">"2026-02-15T10:30:00Z"</span>
+}</code></pre>
+
+        <h4>Example: Export Scan</h4>
+<pre><code><span class="cmt">// GET /api/v1/scans/sess-a1b2c3d4/export?format=csv</span>
+<span class="cmt">// Returns CSV file download</span>
+
+<span class="cmt">// Query parameters:</span>
+<span class="cmt">//   format: csv | json | html | pdf | sarif | xml</span>
+<span class="cmt">//   (html, pdf, sarif, xml require Pro tier)</span></code></pre>
+
+        <!-- Findings -->
+        <h2 id="findings">Findings</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/findings</span>
+            <span class="endpoint-desc">List all findings</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/findings/{id}</span>
+            <span class="endpoint-desc">Get finding details</span>
+        </div>
+
+        <!-- Assets -->
+        <h2 id="assets">Assets</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/assets</span>
+            <span class="endpoint-desc">List all assets</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/assets</span>
+            <span class="endpoint-desc">Create an asset</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/assets/{id}</span>
+            <span class="endpoint-desc">Get asset details</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-put">PUT</span>
+            <span class="endpoint-path">/api/v1/assets/{id}</span>
+            <span class="endpoint-desc">Update an asset</span>
+        </div>
+
+        <h4>Example: Create Asset</h4>
+<pre><code><span class="cmt">// POST /api/v1/assets</span>
+{
+  <span class="str">"hostname"</span>: <span class="str">"web-server-01"</span>,
+  <span class="str">"ip_address"</span>: <span class="str">"10.0.1.50"</span>,
+  <span class="str">"asset_type"</span>: <span class="str">"server"</span>,
+  <span class="str">"business_unit"</span>: <span class="str">"engineering"</span>,
+  <span class="str">"criticality"</span>: <span class="str">"high"</span>
+}</code></pre>
+
+        <!-- Remediation -->
+        <h2 id="remediation">Remediation</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/remediation</span>
+            <span class="endpoint-desc">List remediation items</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/remediation</span>
+            <span class="endpoint-desc">Create remediation item</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-put">PUT</span>
+            <span class="endpoint-path">/api/v1/remediation/{id}</span>
+            <span class="endpoint-desc">Update remediation item</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/remediation/metrics</span>
+            <span class="endpoint-desc">Remediation metrics (MTTR, etc.)</span>
+        </div>
+
+        <!-- Risks -->
+        <h2 id="risks">Risks</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/risks</span>
+            <span class="endpoint-desc">List risks in the risk register</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/risks</span>
+            <span class="endpoint-desc">Create a risk entry</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/risks/posture</span>
+            <span class="endpoint-desc">Overall risk posture summary</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/risks/matrix</span>
+            <span class="endpoint-desc">Risk heatmap matrix</span>
+        </div>
+
+        <!-- Exceptions -->
+        <h3>Risk Exceptions</h3>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/exceptions</span>
+            <span class="endpoint-desc">List risk exceptions</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/exceptions</span>
+            <span class="endpoint-desc">Create a risk exception</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-put">PUT</span>
+            <span class="endpoint-path">/api/v1/exceptions/{id}/approve</span>
+            <span class="endpoint-desc">Approve a risk exception</span>
+        </div>
+
+        <!-- AI -->
+        <h2 id="ai">AI Analysis</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/ai/status</span>
+            <span class="endpoint-desc">AI engine status and quota</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/ai/config</span>
+            <span class="endpoint-desc">Get AI configuration</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/config</span>
+            <span class="endpoint-desc">Update AI configuration</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/test</span>
+            <span class="endpoint-desc">Test AI provider connection</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/analyze</span>
+            <span class="endpoint-desc">Analyze a specific finding</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/triage</span>
+            <span class="endpoint-desc">Triage a list of findings</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/remediate</span>
+            <span class="endpoint-desc">Generate remediation guidance</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/summarize/{session_id}</span>
+            <span class="endpoint-desc">Generate scan summary (Pro+)</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/ai/query</span>
+            <span class="endpoint-desc">Free-form AI query</span>
+        </div>
+
+        <h4>Example: Analyze Finding</h4>
+<pre><code><span class="cmt">// POST /api/v1/ai/analyze</span>
+{
+  <span class="str">"finding"</span>: {
+    <span class="str">"title"</span>: <span class="str">"SQL Injection in Login Form"</span>,
+    <span class="str">"severity"</span>: <span class="str">"CRITICAL"</span>,
+    <span class="str">"cvss_score"</span>: <span class="num">9.8</span>,
+    <span class="str">"epss_score"</span>: <span class="num">0.92</span>,
+    <span class="str">"kev_status"</span>: <span class="str">"true"</span>,
+    <span class="str">"affected_asset"</span>: <span class="str">"10.0.0.5"</span>,
+    <span class="str">"remediation"</span>: <span class="str">"Use parameterized queries."</span>
+  }
+}
+
+<span class="cmt">// Response</span>
+{
+  <span class="str">"analysis"</span>: <span class="str">"This is a critical SQL injection vulnerability..."</span>,
+  <span class="str">"risk_level"</span>: <span class="str">"CRITICAL"</span>,
+  <span class="str">"recommendations"</span>: [ ... ],
+  <span class="str">"ai_generated"</span>: <span class="num">true</span>,
+  <span class="str">"disclaimer"</span>: <span class="str">"AI-Generated - Verify Before Acting"</span>
+}</code></pre>
+
+        <!-- Reports -->
+        <h2 id="compliance-api">Reports and Compliance</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/reports/executive</span>
+            <span class="endpoint-desc">Executive summary report</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/reports/compliance/{framework}</span>
+            <span class="endpoint-desc">Compliance report for a framework</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/export</span>
+            <span class="endpoint-desc">Bulk export data</span>
+        </div>
+
+        <!-- Schedules -->
+        <h2 id="schedules">Schedules (Pro+)</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/schedules</span>
+            <span class="endpoint-desc">List scheduled scans</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/schedules</span>
+            <span class="endpoint-desc">Create a scheduled scan</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/schedules/{id}</span>
+            <span class="endpoint-desc">Get schedule details</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-put">PUT</span>
+            <span class="endpoint-path">/api/v1/schedules/{id}</span>
+            <span class="endpoint-desc">Update a schedule</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/schedules/{id}</span>
+            <span class="endpoint-desc">Delete a schedule</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/schedules/{id}/history</span>
+            <span class="endpoint-desc">Schedule execution history</span>
+        </div>
+
+        <!-- Notifications -->
+        <h2 id="notifications">Notifications</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/notifications/channels</span>
+            <span class="endpoint-desc">List notification channels</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/notifications/channels</span>
+            <span class="endpoint-desc">Create a notification channel</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-put">PUT</span>
+            <span class="endpoint-path">/api/v1/notifications/channels/{id}</span>
+            <span class="endpoint-desc">Update a notification channel</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/notifications/channels/{id}</span>
+            <span class="endpoint-desc">Delete a notification channel</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/notifications/test</span>
+            <span class="endpoint-desc">Send a test notification</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/notifications/history</span>
+            <span class="endpoint-desc">Notification delivery history</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/notifications/stats</span>
+            <span class="endpoint-desc">Notification statistics</span>
+        </div>
+
+        <h4>Example: Create Webhook Channel</h4>
+<pre><code><span class="cmt">// POST /api/v1/notifications/channels</span>
+{
+  <span class="str">"name"</span>: <span class="str">"security-alerts"</span>,
+  <span class="str">"channel_type"</span>: <span class="str">"webhook"</span>,
+  <span class="str">"config"</span>: {
+    <span class="str">"url"</span>: <span class="str">"https://hooks.example.com/security"</span>
+  }
+}
+
+<span class="cmt">// Response</span>
+{
+  <span class="str">"channel_id"</span>: <span class="str">"ch-x1y2z3"</span>,
+  <span class="str">"name"</span>: <span class="str">"security-alerts"</span>,
+  <span class="str">"status"</span>: <span class="str">"active"</span>
+}</code></pre>
+
+        <!-- Additional Endpoints -->
+        <h2 id="additional">Additional Endpoints</h2>
+
+        <h3>Discovery</h3>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/discovery/scan</span>
+            <span class="endpoint-desc">Run a network discovery scan</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/discovery/hosts</span>
+            <span class="endpoint-desc">List discovered hosts</span>
+        </div>
+
+        <h3>Agents</h3>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/agents/checkin</span>
+            <span class="endpoint-desc">Agent check-in</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/agents</span>
+            <span class="endpoint-desc">List registered agents</span>
+        </div>
+
+        <h3>Audit</h3>
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/audit</span>
+            <span class="endpoint-desc">View audit log</span>
+        </div>
+
+        <h3>Maintenance</h3>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/maintenance/purge-scans</span>
+            <span class="endpoint-desc">Purge old scan data</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/maintenance/purge-notifications</span>
+            <span class="endpoint-desc">Purge notification history</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/maintenance/purge-audit</span>
+            <span class="endpoint-desc">Purge audit log entries</span>
+        </div>
+
+        <!-- License API -->
+        <h2 id="license-api">License</h2>
+
+        <div class="endpoint">
+            <span class="method method-get">GET</span>
+            <span class="endpoint-path">/api/v1/license</span>
+            <span class="endpoint-desc">Get license info and current tier</span>
+        </div>
+        <div class="endpoint">
+            <span class="method method-post">POST</span>
+            <span class="endpoint-path">/api/v1/license/activate</span>
+            <span class="endpoint-desc">Activate a new license</span>
+        </div>
+
+        <h4>Example: License Info</h4>
+<pre><code><span class="cmt">// GET /api/v1/license</span>
+{
+  <span class="str">"tier"</span>: <span class="str">"community"</span>,
+  <span class="str">"organization"</span>: <span class="str">""</span>,
+  <span class="str">"expires"</span>: <span class="str">""</span>,
+  <span class="str">"license_id"</span>: <span class="str">""</span>,
+  <span class="str">"format_version"</span>: <span class="num">0</span>,
+  <span class="str">"valid"</span>: <span class="num">true</span>,
+  <span class="str">"limits"</span>: {
+    <span class="str">"scanners"</span>: [<span class="str">"network"</span>, <span class="str">"vulnerability"</span>, <span class="str">"web"</span>, <span class="str">"ssl"</span>, <span class="str">"windows"</span>, <span class="str">"linux"</span>, <span class="str">"compliance"</span>],
+    <span class="str">"scan_depths"</span>: [<span class="str">"quick"</span>, <span class="str">"standard"</span>],
+    <span class="str">"max_targets_per_scan"</span>: <span class="num">16</span>,
+    <span class="str">"export_formats"</span>: [<span class="str">"csv"</span>, <span class="str">"json"</span>],
+    <span class="str">"ai_queries_per_day"</span>: <span class="num">10</span>,
+    <span class="str">"max_users"</span>: <span class="num">1</span>,
+    <span class="str">"api_rate_limit"</span>: <span class="num">100</span>
+  }
+}</code></pre>
+
+        <!-- Error Codes -->
+        <h2 id="errors">Error Codes</h2>
+        <table>
+            <thead><tr><th>Code</th><th>Meaning</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>200</code></td><td>OK</td><td>Request succeeded</td></tr>
+                <tr><td><code>201</code></td><td>Created</td><td>Resource created successfully</td></tr>
+                <tr><td><code>400</code></td><td>Bad Request</td><td>Invalid request body or parameters</td></tr>
+                <tr><td><code>401</code></td><td>Unauthorized</td><td>Missing or invalid API key</td></tr>
+                <tr><td><code>403</code></td><td>Forbidden</td><td>Feature not available for current tier</td></tr>
+                <tr><td><code>404</code></td><td>Not Found</td><td>Resource does not exist</td></tr>
+                <tr><td><code>429</code></td><td>Too Many Requests</td><td>Rate limit exceeded</td></tr>
+                <tr><td><code>500</code></td><td>Internal Error</td><td>Server-side error</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Tier Enforcement Errors</h3>
+        <p>When a feature is not available for the current license tier, the API returns <code>403 Forbidden</code> with an upgrade message:</p>
+<pre><code>{
+  <span class="str">"error"</span>: <span class="num">true</span>,
+  <span class="str">"message"</span>: <span class="str">"Deep scans are a Pro feature. Community includes quick and standard depth. Upgrade to unlock deep scanning."</span>,
+  <span class="str">"tier"</span>: <span class="str">"community"</span>,
+  <span class="str">"required_tier"</span>: <span class="str">"pro"</span>
+}</code></pre>
+
+        <!-- Rate Limiting -->
+        <h2 id="rate-limiting">Rate Limiting</h2>
+        <table>
+            <thead><tr><th>Tier</th><th>Requests / Hour</th></tr></thead>
+            <tbody>
+                <tr><td><span class="badge badge-tier-community">Community</span></td><td>100</td></tr>
+                <tr><td><span class="badge badge-tier-pro">Pro</span></td><td>10,000</td></tr>
+                <tr><td><span class="badge badge-tier-enterprise">Enterprise</span></td><td>Unlimited</td></tr>
+                <tr><td><span class="badge badge-tier-managed">Managed</span></td><td>Unlimited</td></tr>
+            </tbody>
+        </table>
+
+        <p>Rate limit headers are included in every response:</p>
+<pre><code>X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 87
+X-RateLimit-Reset: 1739612400</code></pre>
+
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+# Donjon Platform v7.0 - Configuration Template
+# Copy this file to config/active/config.yaml and customize.
+# See docs/CONFIGURATION.md for full documentation.
+
+# --- Network ---
+network:
+  auto_detect: true
+  # scan_ranges:
+  #   - '192.168.1.0/24'
+  #   - '10.0.0.0/24'
+
+# --- Scanning ---
+scanning:
+  stealth_level: 3        # 1=aggressive (fastest), 5=maximum stealth (slowest)
+  delay_min_seconds: 30
+  delay_max_seconds: 300
+  scan_types:
+    - network
+    - vulnerability
+    - web
+    - ssl
+    - compliance
+
+# --- AI Analysis ---
+ai:
+  provider: template       # template (default), ollama, openai
+  # model: llama3          # Model name for ollama/openai
+  # api_url: 'http://localhost:11434'  # Ollama API URL
+  sanitize_external: true  # Strip IPs/hostnames before sending to external APIs
+
+# --- Risk Quantification ---
+risk:
+  industry: default        # healthcare, financial, technology, government, education, retail, manufacturing, energy
+  benchmark_year: 2025
+  monte_carlo_iterations: 10000
+
+# --- Container Security ---
+container:
+  enabled: true
+  runtime: auto            # auto, docker, podman
+  trivy_enabled: true
+
+# --- Cloud Security ---
+cloud:
+  enabled: true
+  aws:
+    enabled: true
+    read_only: true
+  azure:
+    enabled: true
+    read_only: true
+  gcp:
+    enabled: true
+    read_only: true
+
+# --- Attack Surface Management ---
+asm:
+  active_enumeration: false  # Set true to enable active subdomain enumeration
+  ct_logs: true
+  dns_brute: true
+
+# --- SBOM ---
+sbom:
+  enabled: true
+  formats:
+    - cyclonedx
+    - spdx
+
+# --- CI/CD ---
+cicd:
+  security_gate:
+    fail_on_critical: true
+    max_high: 5
+    max_medium: 20
+
+# --- Reporting ---
+reporting:
+  formats:
+    - html
+    - json
+    - csv
+    - sarif
+
+# --- Notifications (optional) ---
+# notifications:
+#   slack:
+#     webhook_url: 'https://hooks.slack.com/services/...'
+#   teams:
+#     webhook_url: 'https://outlook.office.com/webhook/...'
+
+# --- Integrations (optional) ---
+# integrations:
+#   jira:
+#     url: 'https://your-org.atlassian.net'
+#     project_key: 'SEC'
+#   shodan:
+#     api_key: ''  # Or use credential manager
+
+# --- API Keys (set as environment variables) ---
+# NVD_API_KEY       - NVD API key (increases rate limit from 5 to 50 req/30s)
+# GITHUB_TOKEN      - GitHub token (increases rate limit from 60 to 5000 req/hr)
+# ABUSECH_API_KEY   - abuse.ch API key for URLhaus + ThreatFox (free: https://auth.abuse.ch/)

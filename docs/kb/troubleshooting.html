@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Troubleshooting - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html" class="active"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#installation-issues"><span class="nav-icon">&#x1F4E6;</span> Installation</a>
+        <a href="#scan-issues"><span class="nav-icon">&#x1F50D;</span> Scan Issues</a>
+        <a href="#license-issues"><span class="nav-icon">&#x1F511;</span> License Issues</a>
+        <a href="#ai-issues"><span class="nav-icon">&#x1F916;</span> AI Issues</a>
+        <a href="#database-issues"><span class="nav-icon">&#x1F4BE;</span> Database Issues</a>
+        <a href="#export-issues"><span class="nav-icon">&#x1F4E4;</span> Export Errors</a>
+        <a href="#faq"><span class="nav-icon">&#x2753;</span> FAQ</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">Troubleshooting</span>
+        </div>
+
+        <h1>Troubleshooting Guide</h1>
+        <p>Solutions for common issues encountered when installing, configuring, and operating the Donjon Platform.</p>
+
+        <!-- Installation Issues -->
+        <h2 id="installation-issues">Common Installation Issues</h2>
+
+        <details>
+            <summary>Python not found</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> The launcher displays "ERROR: Python 3 not found".</p>
+                <p><strong>Cause:</strong> Python 3.10+ is not installed or not on the system PATH.</p>
+                <p><strong>Solution:</strong></p>
+                <ol>
+                    <li>Download Python 3.10+ from <a href="https://www.python.org/downloads/" target="_blank">python.org</a></li>
+                    <li>During installation, check <strong>"Add Python to PATH"</strong></li>
+                    <li>Restart your terminal after installation</li>
+                    <li>Verify: <code>python --version</code> or <code>python3 --version</code></li>
+                </ol>
+                <p>On Windows, also try the Python launcher: <code>py -3 --version</code></p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Execution policy error (PowerShell)</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>donjon-launcher.ps1 cannot be loaded because running scripts is disabled on this system</code></p>
+                <p><strong>Solution:</strong> Run one of these commands:</p>
+<pre><code><span class="cmt"># Option 1: Set policy for current user (recommended)</span>
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+<span class="cmt"># Option 2: Bypass for this session only</span>
+powershell -ExecutionPolicy Bypass -File bin\donjon-launcher.ps1
+
+<span class="cmt"># Option 3: Use the batch file instead</span>
+bin\donjon-launcher.bat</code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>Missing dependencies / pip install fails</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>pip install -r requirements.txt</code> fails with compilation errors.</p>
+                <p><strong>Solutions:</strong></p>
+                <ul>
+                    <li><strong>Windows:</strong> Install Microsoft Visual C++ Build Tools from <a href="https://visualstudio.microsoft.com/visual-cpp-build-tools/" target="_blank">Visual Studio</a></li>
+                    <li><strong>Linux:</strong> Install development headers: <code>sudo apt install python3-dev build-essential</code></li>
+                    <li><strong>macOS:</strong> Install Xcode CLI tools: <code>xcode-select --install</code></li>
+                </ul>
+                <p>If only the <code>dilithium-py</code> package fails, the platform will still work but post-quantum license verification will be unavailable (falls back to Ed25519 only).</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Port 8443 already in use</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>OSError: [Errno 98] Address already in use</code> or similar.</p>
+                <p><strong>Solution:</strong></p>
+<pre><code><span class="cmt"># Find what is using the port</span>
+<span class="cmt"># Linux/macOS:</span>
+lsof -i :8443
+
+<span class="cmt"># Windows:</span>
+netstat -ano | findstr :8443
+
+<span class="cmt"># Kill the process or change the port in config.yaml:</span>
+<span class="var">server</span>:
+  <span class="var">port</span>: <span class="num">9443</span></code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>Virtual environment creation fails</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>Failed to create venv</code> during first-run bootstrap.</p>
+                <p><strong>Solutions:</strong></p>
+                <ul>
+                    <li>Ensure <code>python3-venv</code> is installed: <code>sudo apt install python3-venv</code> (Debian/Ubuntu)</li>
+                    <li>Ensure you have write permissions to the platform directory</li>
+                    <li>If on a USB drive, ensure it is not write-protected</li>
+                    <li>Try creating the venv manually: <code>python3 -m venv venv</code></li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- Scan Issues -->
+        <h2 id="scan-issues">Scan Issues</h2>
+
+        <details>
+            <summary>Scans timing out</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> Scans take extremely long or appear to hang.</p>
+                <p><strong>Possible causes and solutions:</strong></p>
+                <ul>
+                    <li><strong>Community tier throttling:</strong> Community scans have a 500ms delay between checks. Upgrade to Pro for full-speed scanning.</li>
+                    <li><strong>Too many targets:</strong> Reduce the target count or use CIDR notation for subnets.</li>
+                    <li><strong>Unreachable targets:</strong> Verify network connectivity to targets before scanning.</li>
+                    <li><strong>Deep scan on large network:</strong> Use "quick" scan depth for initial assessment, then deep-scan specific targets.</li>
+                </ul>
+                <p>Adjust the per-test timeout in the test runner with <code>--timeout 120</code> (seconds).</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Network permission errors</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>Permission denied</code> or <code>Operation not permitted</code> during network scans.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li><strong>nmap requires root/admin for SYN scans:</strong> Run with <code>sudo</code> on Linux/macOS or as Administrator on Windows. Alternatively, nmap falls back to TCP connect scans without elevated privileges.</li>
+                    <li><strong>Firewall blocking:</strong> Check local firewall rules and ensure outbound connections to scan targets are permitted.</li>
+                    <li><strong>Corporate proxy:</strong> Configure proxy settings if scanning through a corporate network.</li>
+                </ul>
+            </div>
+        </details>
+
+        <details>
+            <summary>Scanner not found</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> "Scanner X not available" or findings are limited.</p>
+                <p><strong>Solution:</strong> Donjon gracefully degrades when external tools are missing. Install the recommended tools for full scanning capabilities:</p>
+                <table>
+                    <thead><tr><th>Tool</th><th>Install Command</th></tr></thead>
+                    <tbody>
+                        <tr><td>nmap</td><td><code>apt install nmap</code> / download from nmap.org</td></tr>
+                        <tr><td>nuclei</td><td><code>go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest</code></td></tr>
+                        <tr><td>nikto</td><td><code>apt install nikto</code></td></tr>
+                        <tr><td>testssl.sh</td><td><code>git clone https://github.com/drwetter/testssl.sh.git</code></td></tr>
+                        <tr><td>trivy</td><td><code>apt install trivy</code> / download from aquasec</td></tr>
+                    </tbody>
+                </table>
+                <p>Check available tools: the platform auto-detects tools at startup and reports in the tool discovery phase.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Tier feature blocked during scan</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> "This scanner requires Pro" or "Deep scans are a Pro feature".</p>
+                <p><strong>Explanation:</strong> Community tier is limited to 7 core scanners (network, vulnerability, web, ssl, windows, linux, compliance) and quick/standard depths. Additional scanners and deep scan require Pro or above.</p>
+                <p><strong>Solution:</strong> Upgrade your license tier, or use the available Community scanners.</p>
+            </div>
+        </details>
+
+        <!-- License Issues -->
+        <h2 id="license-issues">License Issues</h2>
+
+        <details>
+            <summary>Invalid license / signature verification failed</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> Log shows "License signature verification failed -- community tier".</p>
+                <p><strong>Possible causes:</strong></p>
+                <ul>
+                    <li><strong>Corrupted file:</strong> The <code>license.json</code> file was modified or corrupted during transfer. Re-download or re-copy the original file.</li>
+                    <li><strong>Wrong file:</strong> Ensure you placed the correct <code>license.json</code> in <code>data/license.json</code>.</li>
+                    <li><strong>Missing crypto libraries:</strong> For v2 licenses, ensure <code>dilithium-py</code> and/or <code>cryptography</code> packages are installed. At least one is required for signature verification.</li>
+                </ul>
+<pre><code><span class="cmt"># Install crypto libraries</span>
+pip install dilithium-py cryptography</code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>License expired</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> Log shows "License expired -- community tier".</p>
+                <p><strong>Solution:</strong> Contact <a href="https://donjonsec.com">donjonsec.com</a> for a renewal. Replace <code>data/license.json</code> with the renewed license file and restart the platform.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Machine fingerprint mismatch</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> Log shows "License not valid for this machine -- community tier".</p>
+                <p><strong>Cause:</strong> The license is bound to a different machine's fingerprint.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>If you moved the license to a new machine, request a license transfer from support.</li>
+                    <li>If hardware changed (NIC replacement, hostname change), the fingerprint changed. Contact support with the new fingerprint.</li>
+                    <li>View current fingerprint via: <code>GET /api/v1/license</code></li>
+                </ul>
+                <p>The fingerprint is a SHA-256 hash of: MAC address + hostname + platform + processor + machine ID.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>License revoked</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> Log shows "License has been revoked -- community tier".</p>
+                <p><strong>Cause:</strong> The license ID appears in <code>data/revoked.json</code>. This can happen if the license was reported stolen, violated terms, or was replaced.</p>
+                <p><strong>Solution:</strong> Contact support at <a href="https://donjonsec.com">donjonsec.com</a> to resolve revocation issues.</p>
+            </div>
+        </details>
+
+        <!-- AI Issues -->
+        <h2 id="ai-issues">AI Issues</h2>
+
+        <details>
+            <summary>AI provider not configured</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> AI queries return errors about missing provider configuration.</p>
+                <p><strong>Solution:</strong> Check <code>config/active/config.yaml</code>:</p>
+<pre><code><span class="var">ai</span>:
+  <span class="var">provider</span>: <span class="str">'template'</span>  <span class="cmt"># Works without any external service</span></code></pre>
+                <p>For Ollama, ensure the service is running: <code>ollama serve</code></p>
+                <p>For OpenAI, ensure <code>OPENAI_API_KEY</code> is set as an environment variable.</p>
+                <p>Check AI status via API: <code>GET /api/v1/ai/status</code></p>
+                <p>Test the connection: <code>POST /api/v1/ai/test</code></p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Daily AI quota exceeded</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> "You've reached the daily AI limit (10 queries)".</p>
+                <p><strong>Cause:</strong> Community tier allows 10 AI queries per day. The quota resets at midnight UTC.</p>
+                <p><strong>Solutions:</strong></p>
+                <ul>
+                    <li>Wait until midnight UTC for the quota to reset.</li>
+                    <li>Upgrade to Pro tier for unlimited AI queries.</li>
+                </ul>
+                <p>The quota counter is stored in <code>data/ai_quota.json</code>.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Slow AI responses</summary>
+            <div class="details-content">
+                <p><strong>Possible causes:</strong></p>
+                <ul>
+                    <li><strong>Ollama backend:</strong> Local LLM inference speed depends on hardware. Ensure you have a capable GPU or use a smaller model.</li>
+                    <li><strong>OpenAI backend:</strong> Network latency or API rate limits. Check your internet connection and OpenAI account status.</li>
+                    <li><strong>Template backend:</strong> Should be near-instant. If slow, check disk I/O.</li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- Database Issues -->
+        <h2 id="database-issues">Database Issues</h2>
+
+        <details>
+            <summary>Database locked</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>sqlite3.OperationalError: database is locked</code></p>
+                <p><strong>Cause:</strong> Multiple processes are trying to write to the SQLite database simultaneously.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Ensure only one instance of Donjon is running</li>
+                    <li>If the issue persists, stop all Donjon processes and restart</li>
+                    <li>For multi-user environments, consider upgrading to PostgreSQL (Enterprise tier)</li>
+                </ul>
+            </div>
+        </details>
+
+        <details>
+            <summary>Database corrupted</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> <code>sqlite3.DatabaseError: database disk image is malformed</code></p>
+                <p><strong>Solution:</strong></p>
+<pre><code><span class="cmt"># Attempt recovery</span>
+sqlite3 data/evidence/evidence.db ".recover" | sqlite3 data/evidence/evidence_recovered.db
+
+<span class="cmt"># If recovery fails, remove the corrupted database</span>
+<span class="cmt"># A new empty database will be created on next launch</span>
+mv data/evidence/evidence.db data/evidence/evidence.db.corrupted</code></pre>
+                <p>Always maintain regular backups to prevent data loss.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Vulnerability intelligence database empty</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> No CVE enrichment data for findings.</p>
+                <p><strong>Solution:</strong> Populate the database:</p>
+<pre><code><span class="cmt"># Quick mode (~2 min)</span>
+python3 bin/update-intel.py --quick
+
+<span class="cmt"># Full mode (~2 hrs with NVD API key)</span>
+NVD_API_KEY=your-key python3 bin/update-intel.py
+
+<span class="cmt"># Check database status</span>
+python3 bin/update-intel.py --status</code></pre>
+                <p>Get a free NVD API key at <a href="https://nvd.nist.gov/developers/request-an-api-key" target="_blank">nvd.nist.gov</a> for 10x faster downloads.</p>
+            </div>
+        </details>
+
+        <!-- Export Issues -->
+        <h2 id="export-issues">Export Errors</h2>
+
+        <details>
+            <summary>Export format not available</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> "This export format requires Pro".</p>
+                <p><strong>Cause:</strong> Community tier only supports CSV and JSON exports. HTML, PDF, SARIF, and XML require Pro or above.</p>
+                <p><strong>Solution:</strong> Use CSV or JSON export, or upgrade your license tier.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>PDF export fails</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> PDF generation errors.</p>
+                <p><strong>Solution:</strong> Ensure the required PDF generation library is installed:</p>
+<pre><code>pip install weasyprint
+<span class="cmt"># OR</span>
+pip install reportlab</code></pre>
+                <p>On Linux, you may also need: <code>sudo apt install libpango-1.0-0 libpangocairo-1.0-0</code></p>
+            </div>
+        </details>
+
+        <details>
+            <summary>SARIF export invalid</summary>
+            <div class="details-content">
+                <p><strong>Symptom:</strong> GitHub/GitLab rejects the SARIF upload.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Ensure you are using SARIF v2.1.0 format (Donjon default)</li>
+                    <li>Validate the file: <code>python3 -m json.tool data/reports/scan.sarif</code></li>
+                    <li>Check GitHub's SARIF size limits (5000 results per file, 10 MB max)</li>
+                    <li>Split large results into multiple SARIF files if needed</li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- FAQ -->
+        <h2 id="faq">Frequently Asked Questions</h2>
+
+        <details>
+            <summary>Can I use Donjon without an internet connection?</summary>
+            <div class="details-content">
+                <p>Yes. Donjon is designed for air-gapped environments. The platform works completely offline when:</p>
+                <ul>
+                    <li>The AI backend is set to "template" (default)</li>
+                    <li>The vulnerability intelligence database is pre-populated</li>
+                    <li>Cloud scanning is disabled (automatic in portable mode)</li>
+                </ul>
+                <p>All license verification happens locally using embedded public keys.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>What happens when my license expires?</summary>
+            <div class="details-content">
+                <p>The platform gracefully falls back to Community tier. You retain full access to Community features (7 core scanners, CSV/JSON export, 10 AI queries/day). Your data and scan history are preserved. Renew your license to restore your previous tier.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Is my data sent to external servers?</summary>
+            <div class="details-content">
+                <p>Only if you explicitly configure an external AI provider (OpenAI). Even then, data sanitization automatically strips IP addresses and hostnames before sending. The template and Ollama backends keep all data local. License verification is performed locally using embedded public keys -- no license server call is required during normal operation.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Can I run multiple instances simultaneously?</summary>
+            <div class="details-content">
+                <p>Running multiple instances against the same SQLite database can cause locking issues. For multi-user environments, use PostgreSQL (Enterprise tier) or run separate instances with separate data directories.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>How do I reset the platform to factory defaults?</summary>
+            <div class="details-content">
+                <p>Remove the data directory and reconfigure:</p>
+<pre><code><span class="cmt"># Back up license first!</span>
+cp data/license.json ~/license-backup.json
+
+<span class="cmt"># Remove data</span>
+rm -rf data/evidence data/reports data/logs
+
+<span class="cmt"># Restore license</span>
+cp ~/license-backup.json data/license.json
+
+<span class="cmt"># Relaunch - databases will be recreated</span>
+python3 bin/donjon-launcher</code></pre>
+            </div>
+        </details>
+
+        <details>
+            <summary>What Python version do I need?</summary>
+            <div class="details-content">
+                <p>Python 3.10 is the minimum supported version. Python 3.11+ is recommended for best performance. Python 3.12 and 3.13 are also supported.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>How much disk space does the full vulnerability database require?</summary>
+            <div class="details-content">
+                <p>The full 7-source vulnerability intelligence database is approximately 732 MB. The base platform requires about 100 MB. Quick mode (<code>--quick</code>) downloads a smaller subset sufficient for most use cases.</p>
+            </div>
+        </details>
+
+        <details>
+            <summary>Can I integrate Donjon with my SIEM?</summary>
+            <div class="details-content">
+                <p>Yes. Donjon supports several integration methods:</p>
+                <ul>
+                    <li><strong>Webhook notifications:</strong> Push alerts to your SIEM webhook endpoint</li>
+                    <li><strong>SARIF export:</strong> Import results into GitHub/GitLab security dashboards</li>
+                    <li><strong>JSON/CSV export:</strong> Import scan results into any system</li>
+                    <li><strong>Audit log export:</strong> Enterprise tier supports audit log export for SIEM integration</li>
+                    <li><strong>REST API:</strong> Pull data programmatically from any system</li>
+                </ul>
+            </div>
+        </details>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Need More Help?</div>
+            <p>If your issue is not covered here, check the <a href="https://github.com/DonjonSec/donjon-platform/issues" target="_blank">GitHub Issues</a> page or contact support at <a href="https://donjonsec.com">donjonsec.com</a>.</p>
+        </div>
+
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

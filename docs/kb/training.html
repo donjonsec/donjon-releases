@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Materials - Donjon Platform v7.0 Knowledge Base</title>
+    <link rel="stylesheet" href="kb-styles.css">
+</head>
+<body>
+
+<header class="top-bar">
+    <div class="logo">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle navigation">&#9776;</button>
+        <div class="logo-icon">D</div>
+        <div class="logo-text">Donjon <span>Knowledge Base</span></div>
+    </div>
+    <div class="badges">
+        <span class="badge badge-version">v7.0</span>
+        <span class="badge badge-pqc">&#x1F512; Post-Quantum Secure</span>
+    </div>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="search-container">
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search..." oninput="filterNav()">
+        </div>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">Knowledge Base</div>
+        <a href="index.html"><span class="nav-icon">&#x1F3E0;</span> Home</a>
+        <a href="user-guide.html"><span class="nav-icon">&#x1F4D6;</span> User Guide</a>
+        <a href="admin-guide.html"><span class="nav-icon">&#x2699;</span> Admin Guide</a>
+        <a href="api-reference.html"><span class="nav-icon">&#x1F517;</span> API Reference</a>
+        <a href="security-guide.html"><span class="nav-icon">&#x1F6E1;</span> Security &amp; Licensing</a>
+        <a href="troubleshooting.html"><span class="nav-icon">&#x1F527;</span> Troubleshooting</a>
+        <a href="training.html" class="active"><span class="nav-icon">&#x1F393;</span> Training</a>
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">On This Page</div>
+        <a href="#quick-start"><span class="nav-icon">&#x1F680;</span> Quick Start (15 min)</a>
+        <a href="#vuln-workflow"><span class="nav-icon">&#x1F50D;</span> Vuln Assessment</a>
+        <a href="#compliance-workflow"><span class="nav-icon">&#x2611;</span> Compliance Assessment</a>
+        <a href="#mssp-management"><span class="nav-icon">&#x1F3E2;</span> MSSP Management</a>
+        <a href="#integration"><span class="nav-icon">&#x1F517;</span> Integration Guide</a>
+        <a href="#certification"><span class="nav-icon">&#x1F4DC;</span> Certification Mapping</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumbs">
+            <a href="index.html">Knowledge Base</a>
+            <span class="separator">/</span>
+            <span class="current">Training Materials</span>
+        </div>
+
+        <h1>Training Materials</h1>
+        <p>Structured training content for security practitioners, administrators, and managed service providers working with the Donjon Platform.</p>
+
+        <!-- Quick Start Tutorial -->
+        <h2 id="quick-start">Quick Start Tutorial (15 Minutes)</h2>
+
+        <div class="callout callout-success">
+            <div class="callout-title">Objective</div>
+            <p>Install Donjon, run your first network scan, and review findings in under 15 minutes.</p>
+        </div>
+
+        <h3>Minute 0-3: Setup</h3>
+        <ol class="steps">
+            <li>
+                <strong>Clone and install</strong>
+<pre><code>git clone https://github.com/DonjonSec/donjon-platform.git
+cd donjon-platform
+python3 -m venv venv
+source venv/bin/activate  <span class="cmt"># Windows: venv\Scripts\activate</span>
+pip install -r requirements.txt</code></pre>
+            </li>
+            <li>
+                <strong>Populate quick intelligence</strong>
+<pre><code>python3 bin/update-intel.py --quick</code></pre>
+                <p>This downloads KEV + EPSS + 14-day NVD data (~2 minutes).</p>
+            </li>
+        </ol>
+
+        <h3>Minute 3-5: Launch</h3>
+        <ol class="steps" style="counter-reset: step 2;">
+            <li>
+                <strong>Start the platform</strong>
+<pre><code>python3 bin/donjon-launcher</code></pre>
+                <p>The TUI main menu appears. The web dashboard is available at <code>https://localhost:8443</code>.</p>
+            </li>
+        </ol>
+
+        <h3>Minute 5-10: First Scan</h3>
+        <ol class="steps" style="counter-reset: step 3;">
+            <li>
+                <strong>Start a network scan via API</strong>
+<pre><code>curl -X POST http://localhost:8443/api/v1/scans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scanner": "network",
+    "targets": ["127.0.0.1"],
+    "scan_type": "quick"
+  }'</code></pre>
+                <p>Note the <code>session_id</code> in the response.</p>
+            </li>
+            <li>
+                <strong>Check scan status</strong>
+<pre><code>curl http://localhost:8443/api/v1/scans/&lt;session_id&gt;</code></pre>
+            </li>
+        </ol>
+
+        <h3>Minute 10-15: Review Results</h3>
+        <ol class="steps" style="counter-reset: step 5;">
+            <li>
+                <strong>Get findings</strong>
+<pre><code>curl http://localhost:8443/api/v1/scans/&lt;session_id&gt;/findings</code></pre>
+            </li>
+            <li>
+                <strong>Ask AI about the results</strong>
+<pre><code>curl -X POST http://localhost:8443/api/v1/ai/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Summarize the findings and recommend next steps",
+    "context": { "session_id": "&lt;session_id&gt;" }
+  }'</code></pre>
+            </li>
+            <li>
+                <strong>Export results</strong>
+<pre><code>curl "http://localhost:8443/api/v1/scans/&lt;session_id&gt;/export?format=json" \
+  -o scan-results.json</code></pre>
+            </li>
+        </ol>
+
+        <div class="callout callout-success">
+            <div class="callout-title">Congratulations</div>
+            <p>You have successfully installed Donjon, run your first scan, and exported results. Continue to the workflow tutorials below for production use cases.</p>
+        </div>
+
+        <!-- Vulnerability Assessment Workflow -->
+        <h2 id="vuln-workflow">Vulnerability Assessment Workflow</h2>
+
+        <h3>Phase 1: Scoping and Planning</h3>
+        <table>
+            <thead><tr><th>Step</th><th>Action</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td>Define target scope (IPs, ranges, domains)</td><td>Asset inventory API</td></tr>
+                <tr><td>2</td><td>Obtain written authorization</td><td>N/A (organizational requirement)</td></tr>
+                <tr><td>3</td><td>Register assets in inventory</td><td><code>POST /api/v1/assets</code></td></tr>
+                <tr><td>4</td><td>Select compliance frameworks</td><td>Configuration file</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Phase 2: Discovery</h3>
+        <table>
+            <thead><tr><th>Step</th><th>Action</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr><td>5</td><td>Network discovery scan</td><td><code>POST /api/v1/discovery/scan</code></td></tr>
+                <tr><td>6</td><td>Review discovered hosts</td><td><code>GET /api/v1/discovery/hosts</code></td></tr>
+                <tr><td>7</td><td>DNS and certificate enumeration</td><td>ASM scanner (Pro+)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Phase 3: Scanning</h3>
+        <table>
+            <thead><tr><th>Step</th><th>Action</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr><td>8</td><td>Quick network scan (port discovery)</td><td>Network scanner - quick</td></tr>
+                <tr><td>9</td><td>Vulnerability assessment</td><td>Vulnerability scanner</td></tr>
+                <tr><td>10</td><td>Web application scan</td><td>Web scanner</td></tr>
+                <tr><td>11</td><td>SSL/TLS assessment</td><td>SSL scanner</td></tr>
+                <tr><td>12</td><td>Compliance scan</td><td>Compliance scanner</td></tr>
+                <tr><td>13</td><td>Container security (if applicable)</td><td>Container scanner (Pro+)</td></tr>
+                <tr><td>14</td><td>Cloud security (if applicable)</td><td>Cloud scanner (Pro+)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Phase 4: Analysis</h3>
+        <table>
+            <thead><tr><th>Step</th><th>Action</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr><td>15</td><td>Review findings by severity</td><td>Dashboard, API</td></tr>
+                <tr><td>16</td><td>Check intelligence enrichment (EPSS, KEV, SSVC)</td><td>Automatic enrichment</td></tr>
+                <tr><td>17</td><td>AI triage and prioritization</td><td><code>POST /api/v1/ai/triage</code></td></tr>
+                <tr><td>18</td><td>FAIR risk quantification</td><td>Risk quantifier, <code>GET /api/v1/risks/posture</code></td></tr>
+            </tbody>
+        </table>
+
+        <h3>Phase 5: Reporting</h3>
+        <table>
+            <thead><tr><th>Step</th><th>Action</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr><td>19</td><td>Generate executive report</td><td><code>GET /api/v1/reports/executive</code></td></tr>
+                <tr><td>20</td><td>Generate compliance report</td><td><code>GET /api/v1/reports/compliance/{fw}</code></td></tr>
+                <tr><td>21</td><td>Export findings for client</td><td>Export API (HTML/PDF for Pro+)</td></tr>
+                <tr><td>22</td><td>Create remediation items</td><td><code>POST /api/v1/remediation</code></td></tr>
+            </tbody>
+        </table>
+
+        <!-- Compliance Assessment Workflow -->
+        <h2 id="compliance-workflow">Compliance Assessment Workflow</h2>
+
+        <h3>Supported Frameworks</h3>
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-title">NIST 800-53</div>
+                <div class="card-description">Federal information systems security controls. Used by US government agencies and contractors.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">HIPAA</div>
+                <div class="card-description">Health Insurance Portability and Accountability Act. Required for healthcare organizations.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">PCI-DSS v4</div>
+                <div class="card-description">Payment Card Industry Data Security Standard. Required for payment card processing.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">ISO 27001:2022</div>
+                <div class="card-description">International information security management standard. Widely used globally.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">SOC 2 Type II</div>
+                <div class="card-description">Service Organization Controls. Required for SaaS and service providers.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">CMMC</div>
+                <div class="card-description">Cybersecurity Maturity Model Certification. Required for DoD contractors.</div>
+            </div>
+        </div>
+
+        <h3>Compliance Assessment Steps</h3>
+        <ol class="steps">
+            <li>
+                <strong>Select applicable frameworks</strong>
+                <p>Configure the frameworks in <code>config/active/config.yaml</code>. Community tier supports 3 frameworks; Pro and above support unlimited.</p>
+<pre><code><span class="var">compliance</span>:
+  <span class="var">frameworks</span>:
+    - <span class="str">'NIST-800-53'</span>
+    - <span class="str">'HIPAA'</span>
+    - <span class="str">'PCI-DSS-v4'</span></code></pre>
+            </li>
+            <li>
+                <strong>Run a compliance scan</strong>
+                <p>The compliance scanner evaluates systems against the selected frameworks.</p>
+<pre><code>POST /api/v1/scans
+{ "scanner": "compliance", "targets": ["10.0.1.0/24"], "scan_type": "standard" }</code></pre>
+            </li>
+            <li>
+                <strong>Review framework-specific report</strong>
+<pre><code>GET /api/v1/reports/compliance/NIST-800-53</code></pre>
+                <p>The report shows control-by-control status: passing, failing, and not assessed.</p>
+            </li>
+            <li>
+                <strong>Address gaps</strong>
+                <p>Create remediation items for failing controls. Use AI for remediation guidance.</p>
+            </li>
+            <li>
+                <strong>Re-scan and verify</strong>
+                <p>After remediation, re-run the compliance scan and generate a delta report to show improvement.</p>
+            </li>
+        </ol>
+
+        <!-- MSSP Management -->
+        <h2 id="mssp-management">MSSP/MSP Multi-Client Management</h2>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Managed Tier Required</div>
+            <p>Multi-client management features require the Managed (MSSP/MSP) tier license.</p>
+        </div>
+
+        <h3>Managed Tier Exclusive Features</h3>
+        <table>
+            <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Client Provisioning</strong></td><td>Automated onboarding and configuration of client tenants</td></tr>
+                <tr><td><strong>Per-Client Dashboards</strong></td><td>Isolated security overview for each client</td></tr>
+                <tr><td><strong>Consolidated Rollup</strong></td><td>Aggregate reporting across all client tenants</td></tr>
+                <tr><td><strong>Bulk Scan Orchestration</strong></td><td>Schedule and coordinate scans across multiple clients</td></tr>
+                <tr><td><strong>Cross-Client Reporting</strong></td><td>Comparative analysis and benchmarking across your client portfolio</td></tr>
+                <tr><td><strong>Usage Metering API</strong></td><td>Track usage for billing integration</td></tr>
+                <tr><td><strong>License Sub-Allocation</strong></td><td>Distribute license seats across client organizations</td></tr>
+                <tr><td><strong>Per-Client Branding</strong></td><td>White-label reports with each client's branding</td></tr>
+                <tr><td><strong>Scan Template Library</strong></td><td>Create and distribute standardized scan templates</td></tr>
+                <tr><td><strong>Unlimited Clients</strong></td><td>No cap on the number of client tenants</td></tr>
+            </tbody>
+        </table>
+
+        <h3>MSSP Workflow</h3>
+        <ol class="steps">
+            <li>
+                <strong>Provision a new client</strong>
+                <p>Use client provisioning to create an isolated tenant with its own data, dashboards, and configurations.</p>
+            </li>
+            <li>
+                <strong>Configure scan templates</strong>
+                <p>Create standardized scan templates from the scan template library. Apply consistent assessment methodology across all clients.</p>
+            </li>
+            <li>
+                <strong>Schedule recurring scans</strong>
+                <p>Use bulk scan orchestration to schedule scans across multiple clients. Configure different schedules per client based on their SLA.</p>
+            </li>
+            <li>
+                <strong>Generate client reports</strong>
+                <p>Use per-client branding to generate white-labeled reports. Each client receives reports with their own logo and branding.</p>
+            </li>
+            <li>
+                <strong>Review consolidated rollup</strong>
+                <p>Use the consolidated rollup dashboard to get a portfolio-wide view of security posture across all clients.</p>
+            </li>
+            <li>
+                <strong>Track billing</strong>
+                <p>Use the usage metering API to track scan volume, AI queries, and other usage metrics for billing integration.</p>
+            </li>
+        </ol>
+
+        <!-- Integration Guide -->
+        <h2 id="integration">Integration Guide</h2>
+
+        <h3>CI/CD Pipeline Integration</h3>
+
+        <h4>GitHub Actions</h4>
+<pre><code><span class="cmt"># .github/workflows/security-scan.yml</span>
+<span class="var">name</span>: Security Scan
+<span class="var">on</span>: [push, pull_request]
+
+<span class="var">jobs</span>:
+  <span class="var">security</span>:
+    <span class="var">runs-on</span>: ubuntu-latest
+    <span class="var">steps</span>:
+      - <span class="var">uses</span>: actions/checkout@v4
+
+      - <span class="var">name</span>: Setup Python
+        <span class="var">uses</span>: actions/setup-python@v5
+        <span class="var">with</span>:
+          <span class="var">python-version</span>: <span class="str">'3.11'</span>
+
+      - <span class="var">name</span>: Install Donjon
+        <span class="var">run</span>: |
+          pip install -r requirements.txt
+
+      - <span class="var">name</span>: Security Scan
+        <span class="var">run</span>: |
+          python3 bin/donjon-launcher quick --output sarif
+
+      - <span class="var">name</span>: Upload SARIF
+        <span class="var">uses</span>: github/codeql-action/upload-sarif@v3
+        <span class="var">with</span>:
+          <span class="var">sarif_file</span>: data/reports/scan.sarif</code></pre>
+
+        <h4>GitLab CI</h4>
+<pre><code><span class="cmt"># .gitlab-ci.yml</span>
+<span class="var">security_scan</span>:
+  <span class="var">stage</span>: test
+  <span class="var">image</span>: python:3.11
+  <span class="var">script</span>:
+    - pip install -r requirements.txt
+    - python3 bin/donjon-launcher quick --output sarif
+  <span class="var">artifacts</span>:
+    <span class="var">reports</span>:
+      <span class="var">sast</span>: data/reports/scan.sarif</code></pre>
+
+        <h4>Jenkins</h4>
+<pre><code><span class="cmt">// Jenkinsfile</span>
+pipeline {
+    agent any
+    stages {
+        stage(<span class="str">'Security Scan'</span>) {
+            steps {
+                sh <span class="str">'python3 bin/donjon-launcher quick --output sarif'</span>
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: <span class="str">'data/reports/*.sarif'</span>
+                }
+            }
+        }
+    }
+}</code></pre>
+
+        <h3>SIEM Integration</h3>
+        <p>Donjon integrates with SIEM systems through multiple channels:</p>
+        <ul>
+            <li><strong>Webhook notifications</strong> &mdash; Push real-time alerts to your SIEM webhook endpoint</li>
+            <li><strong>Syslog</strong> &mdash; Forward log entries to your syslog collector</li>
+            <li><strong>REST API</strong> &mdash; Pull scan data programmatically on a schedule</li>
+            <li><strong>Audit log export</strong> &mdash; Enterprise tier exports structured audit logs for SIEM ingestion</li>
+        </ul>
+
+        <h3>Ticketing System Integration</h3>
+        <table>
+            <thead><tr><th>System</th><th>Method</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><strong>Jira</strong></td><td>REST API</td><td>Automatically create Jira tickets for findings via the export API</td></tr>
+                <tr><td><strong>ServiceNow</strong></td><td>REST API</td><td>Create ServiceNow incidents from scan findings</td></tr>
+                <tr><td><strong>Slack</strong></td><td>Webhook</td><td>Push finding notifications to Slack channels (Pro+)</td></tr>
+                <tr><td><strong>Microsoft Teams</strong></td><td>Webhook</td><td>Push finding notifications to Teams channels (Pro+)</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Certification Study Guide -->
+        <h2 id="certification">Certification Study Guide</h2>
+
+        <p>Donjon Platform concepts map directly to industry certification domains. Use the platform as a hands-on learning tool.</p>
+
+        <h3>CompTIA Security+ (SY0-701)</h3>
+        <table>
+            <thead><tr><th>Domain</th><th>Donjon Feature</th><th>Hands-On Exercise</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>1.0 General Security Concepts</td>
+                    <td>Post-quantum cryptography, license verification</td>
+                    <td>Review <a href="security-guide.html">Security Guide</a> on ML-DSA-65 and Ed25519</td>
+                </tr>
+                <tr>
+                    <td>2.0 Threats, Vulnerabilities, and Mitigations</td>
+                    <td>Vulnerability scanning, CVE database, EPSS scoring</td>
+                    <td>Run a vulnerability scan, analyze CVSS/EPSS/KEV enrichment</td>
+                </tr>
+                <tr>
+                    <td>3.0 Security Architecture</td>
+                    <td>Network scanning, cloud security, container security</td>
+                    <td>Scan a network segment, review architecture findings</td>
+                </tr>
+                <tr>
+                    <td>4.0 Security Operations</td>
+                    <td>SIEM integration, incident response, audit logs</td>
+                    <td>Configure webhooks, review audit trail, export SARIF</td>
+                </tr>
+                <tr>
+                    <td>5.0 Security Program Management</td>
+                    <td>Compliance mapping, risk quantification, FAIR</td>
+                    <td>Generate compliance reports, run FAIR risk analysis</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>CISSP Domains</h3>
+        <table>
+            <thead><tr><th>CISSP Domain</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>1. Security and Risk Management</td>
+                    <td>FAIR risk quantification, compliance frameworks, risk register</td>
+                </tr>
+                <tr>
+                    <td>2. Asset Security</td>
+                    <td>Asset inventory, data classification, credential management</td>
+                </tr>
+                <tr>
+                    <td>3. Security Architecture and Engineering</td>
+                    <td>Post-quantum cryptography, secure licensing, air-gap design</td>
+                </tr>
+                <tr>
+                    <td>4. Communication and Network Security</td>
+                    <td>Network scanning, SSL/TLS assessment, firewall analysis</td>
+                </tr>
+                <tr>
+                    <td>5. Identity and Access Management</td>
+                    <td>SSO (Enterprise), RBAC, API key authentication, credential scanning</td>
+                </tr>
+                <tr>
+                    <td>6. Security Assessment and Testing</td>
+                    <td>Vulnerability scanning, web app testing, compliance scanning</td>
+                </tr>
+                <tr>
+                    <td>7. Security Operations</td>
+                    <td>Remediation tracking, notification channels, scheduled scans, audit trail</td>
+                </tr>
+                <tr>
+                    <td>8. Software Development Security</td>
+                    <td>SBOM generation, CI/CD integration, SARIF export, container security</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>CompTIA CySA+ (CS0-003)</h3>
+        <table>
+            <thead><tr><th>Domain</th><th>Donjon Feature</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>1. Security Operations</td>
+                    <td>Threat intelligence (KEV, EPSS, SSVC), vulnerability database, AI triage</td>
+                </tr>
+                <tr>
+                    <td>2. Vulnerability Management</td>
+                    <td>All scanners, FAIR risk quantification, remediation tracking</td>
+                </tr>
+                <tr>
+                    <td>3. Incident Response</td>
+                    <td>Audit trail, notification channels, risk exception management</td>
+                </tr>
+                <tr>
+                    <td>4. Reporting and Communication</td>
+                    <td>Executive reports, compliance reports, delta reports, AI summaries</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Hands-On Lab Suggestion</div>
+            <p>Set up a local lab environment with a few VMs (or use the platform's localhost scan capabilities) and work through the vulnerability assessment workflow end-to-end. This provides practical experience that maps directly to certification exam objectives.</p>
+        </div>
+
+        <div class="footer">
+            <p>Donjon Security Platform v7.0 | <a href="https://donjonsec.com" target="_blank">donjonsec.com</a> | Post-Quantum Secure</p>
+        </div>
+    </div>
+</main>
+
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function filterNav() {
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('.sidebar-section a').forEach(function(a) {
+        a.style.display = (q === '' || a.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+document.addEventListener('click', function(e) {
+    var sb = document.getElementById('sidebar'), hb = document.querySelector('.hamburger');
+    if (sb.classList.contains('open') && !sb.contains(e.target) && !hb.contains(e.target)) sb.classList.remove('open');
+});
+</script>
+</body>
+</html>

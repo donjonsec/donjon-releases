@@ -1,0 +1,56 @@
+profile:
+  id: apt29
+  name: "APT29 (Cozy Bear/Midnight Blizzard)"
+  aliases: [Cozy Bear, Midnight Blizzard, Nobelium, The Dukes]
+  attribution: Russia (SVR)
+  motivation: espionage
+  target_sectors: [government, diplomatic, technology, think_tanks]
+  active_since: 2008
+
+  ttps:
+    - tactic: Initial Access
+      technique: Supply Chain Compromise
+      technique_id: T1195
+      simulation_check: check_supply_chain_integrity
+      description: Compromises trusted software vendors to distribute trojanized updates (e.g., SolarWinds)
+    - tactic: Credential Access
+      technique: Use Alternate Authentication Material - OAuth Tokens
+      technique_id: T1550
+      simulation_check: check_oauth_token_anomalies
+      description: Abuses stolen or forged OAuth tokens to access cloud resources without credentials
+    - tactic: Defense Evasion
+      technique: Valid Accounts - Cloud
+      technique_id: T1078
+      simulation_check: check_cloud_account_anomalies
+      description: Uses compromised cloud tenant credentials for stealthy long-term access
+    - tactic: Command and Control
+      technique: Application Layer Protocol - Web Protocols
+      technique_id: T1071
+      simulation_check: check_c2_web_traffic
+      description: Tunnels C2 communications over HTTPS to blend with normal web traffic
+    - tactic: Defense Evasion
+      technique: Obfuscated Files or Information
+      technique_id: T1027
+      simulation_check: check_obfuscation_indicators
+      description: Heavily obfuscates payloads and scripts to evade signature-based detection
+    - tactic: Collection
+      technique: Email Collection
+      technique_id: T1114
+      simulation_check: check_email_access_anomalies
+      description: Accesses mailboxes via Graph API or EWS to collect sensitive communications
+    - tactic: Credential Access
+      technique: OS Credential Dumping
+      technique_id: T1003
+      simulation_check: check_credential_dump_artifacts
+      description: Extracts credentials from LSASS memory and Active Directory replication
+    - tactic: Command and Control
+      technique: Multi-hop Proxy
+      technique_id: T1090
+      simulation_check: check_proxy_chain_indicators
+      description: Routes C2 traffic through multiple compromised hosts and residential proxies
+
+  detection_priorities:
+    - OAuth token anomaly detection and consent grant monitoring
+    - Supply chain integrity verification and build pipeline security
+    - C2 traffic analysis for encrypted web protocol abuse
+    - Cloud audit log analysis for mailbox and API access patterns
