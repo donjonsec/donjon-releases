@@ -33,6 +33,8 @@ class APIKeyAuth:
         '/api/v1/maintenance/purge-audit',
         '/api/v1/maintenance/purge-notifications',
         '/api/v1/maintenance/purge-all',
+        '/api/v1/auth/rotate',
+        '/api/v1/agents/register',
     }
 
     def __init__(self, enabled: bool = True):
@@ -69,6 +71,7 @@ class APIKeyAuth:
     def remove_key(self, key: str):
         """Revoke an API key."""
         self._keys.discard(key)
+        self._admin_keys.discard(key)
 
     def list_keys(self) -> List[str]:
         """Return all registered keys (masked for display)."""
@@ -88,6 +91,84 @@ class APIKeyAuth:
         """
         token = secrets.token_hex(24)
         return f"donjon_{token}"
+
+    # -----------------------------------------------------------------
+    # Key rotation
+    # -----------------------------------------------------------------
+
+    def rotate_key(self, old_key: str, grace_seconds: int = 3600) -> Dict:
+        """Rotate an API key with a grace period.
+
+        Generates a new key, keeps the old key valid for *grace_seconds*,
+        then schedules it for cleanup.
+
+        Returns dict with 'new_key' and 'grace_expires' fields.
+        """
+        if old_key not in self._keys:
+            raise ValueError("Key not found — cannot rotate a key that doesn't exist")
+
+        new_key = self.generate_api_key()
+        is_admin = old_key in self._admin_keys
+
+        # Add the new key immediately
+        self._keys.add(new_key)
+        if is_admin:
+            self._admin_keys.add(new_key)
+
+        # Record grace period expiry for the old key
+        grace_expires = time.time() + grace_seconds
+        if not hasattr(self, '_grace_keys'):
+            self._grace_keys: Dict[str, float] = {}
+        self._grace_keys[old_key] = grace_expires
+
+        return {
+            'new_key': new_key,
+            'old_key_masked': old_key[:4] + '...' + old_key[-4:] if len(old_key) > 8 else '****',
+            'grace_expires': grace_expires,
+            'grace_seconds': grace_seconds,
+            'is_admin': is_admin,
+        }
+
+    def cleanup_expired_keys(self) -> int:
+        """Remove keys whose grace period has expired. Returns count removed."""
+        if not hasattr(self, '_grace_keys'):
+            return 0
+        now = time.time()
+        expired = [k for k, exp in self._grace_keys.items() if now >= exp]
+        for key in expired:
+            self._keys.discard(key)
+            self._admin_keys.discard(key)
+            del self._grace_keys[key]
+        return len(expired)
+
+    # -----------------------------------------------------------------
+    # Per-agent tokens
+    # -----------------------------------------------------------------
+
+    def register_agent_token(self, agent_id: str) -> str:
+        """Generate and store a token for a specific agent.
+
+        Returns the new token (``donjon_agent_<hex>``).
+        """
+        if not hasattr(self, '_agent_tokens'):
+            self._agent_tokens: Dict[str, str] = {}
+        token = f"donjon_agent_{secrets.token_hex(16)}"
+        self._agent_tokens[agent_id] = token
+        return token
+
+    def verify_agent_token(self, agent_id: str, token: str) -> bool:
+        """Verify a per-agent token using constant-time comparison."""
+        if not hasattr(self, '_agent_tokens'):
+            return False
+        stored = self._agent_tokens.get(agent_id)
+        if not stored:
+            return False
+        return hmac.compare_digest(token, stored)
+
+    def revoke_agent_token(self, agent_id: str):
+        """Revoke a specific agent's token."""
+        if hasattr(self, '_agent_tokens'):
+            self._agent_tokens.pop(agent_id, None)
 
     # -----------------------------------------------------------------
     # Authentication

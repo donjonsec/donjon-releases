@@ -365,6 +365,10 @@ class DonjonAPI:
         # -- Agents --------------------------------------------------------
         self._post('/api/v1/agents/checkin', self._agent_checkin)
         self._get('/api/v1/agents', self._list_agents)
+        self._post('/api/v1/agents/register', self._register_agent)
+
+        # -- Auth management -----------------------------------------------
+        self._post('/api/v1/auth/rotate', self._rotate_key)
 
         # -- Discovery -----------------------------------------------------
         self._post('/api/v1/discovery/scan', self._discovery_scan)
@@ -430,14 +434,14 @@ class DonjonAPI:
         try:
             from lib.eula import get_eula_text, EULA_VERSION, get_acceptance_record
             record = get_acceptance_record()
-            return self._json_ok({
+            return json_response({
                 'eula_version': EULA_VERSION,
                 'text': get_eula_text(),
                 'accepted': record is not None and record.get('eula_version') == EULA_VERSION,
                 'accepted_at': record.get('accepted_at') if record else None,
             })
         except Exception as exc:
-            return self._json_error(str(exc), 500)
+            return error_response(str(exc), 500)
 
     # ------------------------------------------------------------------
     # Health / Stats
@@ -900,6 +904,13 @@ class DonjonAPI:
         agent_id = body.get('agent_id')
         if not agent_id:
             return error_response('agent_id is required')
+
+        # Verify per-agent token if the agent has one registered
+        if hasattr(self.auth, '_agent_tokens') and agent_id in self.auth._agent_tokens:
+            agent_token = body.get('token', '')
+            if not self.auth.verify_agent_token(agent_id, agent_token):
+                return error_response('Invalid agent token', 403)
+
         self._agents[agent_id] = {
             'agent_id': agent_id,
             'last_checkin': datetime.now(timezone.utc).isoformat(),
@@ -939,6 +950,43 @@ class DonjonAPI:
         for a in agents:
             a.pop('results', None)
         return json_response({'count': len(agents), 'agents': agents})
+
+    def _register_agent(self, body: Optional[Dict], **kw) -> Tuple[bytes, int, str]:
+        """POST /api/v1/agents/register — Admin: register a new agent and return its token."""
+        if not body:
+            return error_response('Request body required')
+        agent_id = body.get('agent_id')
+        if not agent_id:
+            return error_response('agent_id is required')
+        token = self.auth.register_agent_token(agent_id)
+        if get_audit_trail:
+            get_audit_trail().log('agent_registered', target_type='agent',
+                                 target_id=agent_id)
+        return json_response({
+            'agent_id': agent_id,
+            'token': token,
+            'message': 'Store this token securely. It will not be shown again.',
+        }, 201)
+
+    def _rotate_key(self, body: Optional[Dict], **kw) -> Tuple[bytes, int, str]:
+        """POST /api/v1/auth/rotate — Admin: rotate an API key with grace period."""
+        if not body:
+            return error_response('Request body required')
+        old_key = body.get('api_key')
+        grace = int(body.get('grace_seconds', 3600))
+        if not old_key:
+            return error_response('api_key is required')
+        try:
+            result = self.auth.rotate_key(old_key, grace_seconds=grace)
+        except ValueError as e:
+            return error_response(str(e), 400)
+        # Cleanup any expired grace-period keys
+        cleaned = self.auth.cleanup_expired_keys()
+        result['expired_keys_cleaned'] = cleaned
+        if get_audit_trail:
+            get_audit_trail().log('api_key_rotated', target_type='auth',
+                                 details={'grace_seconds': grace})
+        return json_response(result)
 
     # ------------------------------------------------------------------
     # Discovery

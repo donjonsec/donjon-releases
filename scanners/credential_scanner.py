@@ -157,7 +157,12 @@ class CredentialScanner(BaseScanner):
                 return ''
 
     def _winrm_exec(self, target: str, cred: Dict, command: str) -> str:
-        """Execute a PowerShell command via WinRM (Windows-to-Windows only)."""
+        """Execute a PowerShell command via WinRM (Windows-to-Windows only).
+
+        SECURITY: Password is piped via stdin to avoid exposure in process
+        listings (ps/tasklist). The PowerShell script reads it from the
+        pipeline instead of embedding it in the command string.
+        """
         if sys.platform != 'win32':
             return ''
         params = cred.get('params', {})
@@ -167,15 +172,17 @@ class CredentialScanner(BaseScanner):
             return ''
         try:
             import subprocess
+            # Build a script that reads the password from stdin to keep it
+            # out of process argument lists visible via tasklist/ps.
             ps_script = (
-                f"$pw = ConvertTo-SecureString '{password}' -AsPlainText -Force; "
+                "$pw = ConvertTo-SecureString (Read-Host) -AsPlainText -Force; "
                 f"$cred = New-Object System.Management.Automation.PSCredential('{username}', $pw); "
                 f"Invoke-Command -ComputerName '{target}' -Credential $cred "
                 f"-ScriptBlock {{ {command} }}"
             )
             result = subprocess.run(
                 ['powershell', '-NoProfile', '-Command', ps_script],
-                capture_output=True, text=True, timeout=30
+                input=password, capture_output=True, text=True, timeout=30
             )
             return result.stdout
         except Exception:

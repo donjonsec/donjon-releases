@@ -51,17 +51,32 @@ _MAX_REQUEST_BODY_SIZE: int = 512 * 1024  # 512 KiB
 # Prevents unbounded growth that could degrade worker performance.
 _MAX_REVOCATION_ENTRIES: int = 10_000
 
-# Allowed CORS origins.  Set to "*" for development; restrict to your
-# dashboard domain in production.
-# TODO: Restrict this to the actual dashboard origin(s) in production.
-_CORS_ALLOW_ORIGIN: str = "*"
+# Allowed CORS origin.  Reads from the CORS_ALLOW_ORIGIN env var
+# (set in wrangler.toml [vars]), falling back to the production domain.
+_CORS_ALLOW_ORIGIN: str = "https://donjonsec.com"
+
+# Rate limiting: max requests per IP within the sliding window.
+_RATE_LIMIT_MAX: int = 30
+_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
 
 # ---------------------------------------------------------------------------
 # Response helpers
 # ---------------------------------------------------------------------------
 
-def json_headers(extra: dict = None) -> object:
+def _get_cors_origin(env: object = None) -> str:
+    """Return the CORS origin, preferring the env var if available."""
+    if env:
+        try:
+            override = getattr(env, "CORS_ALLOW_ORIGIN", None)
+            if override:
+                return str(override)
+        except Exception:
+            pass
+    return _CORS_ALLOW_ORIGIN
+
+
+def json_headers(extra: dict = None, env: object = None) -> object:
     """Build standard JSON response headers with security headers and CORS.
 
     Why these headers:
@@ -74,7 +89,7 @@ def json_headers(extra: dict = None) -> object:
     """
     h: dict = {
         "Content-Type": "application/json; charset=utf-8",
-        "Access-Control-Allow-Origin": _CORS_ALLOW_ORIGIN,
+        "Access-Control-Allow-Origin": _get_cors_origin(env),
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Admin-Key",
         "X-Content-Type-Options": "nosniff",
@@ -211,6 +226,61 @@ async def kv_get_revocation_list(env: object) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+async def check_rate_limit(request: object, env: object) -> object | None:
+    """Sliding window rate limiter using KV.
+
+    Returns None if allowed, or an error Response if rate-limited.
+    Uses a per-IP KV key with a list of timestamps.  Old entries outside
+    the window are pruned on each check.
+
+    SECURITY: Prevents brute-force license ID enumeration via /api/v1/validate.
+    """
+    # Extract client IP from CF-Connecting-IP header (set by Cloudflare edge).
+    client_ip = request.headers.get("CF-Connecting-IP") or "unknown"
+    kv_key = f"ratelimit:{client_ip}"
+
+    now_ms = Date.now()
+    window_ms = _RATE_LIMIT_WINDOW_SECONDS * 1000
+
+    # Read existing timestamps for this IP.
+    raw = await env.LICENSE_KV.get(kv_key)
+    timestamps = []
+    if raw:
+        try:
+            timestamps = json.loads(raw)
+            if not isinstance(timestamps, list):
+                timestamps = []
+        except (json.JSONDecodeError, TypeError):
+            timestamps = []
+
+    # Prune entries outside the window.
+    cutoff = now_ms - window_ms
+    timestamps = [ts for ts in timestamps if ts > cutoff]
+
+    if len(timestamps) >= _RATE_LIMIT_MAX:
+        return json_response({
+            "error": "Rate limit exceeded. Try again later.",
+            "retry_after_seconds": _RATE_LIMIT_WINDOW_SECONDS,
+        }, status=429, extra_headers={
+            "Retry-After": str(_RATE_LIMIT_WINDOW_SECONDS),
+        })
+
+    # Record this request and save.
+    timestamps.append(now_ms)
+    await env.LICENSE_KV.put(
+        kv_key,
+        json.dumps(timestamps, separators=(",", ":")),
+        # Auto-expire the KV key after 2x the window to avoid stale data.
+        expirationTtl=_RATE_LIMIT_WINDOW_SECONDS * 2,
+    )
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Input validation
 # ---------------------------------------------------------------------------
 
@@ -315,9 +385,13 @@ async def handle_validate(request: object, env: object) -> object:
     locally.  This endpoint exists to check revocation status and
     expiry when the client has network access.
 
-    TODO: Consider rate-limiting this endpoint to prevent enumeration
+    Rate-limited to 30 requests/minute per IP to prevent enumeration
     of valid license IDs.
     """
+    # Rate limit to prevent brute-force license ID enumeration.
+    rate_err = await check_rate_limit(request, env)
+    if rate_err:
+        return rate_err
     body = await read_request_json(request)
     if body is None:
         return error_response("Invalid JSON body")

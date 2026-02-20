@@ -134,8 +134,11 @@ def prompt_eula_acceptance_tui() -> bool:
             record_acceptance()
             tui.ok(f"EULA v{EULA_VERSION} accepted.")
             return True
-        elif response in ("n", "no", ""):
+        elif response in ("n", "no"):
             return False
+        elif response == "":
+            print(f"  {C.DIM}Please type 'y' to accept or 'n' to decline.{C.RESET}")
+            continue
         else:
             print(f"  {C.DIM}Please enter 'y', 'n', or 'view'.{C.RESET}")
 
@@ -162,6 +165,8 @@ def _env_accepted() -> bool:
 
 def _page_text(text: str):
     """Simple pager for terminal output."""
+    from tui import safe_input
+
     lines = text.splitlines()
     term_height = 30
     try:
@@ -173,6 +178,6 @@ def _page_text(text: str):
     for i, line in enumerate(lines):
         print(line)
         if (i + 1) % term_height == 0 and i + 1 < len(lines):
-            resp = input("  -- Press Enter for more, 'q' to stop -- ").strip().lower()
+            resp = safe_input("  -- Press Enter for more, 'q' to stop -- ").strip().lower()
             if resp == "q":
                 break
