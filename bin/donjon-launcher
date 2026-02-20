@@ -1415,7 +1415,7 @@ Systems Thinking Security Assessment
                     print(f"  {k}: {v}")
 
             print()
-            input(f"{C.DIM}Press Enter to continue...{C.RESET}")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
             self.show_banner()
             tui.section("Vulnerability Intelligence Database", C.GREEN)
             print()

@@ -24,7 +24,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import BaseScanner
+try:
+    from .base import BaseScanner
+except ImportError:
+    from base import BaseScanner
 
 
 class ShadowAIScanner(BaseScanner):

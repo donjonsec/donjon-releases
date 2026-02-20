@@ -177,7 +177,7 @@ class PortablePaths:
         """
         # Check bundled tools first
         bundled = self.tools / tool_name
-        if bundled.exists() and os.access(bundled, os.X_OK):
+        if bundled.is_file() and os.access(bundled, os.X_OK):
             return bundled
 
         # On Windows, also check with .exe extension

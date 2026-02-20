@@ -6,6 +6,7 @@ Systems Thinking: Openness - adapt to available tools in the environment.
 """
 
 import os
+import sys
 import subprocess
 import shutil
 from pathlib import Path
@@ -422,8 +423,11 @@ class ToolDiscovery:
         if not tools_dir.exists():
             return
 
+        is_windows = sys.platform == 'win32'
+
         # Check for nuclei
-        for name in ('nuclei', 'nuclei.exe'):
+        candidates = ('nuclei.exe', 'nuclei') if is_windows else ('nuclei',)
+        for name in candidates:
             nuclei_path = tools_dir / name
             if nuclei_path.exists():
                 self.tools['nuclei'].in_tools_dir = True
@@ -438,25 +442,28 @@ class ToolDiscovery:
             self.tools['testssl.sh'].in_tools_dir = True
             self.tools['testssl.sh'].path = str(testssl_path)
 
-        # Check for nmap portable
-        nmap_path = tools_dir / 'nmap' / 'nmap.exe'
-        if nmap_path.exists():
-            self.tools['nmap'].in_tools_dir = True
-            self.tools['nmap'].path = str(nmap_path)
+        # Check for nmap portable — nmap.exe only works on Windows
+        if is_windows:
+            nmap_path = tools_dir / 'nmap' / 'nmap.exe'
+            if nmap_path.exists():
+                self.tools['nmap'].in_tools_dir = True
+                self.tools['nmap'].path = str(nmap_path)
 
-        # Check for YARA
-        for name in ('yara' / Path('yara64.exe'), 'yara' / Path('yara.exe')):
-            yara_path = tools_dir / name
-            if yara_path.exists():
-                if 'yara' in self.tools:
-                    self.tools['yara'].in_tools_dir = True
-                    self.tools['yara'].path = str(yara_path)
-                break
+        # Check for YARA — .exe only on Windows
+        if is_windows:
+            for name in ('yara' / Path('yara64.exe'), 'yara' / Path('yara.exe')):
+                yara_path = tools_dir / name
+                if yara_path.exists():
+                    if 'yara' in self.tools:
+                        self.tools['yara'].in_tools_dir = True
+                        self.tools['yara'].path = str(yara_path)
+                    break
 
         # Check for gobuster
         gobuster_dir = tools_dir / 'gobuster'
         if gobuster_dir.exists():
-            for name in ('gobuster.exe', 'gobuster'):
+            candidates = ('gobuster.exe', 'gobuster') if is_windows else ('gobuster',)
+            for name in candidates:
                 gob_path = gobuster_dir / name
                 if gob_path.exists():
                     self.tools['gobuster'].in_tools_dir = True
@@ -466,33 +473,35 @@ class ToolDiscovery:
         # Check for amass
         amass_dir = tools_dir / 'amass'
         if amass_dir.exists():
-            for name in ('amass.exe', 'amass'):
+            candidates = ('amass.exe', 'amass') if is_windows else ('amass',)
+            for name in candidates:
                 amass_path = amass_dir / name
                 if amass_path.exists():
                     self.tools['amass'].in_tools_dir = True
                     self.tools['amass'].path = str(amass_path)
                     break
 
-        # Check for Sysinternals tools
-        sysinternals_dir = tools_dir / 'sysinternals'
-        if sysinternals_dir.exists():
-            sysinternals_map = {
-                'sigcheck': ['sigcheck64.exe', 'sigcheck.exe'],
-                'autoruns': ['autorunsc64.exe', 'autorunsc.exe'],
-                'tcpview': ['tcpvcon.exe', 'tcpview.exe'],
-                'accesschk': ['accesschk64.exe', 'accesschk.exe'],
-                'handle': ['handle64.exe', 'handle.exe'],
-                'strings_sys': ['strings64.exe', 'strings.exe'],
-                'listdlls': ['listdlls64.exe', 'listdlls.exe'],
-            }
-            for tool_name, exe_names in sysinternals_map.items():
-                if tool_name in self.tools:
-                    for exe_name in exe_names:
-                        exe_path = sysinternals_dir / exe_name
-                        if exe_path.exists():
-                            self.tools[tool_name].in_tools_dir = True
-                            self.tools[tool_name].path = str(exe_path)
-                            break
+        # Check for Sysinternals tools — Windows-only
+        if is_windows:
+            sysinternals_dir = tools_dir / 'sysinternals'
+            if sysinternals_dir.exists():
+                sysinternals_map = {
+                    'sigcheck': ['sigcheck64.exe', 'sigcheck.exe'],
+                    'autoruns': ['autorunsc64.exe', 'autorunsc.exe'],
+                    'tcpview': ['tcpvcon.exe', 'tcpview.exe'],
+                    'accesschk': ['accesschk64.exe', 'accesschk.exe'],
+                    'handle': ['handle64.exe', 'handle.exe'],
+                    'strings_sys': ['strings64.exe', 'strings.exe'],
+                    'listdlls': ['listdlls64.exe', 'listdlls.exe'],
+                }
+                for tool_name, exe_names in sysinternals_map.items():
+                    if tool_name in self.tools:
+                        for exe_name in exe_names:
+                            exe_path = sysinternals_dir / exe_name
+                            if exe_path.exists():
+                                self.tools[tool_name].in_tools_dir = True
+                                self.tools[tool_name].path = str(exe_path)
+                                break
 
     def _run_cmd(self, cmd: str) -> tuple:
         """Run a command and return (success, output).

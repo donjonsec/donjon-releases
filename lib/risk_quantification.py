@@ -143,6 +143,18 @@ class RiskQuantifier:
     # Business context
     # ------------------------------------------------------------------
 
+    @property
+    def business_context(self) -> dict:
+        """Public accessor for business context (used by reporter)."""
+        return {
+            'industry': self._industry,
+            'revenue': self._revenue,
+            'record_count': self._record_count,
+            'asset_values': self._asset_values,
+            'business_criticality': self._business_criticality,
+            'benchmark_year': 2025,
+        }
+
     def set_business_context(self, industry: str = 'default',
                              revenue: float = 0.0,
                              record_count: int = 0,
