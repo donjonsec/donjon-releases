@@ -4,7 +4,10 @@
 # Portable launcher that works from any installation location.
 #
 
-set -e
+# Note: set -e intentionally NOT used at top level.
+# The interactive menu loop runs scanners that may return non-zero on
+# partial failure — that should not kill the launcher. set -e is used
+# locally in the bootstrap section below where abort-on-error is correct.
 
 # Resolve script directory (works with symlinks)
 SOURCE="${BASH_SOURCE[0]}"
@@ -33,42 +36,50 @@ export PYTHONPATH="$DONJON_HOME/lib:$PYTHONPATH"
 
 # Auto-bootstrap: create venv + install deps if missing
 if [ ! -f "$VENV_DIR/bin/python3" ] && [ ! -f "$VENV_DIR/bin/python" ]; then
-    echo ""
-    echo "  ============================================================"
-    echo "   Donjon Platform v7.0 - First-Run Setup"
-    echo "  ============================================================"
-    echo ""
-    echo "  [*] Creating virtual environment..."
-    python3 -m venv "$VENV_DIR" 2>/dev/null || python -m venv "$VENV_DIR" 2>/dev/null
-    if [ $? -ne 0 ]; then
-        echo "  [ERROR] Failed to create venv. Install python3-venv package."
-        exit 1
-    fi
-    echo "  [OK] Virtual environment created."
+    (
+        set -euo pipefail
+        echo ""
+        echo "  ============================================================"
+        echo "   Donjon Platform v7.0 - First-Run Setup"
+        echo "  ============================================================"
+        echo ""
+        echo "  [*] Creating virtual environment..."
+        python3 -m venv "$VENV_DIR" 2>/dev/null || python -m venv "$VENV_DIR" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "  [ERROR] Failed to create venv. Install python3-venv package."
+            exit 1
+        fi
+        echo "  [OK] Virtual environment created."
 
+        echo "  [*] Installing dependencies..."
+        if [ -f "$VENV_DIR/bin/python3" ]; then
+            "$VENV_DIR/bin/python3" -m pip install --upgrade pip -q 2>/dev/null
+        else
+            "$VENV_DIR/bin/python" -m pip install --upgrade pip -q 2>/dev/null
+        fi
+        "$VENV_DIR/bin/pip" install -r "$DONJON_HOME/requirements.txt"
+        echo "  [OK] Dependencies installed."
+
+        # Create data directories
+        mkdir -p "$DONJON_HOME/data/results"
+        mkdir -p "$DONJON_HOME/data/evidence"
+        mkdir -p "$DONJON_HOME/data/reports"
+        mkdir -p "$DONJON_HOME/data/logs"
+        echo "  [OK] Data directories ready."
+        echo ""
+        echo "  ============================================================"
+        echo "   Setup complete. Launching platform..."
+        echo "  ============================================================"
+        echo ""
+    ) || { echo "  [ERROR] Bootstrap failed. Check errors above."; exit 1; }
+
+    # Re-detect python after bootstrap
     if [ -f "$VENV_DIR/bin/python3" ]; then
         PYTHON_BIN="$VENV_DIR/bin/python3"
     else
         PYTHON_BIN="$VENV_DIR/bin/python"
     fi
-
-    echo "  [*] Installing dependencies..."
-    "$PYTHON_BIN" -m pip install --upgrade pip -q 2>/dev/null
-    "$VENV_DIR/bin/pip" install -r "$DONJON_HOME/requirements.txt"
-    echo "  [OK] Dependencies installed."
-
-    # Create data directories
-    mkdir -p "$DONJON_HOME/data/results"
-    mkdir -p "$DONJON_HOME/data/evidence"
-    mkdir -p "$DONJON_HOME/data/reports"
-    mkdir -p "$DONJON_HOME/data/logs"
-    echo "  [OK] Data directories ready."
-    echo ""
-    echo "  ============================================================"
-    echo "   Setup complete. Launching platform..."
-    echo "  ============================================================"
-    echo ""
-elif ! $PYTHON_BIN -c "import yaml" 2>/dev/null; then
+elif ! "$PYTHON_BIN" -c "import yaml" 2>/dev/null; then
     echo ""
     echo "  [*] Installing missing dependencies..."
     "$VENV_DIR/bin/pip" install -r "$DONJON_HOME/requirements.txt" -q
@@ -132,12 +143,12 @@ show_menu() {
 }
 
 run_assessment() {
-    local type=$1
+    local type="$1"
     echo -e "${GREEN}Starting $type assessment...${NC}"
-    $PYTHON_BIN -c "
-import sys
-sys.path.insert(0, '$DONJON_HOME/lib')
-sys.path.insert(0, '$DONJON_HOME/utilities')
+    "$PYTHON_BIN" -c "
+import sys, os
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'lib'))
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'utilities'))
 from orchestrator import AssessmentOrchestrator
 orchestrator = AssessmentOrchestrator()
 results = orchestrator.run_full_assessment(assessment_type='$type')
@@ -147,17 +158,22 @@ print(f\"Total findings: {results.get('summary', {}).get('total_findings', 0)}\"
 }
 
 run_scanner() {
-    local scanner=$1
+    local scanner="$1"
+    local scanner_path="$DONJON_HOME/scanners/${scanner}.py"
+    if [ ! -f "$scanner_path" ]; then
+        echo -e "${RED}[ERROR] Scanner not found: $scanner_path${NC}"
+        return 1
+    fi
     echo -e "${GREEN}Running $scanner scanner...${NC}"
-    $PYTHON_BIN "$DONJON_HOME/scanners/$scanner.py"
+    "$PYTHON_BIN" "$scanner_path"
 }
 
 run_reports() {
     echo -e "${GREEN}Report Generation${NC}"
-    $PYTHON_BIN -c "
-import sys
-sys.path.insert(0, '$DONJON_HOME/lib')
-sys.path.insert(0, '$DONJON_HOME/utilities')
+    "$PYTHON_BIN" -c "
+import sys, os
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'lib'))
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'utilities'))
 from reporter import ReportGenerator
 from config import config
 
@@ -176,10 +192,10 @@ for fw in frameworks:
 
 run_export() {
     echo -e "${GREEN}Exporting for GRC platforms...${NC}"
-    $PYTHON_BIN -c "
-import sys
-sys.path.insert(0, '$DONJON_HOME/lib')
-sys.path.insert(0, '$DONJON_HOME/utilities')
+    "$PYTHON_BIN" -c "
+import sys, os
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'lib'))
+sys.path.insert(0, os.path.join(os.environ['DONJON_HOME'], 'utilities'))
 from exporter import ComplianceExporter
 from config import config
 
@@ -203,11 +219,11 @@ view_results() {
 }
 
 schedule_scans() {
-    $PYTHON_BIN "$DONJON_HOME/bin/scheduler.py" --setup
+    "$PYTHON_BIN" "$DONJON_HOME/bin/scheduler.py" --setup
 }
 
 view_schedule() {
-    $PYTHON_BIN "$DONJON_HOME/bin/scheduler.py" --status
+    "$PYTHON_BIN" "$DONJON_HOME/bin/scheduler.py" --status
 }
 
 check_prerequisites() {
@@ -216,10 +232,15 @@ check_prerequisites() {
     local missing_tools=""
 
     for tool in nmap nikto nuclei testssl.sh; do
-        if ! command -v $tool &> /dev/null; then
-            # Check tools directory too
-            if [ ! -x "$DONJON_HOME/tools/$tool" ] && \
-               [ ! -x "$DONJON_HOME/tools/testssl.sh/testssl.sh" -o "$tool" != "testssl.sh" ]; then
+        if ! command -v "$tool" &> /dev/null; then
+            # Check tools directory — testssl.sh lives in a subdirectory
+            local found=0
+            if [ -x "$DONJON_HOME/tools/$tool" ]; then
+                found=1
+            elif [ "$tool" = "testssl.sh" ] && [ -x "$DONJON_HOME/tools/testssl.sh/testssl.sh" ]; then
+                found=1
+            fi
+            if [ "$found" -eq 0 ]; then
                 missing=1
                 missing_tools="$missing_tools $tool"
             fi
@@ -238,7 +259,11 @@ check_prerequisites() {
         echo "  2) Continue anyway (scans requiring missing tools will fail)"
         echo "  3) Exit"
         echo ""
-        read -p "Select option [1]: " prereq_choice
+        if [ -t 0 ]; then
+            read -p "Select option [1]: " prereq_choice
+        else
+            prereq_choice=""
+        fi
         prereq_choice=${prereq_choice:-1}
 
         case $prereq_choice in
@@ -302,7 +327,11 @@ system_check() {
     if [ ${#missing_tools[@]} -gt 0 ]; then
         echo ""
         echo -e "${YELLOW}Missing tools: ${missing_tools[*]}${NC}"
-        read -p "Run setup to install missing tools? (y/n) [y]: " install_now
+        if [ -t 0 ]; then
+            read -p "Run setup to install missing tools? (y/n) [y]: " install_now
+        else
+            install_now=""
+        fi
         install_now=${install_now:-y}
         if [[ "$install_now" =~ ^[Yy] ]]; then
             bash "$DONJON_HOME/bin/setup.sh"
@@ -370,6 +399,12 @@ show_banner
 
 # Check prerequisites before showing menu
 check_prerequisites
+
+if [ ! -t 0 ]; then
+    echo -e "${RED}[ERROR] Interactive menu requires a terminal (stdin is not a TTY).${NC}"
+    echo "Use direct commands instead: donjon quick | standard | deep | check | setup"
+    exit 1
+fi
 
 while true; do
     show_menu

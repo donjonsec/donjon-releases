@@ -367,22 +367,32 @@ class ShadowAIScanner(BaseScanner):
         self.scan_logger.info("Checking AI installation paths...")
 
         home = Path.home()
+        is_windows = sys.platform == 'win32'
+
+        # Cross-platform paths (dot-dirs work everywhere)
         install_paths = [
             home / '.ollama',
             home / '.lmstudio',
             home / 'lm-studio',
-            home / '.local' / 'share' / 'ollama',
-            home / 'AppData' / 'Local' / 'Ollama',
-            home / 'AppData' / 'Local' / 'LM Studio',
-            home / 'AppData' / 'Local' / 'Jan',
-            home / 'AppData' / 'Local' / 'Programs' / 'LM Studio',
-            home / 'AppData' / 'Local' / 'nomic.ai' / 'GPT4All',
             home / '.cache' / 'huggingface',
             home / '.cache' / 'torch',
-            Path('/usr/local/bin/ollama'),
-            Path('/opt/ollama'),
-            Path('/opt/lm-studio'),
         ]
+
+        if is_windows:
+            install_paths.extend([
+                home / 'AppData' / 'Local' / 'Ollama',
+                home / 'AppData' / 'Local' / 'LM Studio',
+                home / 'AppData' / 'Local' / 'Jan',
+                home / 'AppData' / 'Local' / 'Programs' / 'LM Studio',
+                home / 'AppData' / 'Local' / 'nomic.ai' / 'GPT4All',
+            ])
+        else:
+            install_paths.extend([
+                home / '.local' / 'share' / 'ollama',
+                Path('/usr/local/bin/ollama'),
+                Path('/opt/ollama'),
+                Path('/opt/lm-studio'),
+            ])
 
         found = []
         for p in install_paths:
