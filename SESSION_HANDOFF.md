@@ -98,11 +98,10 @@
 | 2 | `f7b7dac` | fix: resolve 6 bugs found during Linux (Kali) cross-platform testing |
 | 3 | `4c763ab` | fix: resolve 4 additional bugs found during architecture audit |
 | 4 | `01dc9de` | fix: harden bash launcher and platform-guard shadow AI scanner |
-| 5 | (pending) | security: fix EULA bugs, WinRM credential exposure, CORS, rate limiting |
-| 6 | (pending) | ci: add GitHub Actions CI/CD, dependabot, pre-commit hooks |
-| 7 | (pending) | feat: add API key rotation and per-agent authentication |
-| 8 | (pending) | test: expand test suite (scanners, EULA, API routes) |
-| 9 | (pending) | docs: update roadmap, changelog, session handoff |
+| 5 | `501108a` | security: fix 8 security issues and harden API authentication |
+| 6 | `d22ca2d` | ci: add GitHub Actions CI/CD, dependabot, and pre-commit hooks |
+| 7 | `bc905cb` | test: add scanner, EULA, and API route test suites (55 new tests) |
+| 8 | `f76d97b` | docs: add changelog, update roadmap, and session handoff |
 
 All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
@@ -211,7 +210,7 @@ All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
 - **Repo:** donjonsec/donjon-platform (private, GitHub)
 - **Branch:** develop
-- **Commits:** 4 committed + 5 pending
+- **Commits:** 8 (all pushed to origin/develop)
 - **Platform:** Python 3.10+, Windows 11 primary, Linux (Kali) tested
 - **Modules:** 84 Python files, 43 YAML configs, 14 doc files (5,470 lines)
 - **Scanners:** 18 specialized security scanners
