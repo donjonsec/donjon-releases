@@ -325,7 +325,7 @@ class CloudScanner(BaseScanner):
                     try:
                         rotated = datetime.strptime(
                             last_rotated[:10], '%Y-%m-%d'
-                        )
+                        ).replace(tzinfo=timezone.utc)
                         age_days = (datetime.now(timezone.utc) - rotated).days
                         if age_days > 90:
                             old_keys.append({

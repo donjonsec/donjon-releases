@@ -279,7 +279,7 @@ class AssessmentOrchestrator:
                     self.logger.warning(f"Windows security assessment skipped: {e}")
 
             # Phase 5.6: Linux Security Assessment (if on Linux)
-            if LinuxScanner is not None and sys.platform == 'linux':
+            if LinuxScanner is not None and sys.platform.startswith('linux'):
                 try:
                     self.logger.info("=" * 50)
                     self.logger.info("PHASE 5.6: Linux Security Assessment")

@@ -451,7 +451,7 @@ class ToolDiscovery:
 
         # Check for YARA — .exe only on Windows
         if is_windows:
-            for name in ('yara' / Path('yara64.exe'), 'yara' / Path('yara.exe')):
+            for name in (Path('yara') / 'yara64.exe', Path('yara') / 'yara.exe'):
                 yara_path = tools_dir / name
                 if yara_path.exists():
                     if 'yara' in self.tools:
