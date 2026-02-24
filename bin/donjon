@@ -25,17 +25,28 @@ export DONJON_HOME="$(dirname "$SCRIPT_DIR")"
 VENV_DIR="$DONJON_HOME/venv"
 PYTHON_BIN="python3"
 
-if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/python3" ]; then
-    PYTHON_BIN="$VENV_DIR/bin/python3"
-elif [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/python" ]; then
-    PYTHON_BIN="$VENV_DIR/bin/python"
+# Detect platform — venv uses Scripts/ on Windows, bin/ on Unix
+if [[ "$(uname -s)" =~ MINGW|MSYS|CYGWIN ]] || [[ "$OSTYPE" == "msys" ]]; then
+    VENV_BIN="$VENV_DIR/Scripts"
+    VENV_PYTHON="$VENV_BIN/python.exe"
+    VENV_PIP="$VENV_BIN/pip.exe"
+else
+    VENV_BIN="$VENV_DIR/bin"
+    VENV_PYTHON="$VENV_BIN/python3"
+    VENV_PIP="$VENV_BIN/pip"
+fi
+
+if [ -d "$VENV_DIR" ] && [ -f "$VENV_PYTHON" ]; then
+    PYTHON_BIN="$VENV_PYTHON"
+elif [ -d "$VENV_DIR" ] && [ -f "$VENV_BIN/python" ]; then
+    PYTHON_BIN="$VENV_BIN/python"
 fi
 
 # Add lib to Python path
 export PYTHONPATH="$DONJON_HOME/lib:$PYTHONPATH"
 
 # Auto-bootstrap: create venv + install deps if missing
-if [ ! -f "$VENV_DIR/bin/python3" ] && [ ! -f "$VENV_DIR/bin/python" ]; then
+if [ ! -f "$VENV_PYTHON" ] && [ ! -f "$VENV_BIN/python" ]; then
     (
         set -euo pipefail
         echo ""
@@ -52,12 +63,12 @@ if [ ! -f "$VENV_DIR/bin/python3" ] && [ ! -f "$VENV_DIR/bin/python" ]; then
         echo "  [OK] Virtual environment created."
 
         echo "  [*] Installing dependencies..."
-        if [ -f "$VENV_DIR/bin/python3" ]; then
-            "$VENV_DIR/bin/python3" -m pip install --upgrade pip -q 2>/dev/null
-        else
-            "$VENV_DIR/bin/python" -m pip install --upgrade pip -q 2>/dev/null
+        if [ -f "$VENV_PYTHON" ]; then
+            "$VENV_PYTHON" -m pip install --upgrade pip -q 2>/dev/null
+        elif [ -f "$VENV_BIN/python" ]; then
+            "$VENV_BIN/python" -m pip install --upgrade pip -q 2>/dev/null
         fi
-        "$VENV_DIR/bin/pip" install -r "$DONJON_HOME/requirements.txt"
+        "$VENV_PIP" install -r "$DONJON_HOME/requirements.txt"
         echo "  [OK] Dependencies installed."
 
         # Create data directories
@@ -74,15 +85,15 @@ if [ ! -f "$VENV_DIR/bin/python3" ] && [ ! -f "$VENV_DIR/bin/python" ]; then
     ) || { echo "  [ERROR] Bootstrap failed. Check errors above."; exit 1; }
 
     # Re-detect python after bootstrap
-    if [ -f "$VENV_DIR/bin/python3" ]; then
-        PYTHON_BIN="$VENV_DIR/bin/python3"
-    else
-        PYTHON_BIN="$VENV_DIR/bin/python"
+    if [ -f "$VENV_PYTHON" ]; then
+        PYTHON_BIN="$VENV_PYTHON"
+    elif [ -f "$VENV_BIN/python" ]; then
+        PYTHON_BIN="$VENV_BIN/python"
     fi
 elif ! "$PYTHON_BIN" -c "import yaml" 2>/dev/null; then
     echo ""
     echo "  [*] Installing missing dependencies..."
-    "$VENV_DIR/bin/pip" install -r "$DONJON_HOME/requirements.txt" -q
+    "$VENV_PIP" install -r "$DONJON_HOME/requirements.txt" -q
     echo "  [OK] Dependencies installed."
     echo ""
 fi
