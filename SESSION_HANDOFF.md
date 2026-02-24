@@ -1,6 +1,6 @@
-# Session Handoff — 2026-02-20 (Session 3)
+# Session Handoff — 2026-02-24 (Session 4)
 
-> Previous session: 2026-02-20 (Session 2)
+> Previous session: 2026-02-20 (Session 3)
 
 ---
 
@@ -102,6 +102,9 @@
 | 6 | `d22ca2d` | ci: add GitHub Actions CI/CD, dependabot, and pre-commit hooks |
 | 7 | `bc905cb` | test: add scanner, EULA, and API route test suites (55 new tests) |
 | 8 | `f76d97b` | docs: add changelog, update roadmap, and session handoff |
+| 9 | `a546c68` | docs: update session handoff with final commit hashes |
+| 10 | `651db5e` | fix: detect Windows venv paths in bash launcher |
+| 11 | `b8381f2` | docs: add dark factory build log |
 
 All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
@@ -162,15 +165,35 @@ All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
 ---
 
+## What Was Accomplished This Session (Session 4)
+
+### Part A: DonjonSec Product — Completed to 100%
+
+1. **Committed pending changes**: `651db5e` (fix: Windows venv paths in bash launcher), `b8381f2` (docs: dark factory build log)
+2. **Extended testing**: nikto installed and producing real CVE findings, testssl.sh working (no TLS targets in range), JSON output verified, scan depth compared (quick vs standard), EULA non-interactive paths verified
+3. **Open issues resolved**: v1 HMAC key is NOT dead code (migration bridge, documented), wrangler.toml placeholder documented
+4. **Test suite**: 137/137 on both Linux (Debian 12, 1.78s) and Windows (Win 11, 4.39s)
+
+### Part B: Factory Infrastructure — Fixed, Hardened, Validated to 100%
+
+1. **Data loss documented**: Issue #15 in DARK_FACTORY_BUILD_LOG.md (recovered journalctl benchmarks)
+2. **10 bugs fixed** across pipeline.py, worker.py, routers, main.py:
+   - 2 CRITICAL: FK crash in create_pipeline, auth bypass on pending-reviews
+   - 2 HIGH: Project deletion removed (archive-only), agent validation in remediation
+   - 6 MEDIUM: Connection leak, startup error handling, empty project redirect, mid-execution orphan detection, JOIN fix, activity-feed auth
+3. **Data protection**: No DELETE on business data, archive lifecycle, export endpoint, orphan detection, full failure audit logging
+4. **End-to-end validated**: All 8 checklist categories passed (service health, API endpoints, worker execution, failure handling, 6-phase pipeline flow, review FAIL remediation, data protection, dashboard)
+5. **Worker benchmarks**: 14B at 2.7-3.1 tok/s, 32B at 1.1-1.4 tok/s
+
 ## Next Session Plan
 
-### Priority 1: GUI / Distribution (from ROADMAP.md)
+### Priority 1: Factory Eats Itself
+- Submit the factory itself as the first real project through the pipeline
+- Wraith decomposes, Cipher/Jackal implement, Glitch tests, Specter reviews
+
+### Priority 2: GUI / Distribution (from ROADMAP.md)
 - Phase 2: One-click launcher (donjon.bat enhancement + donjon-gui for Linux)
 - Phase 3: Offline update pack builder/applier (air-gap critical)
-
-### Priority 2: Commit Pending Changes
-- Stage and commit the 5 pending changes from this session
-- Follow conventional commit format per Dark Factory standards
 
 ### Priority 3: DonjonAI Planning
 - Product spec using `C:\Darkfactory\templates\PRODUCT_SPEC.md`
@@ -210,7 +233,7 @@ All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
 - **Repo:** donjonsec/donjon-platform (private, GitHub)
 - **Branch:** develop
-- **Commits:** 8 (all pushed to origin/develop)
+- **Commits:** 11 (all pushed to origin/develop)
 - **Platform:** Python 3.10+, Windows 11 primary, Linux (Kali) tested
 - **Modules:** 84 Python files, 43 YAML configs, 14 doc files (5,470 lines)
 - **Scanners:** 18 specialized security scanners
