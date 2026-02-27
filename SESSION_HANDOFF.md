@@ -1,12 +1,56 @@
-# Session Handoff — 2026-02-24 (Session 4)
+# Session Handoff — 2026-02-27 (Session 5)
 
-> Previous session: 2026-02-20 (Session 3)
+> Previous session: 2026-02-24 (Session 4)
 
 ---
 
-## What Was Accomplished This Session
+## What Was Accomplished This Session (Session 5)
 
-### Phase 1: Security Bug Fixes (5 fixes)
+### Claude Agent Activation (Phases 1-3)
+
+**Phase 1: Factory MCP Server** — `.claude/mcp/factory-mcp-server.py`
+- Python MCP server (stdio transport) wrapping the factory REST API
+- 10 tools: factory_status, factory_decompose, factory_review, factory_advance, factory_pending, factory_orphans, factory_projects, factory_create_project, factory_export, factory_agents
+- Uses `mcp` SDK + `httpx` for async HTTP
+- Auth-aware: pipeline endpoints use Bearer token, public endpoints skip auth
+- All 10 tools tested and verified against live factory API
+
+**Phase 2: Custom Subagents** — `.claude/agents/`
+- `wraith.md` — Lead orchestrator (model: opus, full tools + factory MCP, 50 turns)
+- `specter.md` — Adversarial code reviewer (model: opus, read-only + factory MCP, 30 turns)
+- `phantom.md` — Security auditor (model: opus, read-only + factory MCP, 30 turns)
+- Specter/Phantom have `disallowedTools: Write, Edit, Bash, NotebookEdit` (hard deny)
+- System prompts adapted from `C:\Darkfactory\workspaces\{agent}\CLAUDE.md`
+
+**Phase 3: Settings & Wiring**
+- `.claude/settings.local.json` — MCP server config + API key (gitignored)
+- `.claude/settings.json` — SessionStart hook configuration
+- `.claude/hooks/check-factory-pending.py` — Proactive factory status check on session start
+- `.gitignore` — Updated to exclude `settings.local.json`
+
+### Factory Dashboard Bug Fix
+
+**Bug:** Dashboard at factory.donjonsec.com nested itself on refresh (HTMX nesting)
+- **Root cause:** `setInterval` JS polled `GET /` via HTMX, but route always returned full page (extends base.html). Full page got injected as innerHTML into `<main>`, creating recursive nesting.
+- **Fix:** 4 files modified on factory-core:
+  - `dashboard_partial.html` (NEW) — Dashboard content without `{% extends %}`
+  - `dashboard.html` — Slim wrapper: extends base, includes partial
+  - `base.html` — Removed broken `setInterval` JS, added `{% block main_attrs %}`
+  - `dashboard.py` — Added `_is_htmx()` check: HTMX requests get partial, normal requests get full page. Added `HX-Redirect` for session expiry handling.
+- **Verified:** Normal request → 303 redirect to `/login`, HTMX request → partial HTML (no `<!DOCTYPE>`)
+
+### Smoke Test Results
+- MCP server: 10/10 tools registered, 3/3 API call tests passed
+- SessionStart hook: Returns structured factory status (active projects, pending reviews)
+- Factory API: 6 projects, 10 agents, all connectivity confirmed
+
+---
+
+## Previous Sessions
+
+### Session 4 (2026-02-24)
+
+#### Phase 1: Security Bug Fixes (5 fixes)
 
 **Fix 1a — EULA empty-input decline** (MEDIUM)
 - `lib/eula.py:137` — Removed `""` from decline set `("n", "no", "")` → `("n", "no")`
@@ -187,18 +231,24 @@ All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
 ## Next Session Plan
 
-### Priority 1: Factory Eats Itself
-- Submit the factory itself as the first real project through the pipeline
-- Wraith decomposes, Cipher/Jackal implement, Glitch tests, Specter reviews
+### Priority 1: Restart Claude Code & Validate MCP Integration
+- Restart Claude Code to pick up new `.claude/settings.local.json` (MCP server)
+- Verify `factory` MCP tools appear in Claude Code's tool list
+- Test subagent spawn: Wraith (full access), Specter (read-only), Phantom (read-only)
 
-### Priority 2: GUI / Distribution (from ROADMAP.md)
-- Phase 2: One-click launcher (donjon.bat enhancement + donjon-gui for Linux)
-- Phase 3: Offline update pack builder/applier (air-gap critical)
+### Priority 2: Factory Run — GUI Launcher (Phase 4b of Agent Plan)
+- Wraith creates project for "One-Click GUI Launcher" (ROADMAP Phase 2)
+- Wraith decomposes spec into tasks via `factory_decompose`
+- Ollama worker picks up implement + validate tasks
+- Specter + Phantom review via subagents
+- Full pipeline flow: planning → implement → validate → review → commit → done
+- This is the **"factory eats itself" milestone**
 
-### Priority 3: DonjonAI Planning
-- Product spec using `C:\Darkfactory\templates\PRODUCT_SPEC.md`
-- Domain registration consideration
-- MVP feature set for framework license offering
+### Priority 3: Phase 5 Enhancements
+- Agent Teams (Specter + Phantom parallel review)
+- Custom commands (`/factory-status`, `/factory-review`, `/factory-run`)
+- Scout agents (Hawk, Raven, Oracle)
+- mcp-everything-search for Windows file search acceleration
 
 ---
 
@@ -233,7 +283,7 @@ All as `donjonsec <dev@donjonsec.com>`. No AI attribution anywhere.
 
 - **Repo:** donjonsec/donjon-platform (private, GitHub)
 - **Branch:** develop
-- **Commits:** 11 (all pushed to origin/develop)
+- **Commits:** 12+ (all pushed to origin/develop)
 - **Platform:** Python 3.10+, Windows 11 primary, Linux (Kali) tested
 - **Modules:** 84 Python files, 43 YAML configs, 14 doc files (5,470 lines)
 - **Scanners:** 18 specialized security scanners

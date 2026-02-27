@@ -949,4 +949,76 @@ All 8 validation categories verified with evidence. Zero failures.
 - **Data protection**: No delete, archive-only, export, orphan detection, failure audit logging
 - **Dashboard**: All UI elements verified, auth enforced on all endpoints
 
-*Build log complete. Every claim backed by actual command output.*
+---
+
+## Phase 2: Claude Agent Activation (2026-02-27)
+
+### Overview
+Activated 3 of 6 Claude-powered agents using Claude Code native features (custom subagents, MCP server, hooks). No Anthropic API key required — everything runs through Claude Max interactive sessions.
+
+### Files Created
+
+| # | File | Purpose |
+|---|------|---------|
+| 1 | `.claude/mcp/factory-mcp-server.py` | MCP stdio server wrapping factory REST API (10 tools) |
+| 2 | `.claude/agents/wraith.md` | Lead orchestrator subagent (full tools, 50 turns) |
+| 3 | `.claude/agents/specter.md` | Adversarial code reviewer subagent (read-only, 30 turns) |
+| 4 | `.claude/agents/phantom.md` | Security auditor subagent (read-only, 30 turns) |
+| 5 | `.claude/settings.local.json` | MCP server config + API key (gitignored) |
+| 6 | `.claude/settings.json` | SessionStart hook config |
+| 7 | `.claude/hooks/check-factory-pending.py` | Proactive factory status on session start |
+
+### MCP Server Tools
+
+| Tool | Method | Endpoint | Auth |
+|------|--------|----------|------|
+| `factory_status` | GET | `/api/v1/pipeline/{id}/status` | Yes |
+| `factory_decompose` | POST | `/api/v1/pipeline/{id}/decompose` | Yes |
+| `factory_review` | POST | `/api/v1/pipeline/{id}/review` | Yes |
+| `factory_advance` | POST | `/api/v1/pipeline/{id}/advance` | Yes |
+| `factory_pending` | GET | `/api/v1/pipeline/pending-reviews` | Yes |
+| `factory_orphans` | GET | `/api/v1/pipeline/orphans` | Yes |
+| `factory_projects` | GET | `/api/v1/projects/` | No |
+| `factory_create_project` | POST | `/api/v1/projects/` | No |
+| `factory_export` | GET | `/api/v1/pipeline/{id}/export` | Yes |
+| `factory_agents` | GET | `/api/v1/agents/` | No |
+
+### Subagent Architecture
+
+| Agent | ID | Model | Tools | MCP | Turns |
+|-------|----|-------|-------|-----|-------|
+| Wraith | lead | opus | Read, Write, Edit, Bash, Glob, Grep, WebFetch, WebSearch | factory | 50 |
+| Specter | reviewer-1 | opus | Read, Glob, Grep (deny: Write, Edit, Bash) | factory | 30 |
+| Phantom | security-1 | opus | Read, Glob, Grep (deny: Write, Edit, Bash) | factory | 30 |
+
+### Smoke Test Results
+
+```
+MCP Server Import: OK (10/10 tools registered)
+factory_projects: OK (6 projects found)
+factory_agents: OK (10 agents found)
+factory_pending: OK (0 pending reviews)
+SessionStart hook: OK (returns structured factory status)
+```
+
+### Dashboard Bug Fix
+
+**Issue #16: HTMX nesting on page refresh**
+- Severity: MEDIUM (UI-breaking, not data-affecting)
+- Root cause: `setInterval` polled `GET /` via HTMX, route always returned full page, full page nested inside `<main>` as innerHTML
+- Fix: Split `dashboard.html` into full-page and partial templates, added `HX-Request` header detection in route handler
+- Files modified: `dashboard_partial.html` (new), `dashboard.html`, `base.html`, `dashboard.py`
+- Verified: Normal request → 303 redirect, HTMX request → partial HTML (no nesting)
+
+### Remaining Work (Not Started)
+
+| Item | Status |
+|------|--------|
+| Restart Claude Code to pick up MCP config | Pending |
+| Verify subagent tool restrictions (Specter can't write) | Pending |
+| Factory run: GUI Launcher project through full pipeline | Pending |
+| Agent Teams (Specter + Phantom parallel review) | Phase 5 |
+| Scout agents (Hawk, Raven, Oracle) | Phase 5 |
+| Custom commands (/factory-status, /factory-review) | Phase 5 |
+
+*Build log continues. Every claim backed by actual command output.*
