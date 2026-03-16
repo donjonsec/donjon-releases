@@ -1,305 +1,284 @@
-# Donjon Platform v7.0 - Quick Start Guide
+# Donjon Platform v7.0 - Quick Start
 
-Get scanning in 5 minutes on any platform.
-
----
-
-## Prerequisites
-
-### Linux (Kali, Ubuntu, Debian)
-
-```bash
-# Required
-python3 --version   # 3.10 or later required
-pip3 --version      # pip for Python package management
-
-# Recommended security tools (platform will prompt to install missing ones)
-sudo apt install nmap nikto
-```
-
-### macOS
-
-```bash
-# Install Homebrew if not present
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Required
-brew install python@3.11
-
-# Recommended
-brew install nmap nikto
-```
-
-### Windows 11
-
-```
-1. Install Python 3.11+ from https://python.org
-   - Check "Add Python to PATH" during install
-2. Install Nmap from https://nmap.org/download.html
-   - Check "Register Nmap Path" during install
-3. Open PowerShell or Command Prompt
-```
+Four deployment modes, one platform. Pick the one that fits your environment.
 
 ---
 
-## Step 1: Get the Platform
+## Prerequisites (All Modes)
 
-### Option A: USB Drive (Portable Mode)
+- **Python 3.10+** (3.11+ recommended)
+- **4 GB RAM**, 1 GB disk
+- **nmap** (recommended for network scanning)
 
-Plug in the USB drive containing the platform. The platform auto-detects portable mode and adjusts features accordingly (cloud scanning and external AI are disabled).
+---
+
+## Mode 1: USB / Portable
+
+No installation. No network. Plug in and scan.
+
+**Step 1.** Copy the `donjon-platform/` directory to a USB drive (or receive a pre-loaded one).
+
+**Step 2.** Plug the USB into the target machine.
+
+**Step 3.** Launch the platform:
 
 ```bash
-# Linux
-cd /run/media/$USER/DONJON/donjon-platform/
-
-# macOS
-cd /Volumes/DONJON/donjon-platform/
-
 # Windows
-cd E:\donjon-platform\
+E:\donjon-platform\START.bat
+
+# Linux / macOS
+python3 /media/USB_DRIVE/donjon-platform/bin/donjon-launcher
 ```
 
-### Option B: Git Clone (Installed Mode)
+**Step 4.** Select option `4` (Quick Scan) from the interactive menu. The platform auto-detects local network ranges.
+
+**Step 5.** View results in the terminal dashboard or `data/reports/`.
+
+**Expected output:**
+
+```
+DONJON PLATFORM v7.0
+Systems Thinking Security Assessment | Portable Mode
+
+[*] Auto-detected network: 192.168.1.0/24
+[*] Phase 1: Network Discovery    ... 12 hosts
+[*] Phase 2: Vulnerability Scan   ... 47 ports checked
+[*] Phase 3: Compliance Mapping   ... 10 frameworks
+[+] Scan complete! Session: SESSION-20260316-143022
+    CRITICAL: 1  HIGH: 4  MEDIUM: 8  LOW: 6  INFO: 4
+```
+
+> Portable mode automatically disables cloud scanning, defaults AI to the offline template backend, and stores all data in local SQLite.
+
+---
+
+## Mode 2: Docker
+
+Production-ready stack with PostgreSQL, API server, and scheduler.
+
+**Step 1.** Create a `.env` file in the project root:
+
+```bash
+POSTGRES_PASSWORD=your_secure_password_here
+DONJON_API_KEYS=donjon_your_api_key_here
+NVD_API_KEY=your_nvd_key          # optional, speeds up intel downloads
+```
+
+**Step 2.** Start the stack:
+
+```bash
+docker compose up -d
+```
+
+**Step 3.** Open the dashboard:
+
+```
+http://localhost:8443/
+```
+
+**Step 4.** Run a scan via API:
+
+```bash
+# Windows (PowerShell)
+Invoke-RestMethod -Uri http://localhost:8443/api/v1/scans -Method POST `
+  -Headers @{"X-API-Key"="donjon_your_api_key_here"; "Content-Type"="application/json"} `
+  -Body '{"scan_type":"quick","targets":["192.168.1.0/24"]}'
+
+# Linux / macOS
+curl -X POST http://localhost:8443/api/v1/scans \
+  -H "X-API-Key: donjon_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"scan_type":"quick","targets":["192.168.1.0/24"]}'
+```
+
+**Step 5.** Check scan status:
+
+```bash
+curl -H "X-API-Key: donjon_your_api_key_here" \
+  http://localhost:8443/api/v1/scans
+```
+
+**Expected output:**
+
+```json
+{
+  "count": 1,
+  "sessions": [
+    {
+      "session_id": "SESSION-20260316-143022",
+      "scan_type": "quick",
+      "status": "running"
+    }
+  ]
+}
+```
+
+> The Docker stack includes three containers: `donjon-postgres` (PostgreSQL 16), `donjon-api` (REST API on port 8443), and `donjon-scheduler` (background scan worker).
+
+---
+
+## Mode 3: Installed (pip)
+
+Install into a Python virtual environment for command-line scanning.
+
+**Step 1.** Clone or download the project:
 
 ```bash
 git clone https://github.com/DonjonSec/donjon-platform.git
 cd donjon-platform
 ```
 
----
-
-## Step 2: Launch the Platform
+**Step 2.** Create a virtual environment and install dependencies:
 
 ```bash
-# Interactive menu (recommended for first use)
-python3 bin/donjon-launcher
+# Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-# Or run a quick scan directly
-python3 bin/donjon-launcher quick
+# Windows
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-On first launch the platform will:
-
-1. Display the banner with platform detection (OS, architecture, deployment mode)
-2. Discover available security tools (nmap, nikto, nuclei, testssl.sh, etc.)
-3. Report which tools are available and which are missing
-4. Offer to install missing tools (if on a supported package manager)
-
----
-
-## Step 3: Run Your First Scan
-
-### From the Interactive Menu
-
-```
-DONJON PLATFORM v7.0
-Systems Thinking Security Assessment | Linux x86_64
-
-Main Menu:
-  1. Red Team - Attack Simulation
-  2. Blue Team - Detection & Defense
-  3. Purple Team - Integrated Assessment
-  ---
-  4. Quick Scan           <-- Start here
-  5. Standard Assessment
-  6. Deep Assessment
-  ---
-  7. Compliance & Reports
-  d. Dashboard
-  s. Settings
-  q. Quit
-```
-
-Select option `4` for a Quick Scan. The platform will:
-
-1. Auto-detect network ranges (RFC1918 private ranges on active interfaces)
-2. Run network discovery (host detection, port scanning)
-3. Run vulnerability checks (CVE detection, service enumeration)
-4. Run SSL/TLS analysis (certificate validation, cipher checks)
-5. Run compliance mapping (findings mapped to 10+ frameworks)
-6. Generate findings with threat intelligence enrichment (KEV + EPSS)
-7. Store results in the evidence database
-
-### From the Command Line
+**Step 3.** (Optional) Download threat intelligence data:
 
 ```bash
-# Quick scan (15-30 minutes)
-python3 bin/donjon-launcher quick
+# Quick mode (~2 min): KEV + EPSS + 14-day NVD
+python bin/update-intel.py --quick
 
-# Standard assessment (1-2 hours)
-python3 bin/donjon-launcher standard
-
-# Deep assessment (2-4 hours)
-python3 bin/donjon-launcher deep
+# Full mode (~30 min with API key): all 7 sources
+NVD_API_KEY=your-key python bin/update-intel.py --all
 ```
 
----
-
-## Step 4: View Results
-
-### Executive Dashboard
+**Step 4.** Run a scan:
 
 ```bash
-python3 bin/donjon-launcher dashboard
+# Interactive menu
+python bin/donjon-launcher
+
+# Quick scan (headless)
+python bin/donjon-launcher quick
+
+# Standard assessment
+python bin/donjon-launcher standard
 ```
 
-Displays a terminal dashboard with:
-- Risk score gauge (0-100)
-- Findings by severity
-- Compliance status per framework
-- Top critical/high findings
-- Security trend indicator
-
-### Generated Reports
-
-Reports are saved in `data/reports/`:
-
-```
-data/reports/
-  report_YYYYMMDD_HHMMSS.html   # HTML report with charts
-  report_YYYYMMDD_HHMMSS.json   # Machine-readable JSON
-  report_YYYYMMDD_HHMMSS.csv    # Spreadsheet-compatible CSV
-```
-
-### Evidence Database
-
-All findings, evidence, and compliance mappings are stored in:
-
-```
-data/evidence/evidence.db        # SQLite database
-```
-
----
-
-## Step 5: Explore v7.0 Features
-
-### Risk Quantification (FAIR)
+**Step 5.** View results:
 
 ```bash
-python3 bin/donjon-launcher risk
-```
+# Terminal dashboard
+python bin/donjon-launcher dashboard
 
-Translates findings into dollar amounts using the FAIR model. Set your industry for benchmarks:
-- healthcare, financial, technology, government, education, retail, manufacturing, energy
-
-### AI Analysis
-
-From the Compliance & Reports menu, select `a` for AI Analysis. Choose a backend:
-- Template (default): works offline, no LLM needed
-- Ollama: local LLM, requires Ollama running
-- OpenAI: external API with data sanitization
-
-### Container Security
-
-Requires Docker or Podman installed. Container scanning is available through the orchestrator during standard and deep assessments.
-
-### Cloud Security
-
-Requires AWS CLI, Azure CLI, or gcloud CLI configured. Cloud scanning auto-detects available providers. Disabled in portable mode.
-
----
-
-## Common CLI Commands
-
-| Command | Description | Duration |
-|---------|-------------|----------|
-| `donjon-launcher` | Interactive menu | - |
-| `donjon-launcher quick` | Quick security scan | 15-30 min |
-| `donjon-launcher standard` | Standard assessment | 1-2 hours |
-| `donjon-launcher deep` | Deep audit with evidence | 2-4 hours |
-| `donjon-launcher tools` | Show tool inventory | Instant |
-| `donjon-launcher dashboard` | Executive dashboard | Instant |
-| `donjon-launcher risk` | FAIR risk quantification | 1-5 min |
-| `donjon-launcher delta` | Compare scan sessions | Instant |
-| `donjon-launcher help` | Show CLI help | Instant |
-
----
-
-## Expected Output
-
-### Quick Scan Output
-
-```
-DONJON PLATFORM v7.0
-Systems Thinking Security Assessment | Linux x86_64
-
-[*] Checking Prerequisites
-    nmap .............. OK (7.95)
-    nikto ............. OK (2.5.0)
-    nuclei ............ OK (3.2.1)
-    testssl.sh ........ OK (3.2)
-[+] All required tools are available
-
-Quick Security Scan
-[*] Running quick security posture check...
-[*] Behavior profile: normal
-[*] Auto-detected network: 192.168.1.0/24
-
-[*] Phase 1: Network Discovery
-    Discovered 12 hosts
-[*] Phase 2: Service Enumeration
-    Found 47 open ports
-[*] Phase 3: Vulnerability Scanning
-    Checked 12 hosts
-[*] Phase 4: Compliance Mapping
-    Mapped to 10 frameworks
-
-[+] Scan complete! Session: SESSION-20260209-143022
-[*] Total findings: 23
-    CRITICAL: 1  HIGH: 4  MEDIUM: 8  LOW: 6  INFO: 4
-```
-
-### Dashboard Output
-
-```
-+--------------------------------------------------------+
-| SECURITY DASHBOARD - Session: SESSION-20260209         |
-+--------------------------------------------------------+
-| RISK SCORE: [===============.....] 73/100              |
-| Trend: WORSENING                                       |
-+--------------------------------------------------------+
-| CRITICAL: 1  HIGH: 4  MEDIUM: 8  LOW: 6               |
-| Total findings: 23   Assets: 12                        |
-+--------------------------------------------------------+
-| COMPLIANCE                                             |
-|   NIST-800-53    [========..] 80.0%                   |
-|   HIPAA          [=======...] 72.5%                   |
-|   PCI-DSS-v4     [======....] 65.0%                   |
-+--------------------------------------------------------+
-| TOP RISKS                                              |
-|   1. [CRIT] SQL Injection in login     10.0.0.5       |
-|   2. [HIGH] Weak TLS configuration     10.0.0.2       |
-+--------------------------------------------------------+
+# Start the web dashboard + API
+python bin/start-server.py
+# Open http://localhost:8443/
 ```
 
 ---
 
-## Next Steps
+## Mode 4: CI/CD Pipeline
 
-1. **Configure for your environment**: Edit `config/active/config.yaml` with your industry, network ranges, and compliance frameworks.
-2. **Set up credentials**: From Settings > Manage Credentials, add SSH keys or passwords for authenticated scanning.
-3. **Schedule assessments**: Configure automated monthly scans from the Settings menu.
-4. **Generate reports**: From Compliance & Reports, generate framework-specific audit reports.
-5. **Integrate CI/CD**: From Settings > CI/CD Integration, generate pipeline configs for GitHub Actions, GitLab CI, or Jenkins.
+Integrate Donjon into GitHub Actions, GitLab CI, or Jenkins.
+
+**Step 1.** Add the platform to your repository:
+
+```bash
+git clone https://github.com/DonjonSec/donjon-platform.git .donjon
+```
+
+**Step 2.** Create `.github/workflows/security-scan.yml`:
+
+```yaml
+name: Donjon Security Scan
+on: [push, pull_request]
+
+permissions:
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Donjon
+        run: |
+          pip install -r .donjon/requirements.txt
+          sudo apt-get install -y nmap
+
+      - name: Run Security Scan
+        run: |
+          python .donjon/bin/donjon-launcher quick --output sarif
+        env:
+          DONJON_HEADLESS: "true"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: data/reports/donjon-results.sarif
+
+      - name: Security Gate
+        run: |
+          python .donjon/bin/donjon-launcher gate \
+            --fail-on critical \
+            --max-high 5
+```
+
+**Step 3.** Configure environment variables in your CI provider:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DONJON_HEADLESS` | Yes | Disables interactive prompts |
+| `NVD_API_KEY` | No | Faster intel downloads |
+| `DONJON_API_KEYS` | No | API authentication |
+
+**Step 4.** Push and monitor the workflow.
+
+**Step 5.** SARIF results appear in the GitHub Security tab under Code Scanning Alerts.
+
+**Expected CI output:**
+
+```
+[Donjon] Headless mode: quick scan
+[*] Scanning 3 targets...
+[+] Scan complete: 7 findings (0 critical, 2 high, 3 medium, 2 low)
+[+] SARIF report: data/reports/donjon-results.sarif
+[+] Security gate: PASS (0 critical, 2 high <= 5 max)
+```
+
+---
+
+## What to Do Next
+
+| Task | Command |
+|---|---|
+| Configure your environment | Edit `config/active/config.yaml` |
+| Download vulnerability intel | `python bin/update-intel.py --all` |
+| Set up scheduled scans | API: `POST /api/v1/schedules` (Pro+) |
+| Generate compliance reports | `python bin/donjon-launcher` > Compliance & Reports |
+| View FAIR risk quantification | `python bin/donjon-launcher risk` |
+| Compare scan sessions | `python bin/donjon-launcher delta` |
 
 ---
 
 ## Getting Help
 
 ```bash
-# Built-in help
-python3 bin/donjon-launcher help
-
-# Documentation
-docs/CHANGELOG-v7.md        # v7.0 release notes
-docs/FEATURES-v7.md         # Feature deep-dive
-docs/CONFIGURATION.md       # Config reference
-docs/TROUBLESHOOTING.md     # Problem solving
-docs/CLI-REFERENCE.md       # Command reference
-AUDITOR_GUIDE.md            # Guide for auditors
+python bin/donjon-launcher help          # CLI help
 ```
 
----
-
-Donjon Platform v7.0
-February 2026
+| Document | What It Covers |
+|---|---|
+| [SCANNER-GUIDE.md](SCANNER-GUIDE.md) | All 17 scanners with config and examples |
+| [COMPLIANCE-GUIDE.md](COMPLIANCE-GUIDE.md) | 30 compliance frameworks |
+| [API-REFERENCE.md](API-REFERENCE.md) | Complete REST API reference |
+| [AIRGAP-DEPLOYMENT.md](AIRGAP-DEPLOYMENT.md) | Air-gapped / classified network deployment |
+| [CONFIGURATION.md](CONFIGURATION.md) | Full config.yaml reference |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
