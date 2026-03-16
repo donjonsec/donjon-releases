@@ -733,12 +733,12 @@ class LicenseManager:
             return None
 
         try:
-            pub_bytes = base64.b64decode(_PUBLIC_KEY_PQC_B64, validate=True)
+            # Strip whitespace/padding artifacts from multi-line string concat
+            pub_bytes = base64.b64decode(_PUBLIC_KEY_PQC_B64.strip())
             valid = ML_DSA_65.verify(pub_bytes, payload, signature)
             return bool(valid)
-        except Exception:
-            # SECURITY: Same rationale as _verify_ed25519.
-            logger.debug("ML-DSA-65 verification failed")
+        except Exception as exc:
+            logger.debug("ML-DSA-65 verification failed: %s", exc)
             return False
 
     # ------------------------------------------------------------------
