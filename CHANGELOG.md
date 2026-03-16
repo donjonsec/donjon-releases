@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [7.1.0] - 2026-03-15
+
+### Security
+- **3-layer licensing enforcement** — Added `lib/license_guard.py` with `@require_tier()` decorator, scanner base class tier gate, and API-level filtering. Replaces single API-only check.
+- **File integrity verification** — Added `lib/integrity.py` with SHA-256 manifest of critical modules (licensing, license_guard, base scanner). Tampering detected = Community fallback.
+- **Legacy HMAC v1 removed** — Eliminated embedded `donjon-license-signing-key-v1` shared key. Only v2 (ML-DSA-65 + Ed25519) licenses accepted.
+- **Fail-closed revocation** — Revocation list deletion no longer bypasses check. Embedded hash of last-known list enforced.
+- **AI quota integrity** — HMAC-signed quota file prevents deletion/reset to bypass daily query limits.
+- **Scanner list filtered by tier** — Community users see only 7 permitted scanners in API responses. Pro+ scanners shown as locked with upgrade prompt.
+
+### Added
+- **Enterprise: SSO/SAML** (`lib/sso.py`) — SAML 2.0 Service Provider with IdP metadata parsing, assertion validation, air-gap XML file support
+- **Enterprise: RBAC** (`lib/rbac.py`) — Role-based access control with admin/analyst/auditor/viewer roles, custom role creation, fine-grained permissions
+- **Enterprise: Multi-tenant** (`lib/multi_tenant.py`) — Tenant isolation via per-tenant SQLite databases, thread-local tenant context, cross-tenant query prevention
+- **Enterprise: Zero-retention** (`lib/zero_retention.py`) — Ephemeral scan sessions with cryptographic erasure and purge certificates
+- **Enterprise: Audit trail** (`lib/audit_trail.py`) — Immutable append-only event log with SHA-256 hash chain, SIEM-compatible export
+- **MSSP: Management plane** (`mssp/`) — 10 modules: client provisioning, data isolation, bulk scan orchestration, scan templates, client dashboards, rollup reporting, cross-client analytics, usage metering, license sub-allocation, white-label branding
+- **6 compliance frameworks** — HITRUST CSF v11, SOX IT controls, NERC CIP v7, GLBA Safeguards Rule, FERPA, CIS Controls v8.1 (total: 30 frameworks)
+- **Intel bundler** (`bin/bundle-intel.py`) — Offline vulnerability database packaging for USB/air-gap transfer with SHA-256 checksums
+- **Intel status** — `update-intel.py --status` shows data source freshness with stale/critical warnings
+
+### Removed
+- Internal development docs (DARK_FACTORY_BUILD_LOG.md, SESSION_HANDOFF.md, ERRORS_AND_FIXES.md) removed from public repository
+
+---
+
 ## [7.0.1] - 2026-02-20
 
 ### Security
@@ -38,7 +64,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 - 18 security scanners (network, web, SSL, cloud, container, compliance, malware, shadow AI, adversary emulation, and more)
-- 34 compliance frameworks (NIST 800-53, HIPAA, PCI-DSS, SOC 2, ISO 27001, CIS, and more)
+- 24 compliance frameworks (NIST 800-53, HIPAA, PCI-DSS, SOC 2, ISO 27001, CIS, and more)
 - Post-quantum licensing with ML-DSA-65 + Ed25519 dual signatures
 - 4-tier gating: Community (free), Pro, Enterprise, Managed (MSSP)
 - FAIR risk quantification with Monte Carlo simulation (10,000 iterations)
