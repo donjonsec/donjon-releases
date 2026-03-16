@@ -97,7 +97,10 @@ except ImportError:
     get_license_manager = None
 
 from web.auth import get_auth, APIKeyAuth
-from web.dashboard import generate_dashboard_html
+try:
+    from web.dashboard_shell import generate_shell as generate_dashboard_html
+except ImportError:
+    from web.dashboard import generate_dashboard_html
 
 # ---------------------------------------------------------------------------
 # Import API sub-modules (safe imports — app stays up if deps are missing)
