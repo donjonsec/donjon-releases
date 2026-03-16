@@ -87,7 +87,7 @@ def _license_status(
 
     def _call() -> dict[str, Any]:
         try:
-            require_tier("mssp")
+            require_tier("managed")
             return {"licensed": True, "tier": "mssp"}
         except LicenseError as exc:
             return {"licensed": False, "error": str(exc)}

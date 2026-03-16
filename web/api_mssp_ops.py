@@ -22,7 +22,7 @@ def _route(path: str) -> Callable[[Callable[[dict[str, Any] | None], dict[str, A
 
 
 def _enforce_mssp_license() -> None:
-    require_tier("mssp")
+    require_tier("managed")
 
 
 @_route("/mssp/bulk-scan")
@@ -75,7 +75,7 @@ def _handle_usage_report(body: dict[str, Any] | None) -> dict[str, Any]:
 @_route("/mssp/license/check")
 def _handle_license_check(body: dict[str, Any] | None) -> dict[str, Any]:
     try:
-        require_tier("mssp")
+        require_tier("managed")
         return {"status": 200, "data": {"licensed": True, "tier": "mssp"}}
     except LicenseError as exc:
         return {"status": 200, "data": {"licensed": False, "error": str(exc)}}

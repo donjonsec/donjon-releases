@@ -3,11 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Callable, TypeVar, Any
 
-from lib.config import load_config
-
 logger = logging.getLogger(__name__)
 
-TIER_ORDER: list[str] = ["community", "pro", "enterprise", "mssp"]
+TIER_ORDER: list[str] = ["community", "pro", "enterprise", "managed"]
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -17,9 +15,15 @@ class LicenseError(Exception):
 
 
 def _current_tier() -> str:
-    cfg = load_config()
-    tier: str = cfg.get("license", {}).get("tier", "community")
-    return tier
+    """Get current license tier from LicenseManager (reads data/license.json)."""
+    try:
+        from lib.licensing import get_license_manager
+        lm = get_license_manager()
+        if lm is not None:
+            return lm.get_tier()
+    except Exception:
+        pass
+    return "community"
 
 
 def _tier_index(tier: str) -> int:
@@ -29,12 +33,25 @@ def _tier_index(tier: str) -> int:
         raise LicenseError(f"Unknown tier: {tier!r}. Valid tiers: {TIER_ORDER}") from None
 
 
+_FEATURE_TIERS: dict[str, str] = {
+    "sso": "enterprise",
+    "rbac": "enterprise",
+    "multi_tenant": "enterprise",
+    "zero_retention": "enterprise",
+    "audit-api": "enterprise",
+    "audit_trail": "enterprise",
+    "settings": "pro",
+    "white_label": "managed",
+    "client_provisioning": "managed",
+    "mssp": "managed",
+}
+
+
 def _feature_min_tier(feature: str) -> str:
-    cfg = load_config()
-    feature_tiers: dict[str, str] = cfg.get("license", {}).get("feature_tiers", {})
-    if feature not in feature_tiers:
-        raise LicenseError(f"Unknown feature: {feature!r}")
-    return feature_tiers[feature]
+    if feature in _FEATURE_TIERS:
+        return _FEATURE_TIERS[feature]
+    # Default: enterprise for unknown features (fail closed)
+    return "enterprise"
 
 
 def require_tier(tier: str) -> None:

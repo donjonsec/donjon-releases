@@ -18,7 +18,7 @@ def handle_mssp_clients(
 
     def json_response() -> Any:
         try:
-            require_tier("mssp")
+            require_tier("managed")
         except LicenseError as exc:
             return {"error": str(exc), "status": 403}
 
