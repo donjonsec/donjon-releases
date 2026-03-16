@@ -4,14 +4,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from darkfactory.paths import get_paths
+from lib.paths import get_paths
 
 logger = logging.getLogger(__name__)
 
 
 def generate_schedules() -> dict[str, Any]:
     paths = get_paths()
-    schedules_path: Path = paths["schedules_dir"]
+    schedules_path: Path = paths.config / "schedules"
 
     schedules: list[dict[str, Any]] = []
 

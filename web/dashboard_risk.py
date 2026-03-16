@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 def generate_risk() -> dict[str, Any]:
     """Generate risk dashboard data by reading risk-related paths and aggregating findings."""
-    from paths import get_paths  # type: ignore[import]
+    from lib.paths import get_paths
 
-    paths = get_paths()
+    p = get_paths()
 
     risk_data: dict[str, Any] = {
         "findings": [],
@@ -24,29 +25,26 @@ def generate_risk() -> dict[str, Any]:
         "sources": [],
     }
 
-    findings_path: Path | None = paths.get("findings")
-    if findings_path is not None and Path(findings_path).exists():
-        import json
+    # Check evidence directory for findings
+    findings_dir: Path = p.evidence
+    if findings_dir.exists():
+        for findings_file in sorted(findings_dir.glob("*.json")):
+            try:
+                raw = findings_file.read_text(encoding="utf-8")
+                data = json.loads(raw)
+                items: list[dict[str, Any]] = data if isinstance(data, list) else data.get("findings", [])
+                for item in items:
+                    severity = str(item.get("severity", "low")).lower()
+                    if severity in risk_data["summary"]:
+                        risk_data["summary"][severity] += 1
+                    risk_data["findings"].append(item)
+                risk_data["sources"].append(str(findings_file))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Could not load findings from %s: %s", findings_file, exc)
 
-        findings_file = Path(findings_path)
-        try:
-            raw = findings_file.read_text(encoding="utf-8")
-            data = json.loads(raw)
-            items: list[dict[str, Any]] = data if isinstance(data, list) else data.get("findings", [])
-            for item in items:
-                severity = str(item.get("severity", "low")).lower()
-                if severity in risk_data["summary"]:
-                    risk_data["summary"][severity] += 1
-                risk_data["findings"].append(item)
-            risk_data["sources"].append(str(findings_file))
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Could not load findings from %s: %s", findings_file, exc)
-
-    reports_path: Path | None = paths.get("reports")
-    if reports_path is not None and Path(reports_path).exists():
-        import json
-
-        reports_dir = Path(reports_path)
+    # Check reports directory
+    reports_dir: Path = p.reports
+    if reports_dir.exists():
         for report_file in sorted(reports_dir.glob("*.json")):
             try:
                 raw = report_file.read_text(encoding="utf-8")

@@ -10,20 +10,29 @@ logger = logging.getLogger(__name__)
 def generate_overview() -> dict[str, Any]:
     """Generate a dashboard overview by collecting stats from project paths."""
     try:
-        from paths import get_paths  # type: ignore[import]
+        from lib.paths import get_paths
 
-        paths = get_paths()
+        p = get_paths()
+        paths_map: dict[str, Path] = {
+            "home": p.home,
+            "data": p.data,
+            "results": p.results,
+            "evidence": p.evidence,
+            "logs": p.logs,
+            "reports": p.reports,
+            "config": p.config,
+            "scanners": p.scanners,
+        }
     except Exception as exc:
-        logger.warning("Could not load paths-v1: %s", exc)
-        paths = {}
+        logger.warning("Could not load paths: %s", exc)
+        paths_map = {}
 
     overview: dict[str, Any] = {
         "sections": [],
         "stats": {},
     }
 
-    for name, raw_path in paths.items():
-        path = Path(raw_path) if isinstance(raw_path, str) else raw_path
+    for name, path in paths_map.items():
         if not isinstance(path, Path):
             continue
         entry: dict[str, Any] = {

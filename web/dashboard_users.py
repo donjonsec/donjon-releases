@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 def generate_users(output_dir: Path | str = "output") -> None:
-    from paths import get_paths  # type: ignore[import]
+    from lib.paths import get_paths
 
     out = Path(str(output_dir))
     out.mkdir(parents=True, exist_ok=True)
 
-    path_config: dict[str, Any] = get_paths()
+    path_config = get_paths()
 
     users_data: list[dict[str, Any]] = [
         {

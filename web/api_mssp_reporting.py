@@ -42,14 +42,14 @@ def _route(
 def _client_dashboard(
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
-    from darkfactory.client_dashboard import get_client_dashboard  # type: ignore[import]
+    from mssp.dashboard import get_client_summary
 
     client_id: str | None = (body or {}).get("client_id")
     if not client_id:
         raise ValueError("client_id is required for client dashboard")
 
     def _call() -> dict[str, Any]:
-        return get_client_dashboard(client_id=client_id)
+        return get_client_summary(client_id=client_id)
 
     return _call
 
@@ -57,12 +57,12 @@ def _client_dashboard(
 def _rollup_report(
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
-    from darkfactory.rollup_reporting import generate_rollup_report  # type: ignore[import]
+    from mssp.rollup import generate_rollup
 
     params: dict[str, Any] = body or {}
 
     def _call() -> dict[str, Any]:
-        return generate_rollup_report(**params)
+        return generate_rollup(**params)
 
     return _call
 
@@ -70,12 +70,12 @@ def _rollup_report(
 def _cross_client_report(
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
-    from darkfactory.cross_client_reporting import generate_cross_client_report  # type: ignore[import]
+    from mssp.reporting import compare_clients
 
     params: dict[str, Any] = body or {}
 
     def _call() -> dict[str, Any]:
-        return generate_cross_client_report(**params)
+        return compare_clients(**params)
 
     return _call
 
@@ -83,11 +83,13 @@ def _cross_client_report(
 def _license_status(
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
-    from darkfactory.license_guard import check_license_status  # type: ignore[import]
-
-    params: dict[str, Any] = body or {}
+    from lib.license_guard import require_tier, LicenseError
 
     def _call() -> dict[str, Any]:
-        return check_license_status(**params)
+        try:
+            require_tier("mssp")
+            return {"licensed": True, "tier": "mssp"}
+        except LicenseError as exc:
+            return {"licensed": False, "error": str(exc)}
 
     return _call

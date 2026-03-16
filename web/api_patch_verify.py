@@ -8,15 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 def _load_evidence(session_id: str) -> dict[str, Any]:
-    from darkfactory.evidence import load_evidence  # evidence-v1
+    from lib.evidence import get_evidence_manager
 
-    return load_evidence(session_id)
+    em = get_evidence_manager()
+    return em.get_session_summary(session_id)
 
 
 def _resolve_paths(session_id: str) -> dict[str, Path]:
-    from darkfactory.paths import resolve_paths  # paths-v1
+    from lib.paths import paths
 
-    return resolve_paths(session_id)
+    session_dir = paths.session_dir(session_id)
+    return {"session_dir": session_dir, "results": paths.results}
 
 
 def _build_patch_diff(

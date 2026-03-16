@@ -9,20 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 def run_wizard(interactive: bool) -> None:
-    from lib.config import get_config, set_config
+    from lib.config import get_config
     from lib.paths import get_paths
-    from lib.evidence import record_evidence
+    from lib.evidence import get_evidence_manager
 
     paths = get_paths()
-    config = get_config()
+    cfg = get_config()
 
     if interactive:
         logger.info("Starting first-run wizard (interactive mode)")
-        print("Welcome to DarkFactory. Let's configure your environment.")
+        print("Welcome to Donjon Platform. Let's configure your environment.")
 
-        data_dir = paths.get("data_dir")
-        if data_dir is not None:
-            print(f"Data directory: {data_dir}")
+        data_dir = paths.data
+        print(f"Data directory: {data_dir}")
 
         api_url = input("Enter the API base URL [http://localhost:8000]: ").strip()
         if not api_url:
@@ -31,24 +30,28 @@ def run_wizard(interactive: bool) -> None:
         workspace_input = input("Enter your workspace name [default]: ").strip()
         workspace = workspace_input if workspace_input else "default"
 
-        set_config("api_url", api_url)
-        set_config("workspace", workspace)
-        set_config("first_run_complete", True)
+        cfg.set("api_url", api_url)
+        cfg.set("workspace", workspace)
+        cfg.set("first_run_complete", True)
+        cfg.save()
     else:
         logger.info("Starting first-run wizard (non-interactive mode)")
-        config_api_url = config.get("api_url")
-        if config_api_url is None:
-            set_config("api_url", "http://localhost:8000")
-        config_workspace = config.get("workspace")
-        if config_workspace is None:
-            set_config("workspace", "default")
-        set_config("first_run_complete", True)
+        if cfg.get("api_url") is None:
+            cfg.set("api_url", "http://localhost:8000")
+        if cfg.get("workspace") is None:
+            cfg.set("workspace", "default")
+        cfg.set("first_run_complete", True)
+        cfg.save()
 
     marker_path = _get_marker_path()
     marker_path.parent.mkdir(parents=True, exist_ok=True)
     marker_path.touch()
 
-    record_evidence("first_run_wizard_completed", {"interactive": interactive})
+    em = get_evidence_manager()
+    session_id = em.start_session("first_run", [])
+    em.add_evidence(session_id, "config", "First-run wizard completed",
+                    description=f"interactive={interactive}")
+    em.end_session(session_id, {"interactive": interactive})
     logger.info("First-run wizard completed successfully")
 
 
@@ -61,12 +64,7 @@ def _get_marker_path() -> Path:
     from lib.paths import get_paths
 
     paths = get_paths()
-    data_dir = paths.get("data_dir")
-    if data_dir is not None:
-        base = Path(str(data_dir))
-    else:
-        base = Path.home() / ".darkfactory"
-    return base / ".first_run_complete"
+    return paths.data / ".first_run_complete"
 
 
 def get_run_wizard(interactive: bool) -> Callable[[], None]:

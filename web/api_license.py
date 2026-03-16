@@ -3,17 +3,16 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from darkfactory.config import get_config
-from darkfactory.paths import get_paths
-from darkfactory.license_guard import LicenseGuard
+from lib.config import get_config
+from lib.paths import get_paths
+from lib.license_guard import require_feature
 
 logger = logging.getLogger(__name__)
 
 
 def make_api_license_router() -> Callable[[str, dict[str, Any] | None], Callable[[], Any]]:
-    config = get_config()
-    paths = get_paths()
-    guard = LicenseGuard(config=config, paths=paths)
+    from lib.licensing import get_license_manager
+    lm = get_license_manager()
 
     def handle(request_path: str, request_body: dict[str, Any] | None) -> Callable[[], Any]:
         if not request_path:
@@ -22,20 +21,20 @@ def make_api_license_router() -> Callable[[str, dict[str, Any] | None], Callable
         normalized = request_path.rstrip("/")
 
         if normalized == "/api/license/status":
-            return _handle_status(guard)
+            return _handle_status(lm)
         elif normalized == "/api/license/validate":
-            return _handle_validate(guard, request_body)
+            return _handle_validate(lm, request_body)
         elif normalized == "/api/license/activate":
-            return _handle_activate(guard, request_body)
+            return _handle_activate(lm, request_body)
         elif normalized == "/api/license/deactivate":
-            return _handle_deactivate(guard, request_body)
+            return _handle_deactivate(lm, request_body)
         else:
             raise ValueError(f"Unknown license route: {request_path!r}")
 
     return handle
 
 
-def _handle_status(guard: LicenseGuard) -> Callable[[], dict[str, Any]]:
+def _handle_status(guard: Any) -> Callable[[], dict[str, Any]]:
     def json_response() -> dict[str, Any]:
         status = guard.get_status()
         return {"ok": True, "status": status}
@@ -44,7 +43,7 @@ def _handle_status(guard: LicenseGuard) -> Callable[[], dict[str, Any]]:
 
 
 def _handle_validate(
-    guard: LicenseGuard,
+    guard: Any,
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
     def json_response() -> dict[str, Any]:
@@ -60,7 +59,7 @@ def _handle_validate(
 
 
 def _handle_activate(
-    guard: LicenseGuard,
+    guard: Any,
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
     def json_response() -> dict[str, Any]:
@@ -76,7 +75,7 @@ def _handle_activate(
 
 
 def _handle_deactivate(
-    guard: LicenseGuard,
+    guard: Any,
     body: dict[str, Any] | None,
 ) -> Callable[[], dict[str, Any]]:
     def json_response() -> dict[str, Any]:

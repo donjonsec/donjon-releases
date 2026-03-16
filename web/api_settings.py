@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from config import get_config
-from paths import get_paths
-from license_guard import require_license
+from lib.config import get_config
+from lib.paths import get_paths
+from lib.license_guard import require_feature
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def handle_settings_request(
 ) -> dict[str, Callable[[], Any]]:
     cfg = get_config()
     paths = get_paths()
-    require_license()
+    require_feature("settings")
 
     def _route() -> Any:
         if request_path == "/settings/config":

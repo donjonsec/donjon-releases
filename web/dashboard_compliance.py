@@ -11,14 +11,13 @@ logger = logging.getLogger(__name__)
 def generate_compliance() -> dict[str, Any]:
     """Generate compliance dashboard data by scanning compliance-related paths."""
     try:
-        from paths import get_paths  # type: ignore[import]
+        from lib.paths import get_paths
 
-        paths = get_paths()
+        p = get_paths()
+        specs_path = p.docs / "specs"
     except ImportError:
-        logger.warning("paths-v1 not found, using defaults")
-        paths = {}
-
-    specs_path: Path = Path(paths.get("specs", "specs"))
+        logger.warning("paths not found, using defaults")
+        specs_path = Path("specs")
     compliance_files: list[dict[str, Any]] = []
 
     if specs_path.exists():

@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from darkfactory.config import get_config  # config-v1
-from darkfactory.evidence import record_evidence  # evidence-v1
-from darkfactory.paths import get_paths  # paths-v1
+from lib.config import get_config
+from lib.evidence import get_evidence_manager
+from lib.paths import get_paths
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def run_scan(
     depth: str,
 ) -> dict[str, Any]:
     paths = get_paths()
-    config = get_config()
+    cfg = get_config()
 
     if not targets:
         raise ValueError("targets must be a non-empty list")
@@ -32,22 +32,22 @@ def run_scan(
     if depth not in valid_depths:
         raise ValueError(f"depth must be one of {valid_depths}, got {depth!r}")
 
-    active_scanners: list[str] = scanners if scanners is not None else config.get("default_scanners", [])
+    active_scanners: list[str] = scanners if scanners is not None else cfg.get("tools", {})
 
-    session_id = record_evidence(
-        paths=paths,
-        config=config,
-        targets=targets,
-        scanners=active_scanners,
-        depth=depth,
+    em = get_evidence_manager()
+    session_id = em.start_session(
+        scan_type=depth,
+        target_networks=targets,
+        metadata={"scanners": active_scanners},
     )
 
-    findings_count: int = session_id.get("findings_count", 0) if isinstance(session_id, dict) else 0
-    resolved_session_id: str = session_id.get("session_id", "") if isinstance(session_id, dict) else str(session_id)
+    # TODO: actually invoke scanner modules here
+
+    em.end_session(session_id, {"targets": targets, "scanners": active_scanners, "depth": depth})
 
     return {
-        "session_id": resolved_session_id,
-        "findings_count": findings_count,
+        "session_id": session_id,
+        "findings_count": 0,
     }
 
 

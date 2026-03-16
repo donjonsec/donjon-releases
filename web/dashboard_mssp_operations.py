@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 def generate_mssp_operations(output_dir: Path | None = None) -> dict[str, Any]:
     """Generate MSSP operations dashboard content."""
-    from darkfactory.paths import get_paths  # paths-v1
+    from lib.paths import get_paths
 
     paths = get_paths()
-    base_dir = output_dir or paths.get("web_dir", Path("web"))
+    base_dir = output_dir or (paths.home / "web")
 
     dashboard: dict[str, Any] = {
         "title": "MSSP Operations Dashboard",

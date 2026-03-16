@@ -21,10 +21,10 @@ def generate_mssp_reports(
         A dict with keys: success (bool), reports (list of report metadata dicts),
         output_dir (str path), errors (list of str).
     """
-    from darkfactory.paths import get_paths  # paths-v1
+    from lib.paths import get_paths
 
     paths = get_paths()
-    resolved_output_dir: Path = output_dir if output_dir is not None else paths.reports_dir
+    resolved_output_dir: Path = output_dir if output_dir is not None else paths.reports
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
 
     reports: list[dict[str, Any]] = []
@@ -54,7 +54,7 @@ def generate_mssp_reports(
 
 def _discover_tenants(paths: Any) -> list[str]:
     """Discover tenant IDs from the data directory."""
-    tenants_dir: Path = Path(paths.data_dir) / "tenants"
+    tenants_dir: Path = paths.data / "tenants"
     if not tenants_dir.exists():
         logger.warning("Tenants directory does not exist: %s", tenants_dir)
         return []
@@ -79,7 +79,7 @@ def _generate_tenant_report(
     import json
     import datetime
 
-    tenant_data_dir: Path = Path(paths.data_dir) / "tenants" / tenant_id
+    tenant_data_dir: Path = paths.data / "tenants" / tenant_id
     report_file: Path = output_dir / f"mssp_report_{tenant_id}.json"
 
     summary: dict[str, Any] = {

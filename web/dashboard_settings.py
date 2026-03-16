@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from darkfactory.config import get_config
-from darkfactory.paths import get_paths
+from lib.config import get_config
+from lib.paths import get_paths
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,9 @@ def generate_settings() -> dict[str, Any]:
     settings: dict[str, Any] = {
         "version": config.get("version", ""),
         "environment": config.get("environment", "production"),
-        "base_dir": str(paths.get("base_dir", Path("/opt/darkfactory"))),
-        "data_dir": str(paths.get("data_dir", Path("/opt/darkfactory/data"))),
-        "log_dir": str(paths.get("log_dir", Path("/opt/darkfactory/logs"))),
+        "base_dir": str(paths.home),
+        "data_dir": str(paths.data),
+        "log_dir": str(paths.logs),
         "debug": config.get("debug", False),
         "features": config.get("features", {}),
         "ui": config.get("ui", {}),

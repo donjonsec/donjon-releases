@@ -3,17 +3,24 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from darkfactory.config import get_config
-from darkfactory.license_guard import require_feature
-from darkfactory.sso_saml import (
-    SamlProvider,
-    initiate_saml_login,
-    handle_saml_callback,
-    handle_saml_logout,
-    get_saml_metadata,
-)
+from lib.config import get_config
+from lib.license_guard import require_feature, LicenseError
 
 logger = logging.getLogger(__name__)
+
+# SSO/SAML backend is not yet implemented — guard all routes
+_SSO_AVAILABLE = False
+try:
+    from lib.sso import (  # type: ignore[import]
+        SamlProvider,
+        initiate_saml_login,
+        handle_saml_callback,
+        handle_saml_logout,
+        get_saml_metadata,
+    )
+    _SSO_AVAILABLE = True
+except (ImportError, AttributeError):
+    pass
 
 
 def _json_ok(data: dict[str, Any], status: int = 200) -> Callable[[], dict[str, Any]]:
@@ -42,13 +49,16 @@ def handle_sso_request(
         return {"json_response": _json_error("Service configuration error", 500)}
 
     try:
-        require_feature("sso", config=config)
-    except PermissionError as exc:
+        require_feature("sso")
+    except (LicenseError, PermissionError) as exc:
         logger.warning("SSO feature not licensed: %s", exc)
         return {"json_response": _json_error("SSO feature not available in current license", 403)}
     except Exception as exc:
         logger.error("License check failed: %s", exc)
         return {"json_response": _json_error("License validation error", 500)}
+
+    if not _SSO_AVAILABLE:
+        return {"json_response": _json_error("SSO/SAML backend not yet implemented", 501)}
 
     path = request_path.rstrip("/")
 
