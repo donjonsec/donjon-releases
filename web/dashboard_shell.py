@@ -405,7 +405,7 @@ def generate_shell() -> str:
     parts.append(
         # ---- Tier visibility ----
         'function applyTier(){'
-        '  fetchAPI("/license/info").then(function(d){'
+        '  fetchAPI("/license").then(function(d){'
         '    var tier=d.tier||"community";'
         '    var ent=document.getElementById("navEnterprise");'
         '    var mssp=document.getElementById("navMSSP");'

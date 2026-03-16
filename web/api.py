@@ -100,6 +100,59 @@ from web.auth import get_auth, APIKeyAuth
 from web.dashboard import generate_dashboard_html
 
 # ---------------------------------------------------------------------------
+# Import API sub-modules (safe imports — app stays up if deps are missing)
+# ---------------------------------------------------------------------------
+try:
+    from web.api_license import handle_license_request
+except ImportError:
+    handle_license_request = None
+
+try:
+    from web.api_settings import handle_settings_request
+except ImportError:
+    handle_settings_request = None
+
+try:
+    from web.api_patch_verify import patch_verify
+except ImportError:
+    patch_verify = None
+
+try:
+    from web.api_rbac import handle_rbac_request
+except ImportError:
+    handle_rbac_request = None
+
+try:
+    from web.api_sso import handle_sso_request
+except ImportError:
+    handle_sso_request = None
+
+try:
+    from web.api_tenants import handle_tenants_request
+except ImportError:
+    handle_tenants_request = None
+
+try:
+    from web.api_audit import handle_audit_request
+except ImportError:
+    handle_audit_request = None
+
+try:
+    from web.api_mssp_clients import handle_mssp_clients
+except ImportError:
+    handle_mssp_clients = None
+
+try:
+    from web.api_mssp_ops import handle_request as handle_mssp_ops_request
+except ImportError:
+    handle_mssp_ops_request = None
+
+try:
+    from web.api_mssp_reporting import handle_request as handle_mssp_reporting_request
+except ImportError:
+    handle_mssp_reporting_request = None
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -423,8 +476,437 @@ class DonjonAPI:
         self._post('/api/v1/ai/config', self._ai_save_config)
         self._post('/api/v1/ai/test', self._ai_test_connection)
 
+        # -- License management (api_license) ------------------------------
+        if handle_license_request is not None:
+            self._get('/api/v1/license/status', self._api_license_status)
+            self._post('/api/v1/license/validate', self._api_license_validate)
+            self._post('/api/v1/license/activate-key', self._api_license_activate_key)
+            self._post('/api/v1/license/deactivate', self._api_license_deactivate)
+
+        # -- Settings (api_settings) ---------------------------------------
+        if handle_settings_request is not None:
+            self._get('/api/v1/settings/config', self._api_settings_config_get)
+            self._put('/api/v1/settings/config', self._api_settings_config_put)
+            self._get('/api/v1/settings/paths', self._api_settings_paths_get)
+            self._put('/api/v1/settings/paths', self._api_settings_paths_put)
+            self._get('/api/v1/settings/license', self._api_settings_license_get)
+            self._put('/api/v1/settings/license', self._api_settings_license_put)
+
+        # -- Patch verification (api_patch_verify) -------------------------
+        if patch_verify is not None:
+            self._post('/api/v1/patch/verify', self._api_patch_verify)
+
+        # -- RBAC (api_rbac) — enterprise tier -----------------------------
+        if handle_rbac_request is not None:
+            self._get('/api/v1/rbac/roles', self._api_rbac_roles_list)
+            self._post('/api/v1/rbac/roles', self._api_rbac_roles_create)
+            self._get('/api/v1/rbac/roles/<user_id>', self._api_rbac_roles_user)
+            self._post('/api/v1/rbac/assign', self._api_rbac_assign)
+            self._post('/api/v1/rbac/check', self._api_rbac_check)
+
+        # -- SSO (api_sso) — enterprise tier -------------------------------
+        if handle_sso_request is not None:
+            self._get('/api/v1/sso/metadata', self._api_sso_metadata)
+            self._post('/api/v1/sso/login', self._api_sso_login)
+            self._post('/api/v1/sso/callback', self._api_sso_callback)
+            self._post('/api/v1/sso/logout', self._api_sso_logout)
+
+        # -- Tenants (api_tenants) — enterprise tier -----------------------
+        if handle_tenants_request is not None:
+            self._post('/api/v1/tenants', self._api_tenants_create)
+            self._get('/api/v1/tenants/<tenant_id>', self._api_tenants_get)
+
+        # -- Audit trail (api_audit) — enterprise tier ---------------------
+        if handle_audit_request is not None:
+            self._get('/api/v1/audit/trail', self._api_audit_trail)
+            self._post('/api/v1/audit/trail', self._api_audit_trail_post)
+
+        # -- MSSP Clients (api_mssp_clients) — managed tier ----------------
+        if handle_mssp_clients is not None:
+            self._get('/api/v1/mssp/clients', self._api_mssp_clients_list)
+            self._post('/api/v1/mssp/clients', self._api_mssp_clients_create)
+            self._get('/api/v1/mssp/clients/<client_id>', self._api_mssp_client_get)
+            self._put('/api/v1/mssp/clients/<client_id>', self._api_mssp_client_update)
+            self._delete('/api/v1/mssp/clients/<client_id>', self._api_mssp_client_delete)
+            self._get('/api/v1/mssp/clients/<client_id>/isolation', self._api_mssp_client_isolation)
+
+        # -- MSSP Ops (api_mssp_ops) — managed tier ------------------------
+        if handle_mssp_ops_request is not None:
+            self._post('/api/v1/mssp/bulk-scan', self._api_mssp_bulk_scan)
+            self._get('/api/v1/mssp/templates', self._api_mssp_templates_list)
+            self._post('/api/v1/mssp/templates/create', self._api_mssp_templates_create)
+            self._post('/api/v1/mssp/usage', self._api_mssp_usage)
+            self._get('/api/v1/mssp/license/check', self._api_mssp_license_check)
+
+        # -- MSSP Reporting (api_mssp_reporting) — managed tier -------------
+        if handle_mssp_reporting_request is not None:
+            self._post('/api/v1/mssp/clients/dashboard', self._api_mssp_client_dashboard)
+            self._post('/api/v1/mssp/reports/rollup', self._api_mssp_reports_rollup)
+            self._post('/api/v1/mssp/reports/cross-client', self._api_mssp_reports_cross_client)
+            self._get('/api/v1/mssp/license/status', self._api_mssp_license_status)
+
         # -- Legal ---------------------------------------------------------
         self._get('/api/v1/legal/eula', self._legal_eula)
+
+    # ------------------------------------------------------------------
+    # API sub-module adapters
+    # ------------------------------------------------------------------
+
+    # -- api_license adapters --
+
+    def _api_license_status(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_license_request("/api/license/status", None)
+            return json_response(fn())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_license_validate(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_license_request("/api/license/validate", body)
+            return json_response(fn())
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_license_activate_key(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_license_request("/api/license/activate", body)
+            return json_response(fn())
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_license_deactivate(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_license_request("/api/license/deactivate", body)
+            return json_response(fn())
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_settings adapters --
+
+    def _api_settings_config_get(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/config", None)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_settings_config_put(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/config", body)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_settings_paths_get(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/paths", None)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_settings_paths_put(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/paths", body)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_settings_license_get(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/license", None)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_settings_license_put(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_settings_request("/settings/license", body)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_patch_verify adapter --
+
+    def _api_patch_verify(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        if not body:
+            return error_response('Request body required', 400)
+        baseline = body.get('baseline_session', '')
+        current = body.get('current_session', '')
+        try:
+            fn = patch_verify(baseline, current)
+            return json_response(fn())
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_rbac adapters --
+
+    def _api_rbac_roles_list(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_rbac_request("/rbac/roles", None)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_rbac_roles_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_rbac_request("/rbac/roles", body)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_rbac_roles_user(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_rbac_request(f"/rbac/roles/{params['user_id']}", None)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_rbac_assign(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_rbac_request("/rbac/assign", body)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_rbac_check(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_rbac_request("/rbac/check", body)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_sso adapters --
+
+    def _api_sso_metadata(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_sso_request("/api/sso/metadata", None)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("body", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_sso_login(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_sso_request("/api/sso/login", body)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("body", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_sso_callback(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_sso_request("/api/sso/callback", body)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("body", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_sso_logout(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_sso_request("/api/sso/logout", body)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("body", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_tenants adapters --
+
+    def _api_tenants_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_tenants_request("/api/tenants", body)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            body_data = data.get("body", data)
+            return json_response(body_data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_tenants_get(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_tenants_request(f"/api/tenants/{params['tenant_id']}", None)
+            data = result["json_response"]()
+            status = data.get("status", 200) if isinstance(data.get("status"), int) else 200
+            body_data = data.get("body", data)
+            return json_response(body_data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_audit adapters --
+
+    def _api_audit_trail(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_audit_request("/audit/trail", None)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_audit_trail_post(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_audit_request("/audit/trail", body)
+            return json_response(result["json_response"]())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_mssp_clients adapters --
+
+    def _api_mssp_clients_list(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_clients("/clients", None)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_clients_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_clients("/clients", body)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_client_get(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_clients(f"/clients/{params['client_id']}", None)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_client_update(self, params: Dict, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_clients(f"/clients/{params['client_id']}", body)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_client_delete(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        try:
+            # Pass a sentinel body to distinguish DELETE from GET
+            result = handle_mssp_clients(f"/clients/{params['client_id']}", {"_method": "DELETE"})
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_client_isolation(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_clients(f"/clients/{params['client_id']}/isolation", None)
+            data = result["json_response"]()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data, status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_mssp_ops adapters --
+
+    def _api_mssp_bulk_scan(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_mssp_ops_request("/mssp/bulk-scan", body)
+            data = fn()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("data", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_templates_list(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_mssp_ops_request("/mssp/templates", None)
+            data = fn()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("data", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_templates_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_mssp_ops_request("/mssp/templates/create", body)
+            data = fn()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("data", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_usage(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_mssp_ops_request("/mssp/usage", body)
+            data = fn()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("data", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_license_check(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            fn = handle_mssp_ops_request("/mssp/license/check", None)
+            data = fn()
+            status = data.pop("status", 200) if isinstance(data.get("status"), int) else 200
+            return json_response(data.get("data", data), status)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    # -- api_mssp_reporting adapters --
+
+    def _api_mssp_client_dashboard(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_reporting_request("mssp/clients/dashboard", body)
+            fn = result["json_response"]
+            return json_response(fn())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_reports_rollup(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_reporting_request("mssp/reports/rollup", body)
+            fn = result["json_response"]
+            return json_response(fn())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_reports_cross_client(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_reporting_request("mssp/reports/cross-client", body)
+            fn = result["json_response"]
+            return json_response(fn())
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_mssp_license_status(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_mssp_reporting_request("mssp/license/status", None)
+            fn = result["json_response"]
+            return json_response(fn())
+        except Exception as exc:
+            return error_response(str(exc), 500)
 
     # ------------------------------------------------------------------
     # Legal
@@ -1236,6 +1718,12 @@ class DonjonAPI:
     # ------------------------------------------------------------------
 
     def _list_scanners(self, **kw) -> Tuple[bytes, int, str]:
+        # Community tier includes these 7 scanners
+        _COMMUNITY_SCANNERS = {
+            'network', 'vulnerability', 'web', 'ssl',
+            'windows', 'linux', 'compliance',
+        }
+
         scanners = [
             {'id': 'network', 'name': 'Network Scanner',
              'description': 'TCP/UDP port scanning, service detection, OS fingerprinting',
@@ -1289,7 +1777,27 @@ class DonjonAPI:
              'description': 'Runs all applicable scanners against targets',
              'scan_depths': ['quick', 'standard', 'deep']},
         ]
-        return json_response({'count': len(scanners), 'scanners': scanners})
+
+        # Determine current tier for availability filtering
+        tier = 'community'
+        if get_license_manager:
+            try:
+                tier = get_license_manager().get_tier()
+            except Exception:
+                pass
+
+        is_paid = tier in ('pro', 'enterprise', 'managed')
+
+        for scanner in scanners:
+            in_community = scanner['id'] in _COMMUNITY_SCANNERS
+            scanner['available'] = is_paid or in_community
+            scanner['required_tier'] = 'community' if in_community else 'pro'
+
+        return json_response({
+            'count': len(scanners),
+            'scanners': scanners,
+            'current_tier': tier,
+        })
 
     # ------------------------------------------------------------------
     # AI Engine
