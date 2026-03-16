@@ -7,44 +7,40 @@ from typing import Any
 
 from pathlib import Path
 
+from lib.database import get_database
+from lib.license_guard import require_feature
+from lib.paths import paths
+
 logger = logging.getLogger(__name__)
+
+_DDL = """
+CREATE TABLE IF NOT EXISTS ephemeral_sessions (
+    id                  TEXT PRIMARY KEY,
+    parent_session_id   TEXT NOT NULL,
+    retention_mode      TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    purged              INTEGER NOT NULL DEFAULT 0,
+    purged_at           TEXT
+);
+"""
+
+_db = get_database("zero_retention", schema=_DDL)
 
 
 def create_module(
     session_id: str,
     retention_mode: str,
 ) -> dict[str, Any]:
-    from lib.database import get_engine, get_session
-    from lib.paths import get_data_dir
-    from lib.license_guard import require_feature
-
     require_feature("zero-retention")
 
     def create_ephemeral_session() -> dict[str, Any]:
-        import sqlalchemy as sa
-
-        engine = get_engine()
         ephemeral_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc)
 
-        with get_session(engine) as db:
-            db.execute(
-                sa.insert(sa.table(
-                    "ephemeral_sessions",
-                    sa.column("id"),
-                    sa.column("parent_session_id"),
-                    sa.column("retention_mode"),
-                    sa.column("created_at"),
-                    sa.column("purged"),
-                )).values(
-                    id=ephemeral_id,
-                    parent_session_id=session_id,
-                    retention_mode=retention_mode,
-                    created_at=created_at,
-                    purged=False,
-                )
-            )
-            db.commit()
+        _db.execute_write(
+            "INSERT INTO ephemeral_sessions (id, parent_session_id, retention_mode, created_at, purged) VALUES (?, ?, ?, ?, 0)",
+            (ephemeral_id, session_id, retention_mode, created_at.isoformat()),
+        )
 
         logger.info(
             "ephemeral_session_created",
@@ -63,14 +59,10 @@ def create_module(
         }
 
     def finalize_and_purge(ephemeral_id: str) -> dict[str, Any]:
-        import sqlalchemy as sa
-
-        engine = get_engine()
         purged_at = datetime.now(timezone.utc)
-        data_dir = get_data_dir()
 
         # Remove any ephemeral files written during the session
-        ephemeral_dir = Path(data_dir) / "ephemeral" / ephemeral_id
+        ephemeral_dir = paths.data / "ephemeral" / ephemeral_id
         files_removed: list[str] = []
         if ephemeral_dir.exists():
             for f in ephemeral_dir.rglob("*"):
@@ -82,21 +74,10 @@ def create_module(
             except OSError:
                 pass
 
-        with get_session(engine) as db:
-            db.execute(
-                sa.update(sa.table(
-                    "ephemeral_sessions",
-                    sa.column("id"),
-                    sa.column("purged"),
-                    sa.column("purged_at"),
-                )).where(
-                    sa.column("id") == ephemeral_id
-                ).values(
-                    purged=True,
-                    purged_at=purged_at,
-                )
-            )
-            db.commit()
+        _db.execute_write(
+            "UPDATE ephemeral_sessions SET purged = 1, purged_at = ? WHERE id = ?",
+            (purged_at.isoformat(), ephemeral_id),
+        )
 
         logger.info(
             "ephemeral_session_purged",

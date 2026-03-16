@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lib.paths import get_root
+from lib.paths import paths
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def _hash_file(path: Path) -> str:
 
 
 def _manifest_path() -> Path:
-    return get_root() / "integrity_manifest.json"
+    return paths.home / "integrity_manifest.json"
 
 
 def generate_manifest(modules: list[str]) -> dict[str, str]:

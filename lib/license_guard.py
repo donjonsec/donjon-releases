@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import Callable, TypeVar, Any
 
-from lib.paths import get_root
 from lib.config import load_config
 
 logger = logging.getLogger(__name__)

@@ -1,23 +1,33 @@
 from __future__ import annotations
 
+import csv
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import sqlalchemy as sa
+from lib.database import get_database
+from lib.license_guard import require_feature
+from lib.paths import paths
 
 logger = logging.getLogger(__name__)
 
-_AUDIT_TABLE = sa.table(
-    "audit_events",
-    sa.column("id", sa.Integer),
-    sa.column("actor", sa.String),
-    sa.column("action", sa.String),
-    sa.column("resource", sa.String),
-    sa.column("detail", sa.JSON),
-    sa.column("occurred_at", sa.DateTime(timezone=True)),
-)
+_DDL = """
+CREATE TABLE IF NOT EXISTS audit_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor       TEXT    NOT NULL,
+    action      TEXT    NOT NULL,
+    resource    TEXT    NOT NULL,
+    detail      TEXT,
+    occurred_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS audit_events_actor_idx ON audit_events (actor);
+CREATE INDEX IF NOT EXISTS audit_events_action_idx ON audit_events (action);
+CREATE INDEX IF NOT EXISTS audit_events_occurred_at_idx ON audit_events (occurred_at);
+"""
+
+_db = get_database("audit_trail", schema=_DDL)
 
 
 def create_module(
@@ -26,10 +36,6 @@ def create_module(
     resource: str,
     detail: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    from lib.database import get_engine, get_session
-    from lib.paths import get_data_dir
-    from lib.license_guard import require_feature
-
     require_feature("audit-trail")
 
     def log_event(
@@ -51,21 +57,22 @@ def create_module(
             raise ValueError("resource must not be empty")
 
         occurred_at = datetime.now(timezone.utc)
-        engine = get_engine()
+        detail_json = json.dumps(effective_detail) if effective_detail is not None else None
 
-        with get_session(engine) as db:
-            result = db.execute(
-                sa.insert(_AUDIT_TABLE).values(
-                    actor=effective_actor,
-                    action=effective_action,
-                    resource=effective_resource,
-                    detail=effective_detail,
-                    occurred_at=occurred_at,
-                ).returning(sa.column("id"))
-            )
-            row = result.fetchone()
-            db.commit()
-            event_id: int = row[0] if row is not None else -1
+        _db.execute_write(
+            """
+            INSERT INTO audit_events (actor, action, resource, detail, occurred_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (effective_actor, effective_action, effective_resource, detail_json, occurred_at.isoformat()),
+        )
+
+        # Retrieve the inserted row to get the id
+        row = _db.execute_one(
+            "SELECT id FROM audit_events WHERE actor = ? AND action = ? AND occurred_at = ? ORDER BY id DESC LIMIT 1",
+            (effective_actor, effective_action, occurred_at.isoformat()),
+        )
+        event_id: int = row["id"] if row else -1
 
         logger.info(
             "audit_event_logged",
@@ -95,36 +102,39 @@ def create_module(
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        engine = get_engine()
-
-        stmt = sa.select(_AUDIT_TABLE).order_by(
-            sa.column("occurred_at").desc()
-        )
+        conditions: list[str] = []
+        params: list[Any] = []
 
         if filter_actor is not None:
-            stmt = stmt.where(sa.column("actor") == filter_actor)
+            conditions.append("actor = ?")
+            params.append(filter_actor)
         if filter_action is not None:
-            stmt = stmt.where(sa.column("action") == filter_action)
+            conditions.append("action = ?")
+            params.append(filter_action)
         if filter_resource is not None:
-            stmt = stmt.where(sa.column("resource") == filter_resource)
+            conditions.append("resource = ?")
+            params.append(filter_resource)
         if since is not None:
-            stmt = stmt.where(sa.column("occurred_at") >= since)
+            conditions.append("occurred_at >= ?")
+            params.append(since.isoformat())
         if until is not None:
-            stmt = stmt.where(sa.column("occurred_at") <= until)
+            conditions.append("occurred_at <= ?")
+            params.append(until.isoformat())
 
-        stmt = stmt.limit(limit).offset(offset)
+        where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        sql = f"SELECT id, actor, action, resource, detail, occurred_at FROM audit_events{where_clause} ORDER BY occurred_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
-        with get_session(engine) as db:
-            rows = db.execute(stmt).fetchall()
+        rows = _db.execute(sql, params)
 
         return [
             {
-                "event_id": row[0],
-                "actor": row[1],
-                "action": row[2],
-                "resource": row[3],
-                "detail": row[4],
-                "occurred_at": row[5].isoformat() if isinstance(row[5], datetime) else str(row[5]),
+                "event_id": row["id"],
+                "actor": row["actor"],
+                "action": row["action"],
+                "resource": row["resource"],
+                "detail": json.loads(row["detail"]) if row["detail"] else None,
+                "occurred_at": row["occurred_at"],
             }
             for row in rows
         ]
@@ -137,12 +147,8 @@ def create_module(
         since: datetime | None = None,
         until: datetime | None = None,
     ) -> Path:
-        import csv
-        import io
-
         if output_path is None:
-            data_dir = Path(get_data_dir())
-            exports_dir = data_dir / "audit_exports"
+            exports_dir = paths.data / "audit_exports"
             exports_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             output_path = exports_dir / f"audit_{ts}.csv"

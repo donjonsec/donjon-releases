@@ -4,17 +4,31 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from darkfactory.db import get_db
-from mssp.provisioning import get_client
-from mssp.licensing import check_license
+from lib.database import get_database
+from lib.license_guard import require_feature
 
 logger = logging.getLogger(__name__)
 
+_DDL = """
+CREATE TABLE IF NOT EXISTS usage_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   TEXT    NOT NULL,
+    feature     TEXT    NOT NULL,
+    quantity    REAL    NOT NULL,
+    unit        TEXT    NOT NULL DEFAULT 'count',
+    metadata    TEXT,
+    recorded_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS usage_records_client_idx ON usage_records (client_id);
+CREATE INDEX IF NOT EXISTS usage_records_recorded_at_idx ON usage_records (recorded_at);
+"""
+
+_db = get_database("mssp_metering", schema=_DDL)
+
 
 def create_metering(client_id: str) -> dict[str, Any]:
-    client = get_client(client_id)
-    if client is None:
-        raise ValueError(f"Client not found: {client_id}")
+    if not client_id:
+        raise ValueError("client_id must be non-empty")
 
     def record_usage(
         feature: str,
@@ -22,16 +36,18 @@ def create_metering(client_id: str) -> dict[str, Any]:
         unit: str = "count",
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        db = get_db()
+        import json
+
         now = datetime.now(timezone.utc)
-        check_license(client_id, feature)
-        db.execute(
+        require_feature(feature)
+        metadata_json = json.dumps(metadata) if metadata else None
+        _db.execute_write(
             """
             INSERT INTO usage_records
                 (client_id, feature, quantity, unit, metadata, recorded_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (client_id, feature, quantity, unit, metadata or {}, now),
+            (client_id, feature, quantity, unit, metadata_json, now.isoformat()),
         )
         logger.info("Recorded usage: client=%s feature=%s quantity=%s", client_id, feature, quantity)
 
@@ -39,22 +55,21 @@ def create_metering(client_id: str) -> dict[str, Any]:
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> list[dict[str, Any]]:
-        db = get_db()
         now = datetime.now(timezone.utc)
         if start is None:
             start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
         if end is None:
             end = now
-        rows = db.fetchall(
+        rows = _db.execute(
             """
             SELECT feature, unit, SUM(quantity) AS total_quantity,
                    COUNT(*) AS event_count, MIN(recorded_at) AS first_at, MAX(recorded_at) AS last_at
             FROM usage_records
-            WHERE client_id = %s AND recorded_at >= %s AND recorded_at <= %s
+            WHERE client_id = ? AND recorded_at >= ? AND recorded_at <= ?
             GROUP BY feature, unit
             ORDER BY feature
             """,
-            (client_id, start, end),
+            (client_id, start.isoformat(), end.isoformat()),
         )
         return [
             {
@@ -64,8 +79,8 @@ def create_metering(client_id: str) -> dict[str, Any]:
                 "event_count": int(row["event_count"]),
                 "period_start": start.isoformat(),
                 "period_end": end.isoformat(),
-                "first_recorded_at": row["first_at"].isoformat() if row["first_at"] else None,
-                "last_recorded_at": row["last_at"].isoformat() if row["last_at"] else None,
+                "first_recorded_at": row["first_at"],
+                "last_recorded_at": row["last_at"],
             }
             for row in rows
         ]
@@ -83,7 +98,6 @@ def create_metering(client_id: str) -> dict[str, Any]:
             period_end = now
         billing: dict[str, Any] = {
             "client_id": client_id,
-            "client_name": client.get("name", client_id),
             "export_format": format,
             "exported_at": now.isoformat(),
             "period_start": period_start.isoformat(),
