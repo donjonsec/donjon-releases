@@ -762,6 +762,8 @@ class DonjonAPI:
     def _api_audit_trail(self, **kw) -> Tuple[bytes, int, str]:
         try:
             result = handle_audit_request("/audit/trail", None)
+            if "error" in result:
+                return error_response(result["error"], result.get("status", 403))
             return json_response(result["json_response"]())
         except Exception as exc:
             return error_response(str(exc), 500)
@@ -769,6 +771,8 @@ class DonjonAPI:
     def _api_audit_trail_post(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
         try:
             result = handle_audit_request("/audit/trail", body)
+            if "error" in result:
+                return error_response(result["error"], result.get("status", 403))
             return json_response(result["json_response"]())
         except Exception as exc:
             return error_response(str(exc), 500)
