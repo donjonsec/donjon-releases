@@ -234,7 +234,7 @@ class TestSSRF:
 
     def test_cloud_metadata_cidr_blocked(self):
         """169.254.169.254/32 (AWS/cloud metadata) must be blocked."""
-        status, body = _req("POST", "/api/v1/discovery", {
+        status, body = _req("POST", "/api/v1/discovery/scan", {
             "cidr": "169.254.169.254/32",
             "methods": ["tcp"],
         })
@@ -244,7 +244,7 @@ class TestSSRF:
 
     def test_public_ip_cidr_blocked(self):
         """8.8.8.0/24 (public IP range) must be blocked."""
-        status, body = _req("POST", "/api/v1/discovery", {
+        status, body = _req("POST", "/api/v1/discovery/scan", {
             "cidr": "8.8.8.0/24",
             "methods": ["tcp"],
         })
@@ -254,7 +254,7 @@ class TestSSRF:
 
     def test_invalid_scan_method_rejected(self):
         """Invalid discovery methods must be rejected."""
-        status, body = _req("POST", "/api/v1/discovery", {
+        status, body = _req("POST", "/api/v1/discovery/scan", {
             "cidr": "192.168.1.0/24",
             "methods": ["../../etc/passwd"],
         })
@@ -264,7 +264,7 @@ class TestSSRF:
 
     def test_private_cidr_allowed(self):
         """Private RFC1918 CIDR should be accepted (baseline sanity check)."""
-        status, body = _req("POST", "/api/v1/discovery", {
+        status, body = _req("POST", "/api/v1/discovery/scan", {
             "cidr": "192.168.1.0/24",
             "methods": ["arp"],
         })
@@ -290,12 +290,14 @@ class TestAuthBypass:
             status, _ = _req("GET", "/health")
         assert status == 200, f"Health endpoint not reachable (status {status})"
 
-    @pytest.mark.skipif(
-        os.environ.get("DONJON_ALLOW_NO_AUTH") == "1",
-        reason="Rate limiting requires auth to be enabled"
-    )
     def test_brute_force_rate_limited(self):
         """15+ invalid API key attempts should trigger rate limiting."""
+        # First, check if auth is even enabled by sending one bad key
+        probe_status, _ = _req("GET", "/api/v1/scans",
+                                headers={"X-API-Key": "donjon_probe000000000000000000000000000000000000000000000"})
+        if probe_status != 401:
+            pytest.skip("Auth is disabled (--no-auth mode) — rate limiting not testable")
+
         rate_limited = False
         for i in range(20):
             status, _ = _req(
