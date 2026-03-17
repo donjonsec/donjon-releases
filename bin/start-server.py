@@ -103,6 +103,27 @@ def main():
 
     # Set up auth
     from web.auth import get_auth
+    if args.no_auth:
+        if os.environ.get("DONJON_PRODUCTION") == "1":
+            print(
+                "\n  ERROR: --no-auth is not allowed when DONJON_PRODUCTION=1\n"
+                "  Remove --no-auth or unset DONJON_PRODUCTION to proceed.\n",
+                file=sys.stderr
+            )
+            sys.exit(1)
+        if os.environ.get("DONJON_ALLOW_NO_AUTH") != "1":
+            print(
+                "\n  WARNING: --no-auth disables ALL authentication.\n"
+                "  Every endpoint (including purge, license, MSSP) is wide open.\n"
+                "  Set DONJON_ALLOW_NO_AUTH=1 to confirm this is intentional.\n",
+                file=sys.stderr
+            )
+            sys.exit(1)
+        import logging
+        logging.getLogger('donjon').critical(
+            "SECURITY: Server started with --no-auth. "
+            "All API endpoints are unauthenticated."
+        )
     auth = get_auth(enabled=not args.no_auth)
     if args.add_key:
         auth.add_key(args.add_key)
@@ -117,6 +138,23 @@ def main():
         print("    DONJON_ACCEPT_EULA=yes")
         print()
         sys.exit(1)
+
+    # Security: check data directory permissions
+    try:
+        from lib.paths import paths
+        data_dir = paths.data
+        if data_dir.exists() and os.name == 'posix':
+            import stat
+            mode = data_dir.stat().st_mode
+            if mode & stat.S_IROTH:
+                print(
+                    f"  WARNING: Data directory {data_dir} is world-readable.\n"
+                    f"  Evidence and scan data may be exposed.\n"
+                    f"  Fix: chmod 700 {data_dir}\n",
+                    file=sys.stderr
+                )
+    except Exception:
+        pass
 
     # Banner
     print()

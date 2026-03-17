@@ -39,6 +39,7 @@ import hashlib
 import hmac  # kept for v1 backward compat only -- remove with v1 support
 import json
 import logging
+import os
 import platform
 import secrets
 import uuid
@@ -122,11 +123,14 @@ _PUBLIC_KEY_PQC_B64: str = (
 )
 
 # Legacy HMAC key for v1 backward compatibility only.
-# SECURITY WARNING: This key is embedded in the product binary and therefore
-# known to anyone who decompiles it.  v1 licenses offer no cryptographic
-# assurance -- they exist solely as a migration bridge.
-# TODO: Remove v1 support and this key once migration is complete.
+# v1 license support DISABLED.  v1 used a hardcoded HMAC key that any customer
+# who reads the source could use to forge arbitrary licenses.  All customers
+# must use v2 licenses with dual ML-DSA-65 + Ed25519 signatures.
+#
+# To temporarily re-enable v1 for a migration window, set the environment
+# variable DONJON_ALLOW_V1_LICENSE=1.  This should NEVER be set in production.
 _LEGACY_HMAC_KEY: bytes = b"donjon-license-signing-key-v1"
+_V1_ENABLED: bool = os.environ.get("DONJON_ALLOW_V1_LICENSE") == "1"
 
 
 # ---------------------------------------------------------------------------
@@ -522,12 +526,25 @@ class LicenseManager:
 
         # Determine format version.  The admin tool writes "version";
         # accept "format_version" as a legacy alias.
-        version = data.get("version", data.get("format_version", 1))
+        # SECURITY: Default to version 2 (not 1) to prevent downgrade attacks.
+        # An attacker who omits "version" should NOT fall into the weak v1 path.
+        version = data.get("version", data.get("format_version", 2))
 
         if version >= 2:
             valid = self._validate_license_v2(data)
-        else:
+        elif _V1_ENABLED:
+            logger.warning(
+                "SECURITY: Validating v1 license (HMAC). "
+                "v1 is deprecated and should be migrated to v2."
+            )
             valid = self._validate_license_v1(data)
+        else:
+            logger.warning(
+                "v1 license rejected -- v1 support is disabled. "
+                "Set DONJON_ALLOW_V1_LICENSE=1 to temporarily re-enable, "
+                "or upgrade the license to v2 format."
+            )
+            valid = False
 
         if not valid:
             logger.warning("License signature verification failed -- community tier")
@@ -804,8 +821,8 @@ class LicenseManager:
         - Object array: [{"license_id": "DON-2026-A1B2C", ...}, ...]
 
         Returns True if revoked, False otherwise.  On any read/parse
-        error, returns False (fail open for revocation -- the license
-        was already cryptographically verified at this point).
+        error, returns True (fail closed -- treat as revoked when the
+        revocation list cannot be verified).
         """
         license_id = data.get("license_id", "")
         if not license_id:
@@ -819,13 +836,13 @@ class LicenseManager:
             # Guard against oversized revocation files.
             file_size = revoked_path.stat().st_size
             if file_size > _MAX_LICENSE_FILE_SIZE:
-                logger.warning("Revocation file too large -- skipping check")
-                return False
+                logger.warning("SECURITY: Revocation file too large -- treating as revoked (fail closed)")
+                return True
 
             revoked_list = json.loads(revoked_path.read_text("utf-8"))
             if not isinstance(revoked_list, list):
-                logger.warning("revoked.json is not a JSON array -- ignoring")
-                return False
+                logger.warning("SECURITY: revoked.json is not a JSON array -- treating as revoked (fail closed)")
+                return True
 
             # Support both flat string arrays and object arrays.
             for entry in revoked_list:
@@ -835,8 +852,8 @@ class LicenseManager:
                     return True
             return False
         except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Failed to read revocation list: %s", exc)
-            return False
+            logger.warning("SECURITY: Failed to read revocation list: %s -- treating as revoked (fail closed)", exc)
+            return True
 
     # ------------------------------------------------------------------
     # Tier queries
@@ -860,12 +877,47 @@ class LicenseManager:
 
         # Apply per-license feature overrides (e.g. custom max_users
         # for a managed-tier license).
+        # SECURITY: Only numeric keys may be overridden, and only downward
+        # (more restrictive).  Boolean feature flags (sso, rbac, etc.)
+        # MUST NOT be overridable via license overrides.
+        _NUMERIC_OVERRIDABLE_KEYS = {
+            "max_users", "max_clients", "max_targets_per_scan",
+            "ai_queries_per_day", "compliance_frameworks", "scan_throttle_ms",
+            "api_rate_limit", "scan_history_days",
+        }
         if self._license:
             overrides = self._license.get("features_override")
             if isinstance(overrides, dict):
                 for key, value in overrides.items():
-                    if key in base_limits:
-                        base_limits[key] = value
+                    if key not in _NUMERIC_OVERRIDABLE_KEYS:
+                        logger.warning(
+                            "SECURITY: features_override tried to set non-numeric key '%s' -- ignored", key)
+                        continue
+                    if key not in base_limits:
+                        continue
+                    if not isinstance(value, (int, float)):
+                        logger.warning(
+                            "SECURITY: features_override key '%s' has non-numeric value -- ignored", key)
+                        continue
+                    tier_default = base_limits[key]
+                    # None means unlimited -- any numeric override is more
+                    # restrictive, so allow it.
+                    if tier_default is not None:
+                        # scan_throttle_ms: higher = more restrictive (slower)
+                        if key == "scan_throttle_ms":
+                            if value < tier_default:
+                                logger.warning(
+                                    "SECURITY: features_override '%s' value %s is less restrictive than tier default %s -- ignored",
+                                    key, value, tier_default)
+                                continue
+                        else:
+                            # For all other numeric keys: lower = more restrictive
+                            if value > tier_default:
+                                logger.warning(
+                                    "SECURITY: features_override '%s' value %s exceeds tier default %s -- ignored",
+                                    key, value, tier_default)
+                                continue
+                    base_limits[key] = value
 
         return base_limits
 

@@ -15,6 +15,7 @@ Python stdlib only - no external dependencies.
 """
 
 import csv
+import hashlib
 import io
 import json
 import os
@@ -72,23 +73,40 @@ GITHUB_PAGE_SIZE = 100
 
 
 def _create_ssl_context(verify: bool = True) -> ssl.SSLContext:
-    """Create an SSL context that works in most environments."""
-    if verify:
-        try:
-            ctx = ssl.create_default_context()
-            return ctx
-        except Exception:
-            pass
-    # Fallback: unverified context for hosts with cert issues
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
+    """Create an SSL context. Never silently downgrades to CERT_NONE.
+
+    SECURITY: Falling back to CERT_NONE would let an attacker poison
+    threat intel feeds (NVD, CISA KEV, EPSS) via MitM, which directly
+    undermines every vulnerability finding this product generates.
+    """
+    if not verify or os.environ.get("DONJON_SKIP_TLS_VERIFY") == "1":
+        if verify:
+            logger.warning(
+                "SECURITY: TLS verification disabled via DONJON_SKIP_TLS_VERIFY. "
+                "Threat intelligence data integrity is NOT guaranteed."
+            )
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    # Normal path: full TLS verification. If CA store is missing, raise
+    # a clear error rather than silently disabling verification.
+    try:
+        ctx = ssl.create_default_context()
+        return ctx
+    except Exception as exc:
+        raise RuntimeError(
+            f"Cannot create TLS context: {exc}. "
+            "Install 'ca-certificates' or set DONJON_SKIP_TLS_VERIFY=1 "
+            "(NOT recommended for production)."
+        ) from exc
 
 
 def _http_get(url: str, headers: Optional[Dict[str, str]] = None,
               timeout: int = 60) -> bytes:
     """Perform an HTTP GET with proper headers and error handling."""
+    if os.environ.get("DONJON_OFFLINE") == "1":
+        raise RuntimeError("Network calls disabled in offline/air-gap mode (DONJON_OFFLINE=1)")
     req = urllib.request.Request(url)
     req.add_header("User-Agent", "Donjon/1.0 IntelFeedManager")
     req.add_header("Accept", "application/json")
@@ -97,12 +115,18 @@ def _http_get(url: str, headers: Optional[Dict[str, str]] = None,
             req.add_header(k, v)
     ctx = _create_ssl_context()
     with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-        return resp.read()
+        data = resp.read()
+    # Audit: log hash of received data for integrity verification
+    data_hash = hashlib.sha256(data).hexdigest()[:16]
+    logger.info("Intel feed %s: received %d bytes (sha256: %s...)", url, len(data), data_hash)
+    return data
 
 
 def _http_post(url: str, data: dict, headers: Optional[Dict[str, str]] = None,
                timeout: int = 60) -> bytes:
     """Perform an HTTP POST with JSON body."""
+    if os.environ.get("DONJON_OFFLINE") == "1":
+        raise RuntimeError("Network calls disabled in offline/air-gap mode (DONJON_OFFLINE=1)")
     body = json.dumps(data).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("User-Agent", "Donjon/1.0 IntelFeedManager")
@@ -268,6 +292,8 @@ class IntelFeedManager:
     def _fetch_with_retry(self, url: str, headers: Optional[Dict[str, str]] = None,
                           max_retries: int = 3, timeout: int = 60) -> bytes:
         """Fetch URL with exponential backoff retry for transient failures."""
+        if os.environ.get("DONJON_OFFLINE") == "1":
+            raise RuntimeError("Network calls disabled in offline/air-gap mode (DONJON_OFFLINE=1)")
         ctx = _create_ssl_context()
         for attempt in range(max_retries):
             try:
@@ -277,7 +303,11 @@ class IntelFeedManager:
                     for k, v in headers.items():
                         req.add_header(k, v)
                 with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-                    return resp.read()
+                    data = resp.read()
+                # Audit: log hash of received data for integrity verification
+                data_hash = hashlib.sha256(data).hexdigest()[:16]
+                logger.info("Intel feed %s: received %d bytes (sha256: %s...)", url, len(data), data_hash)
+                return data
             except urllib.error.HTTPError as e:
                 if e.code in (429, 503) and attempt < max_retries - 1:
                     wait = (2 ** attempt) * 5  # 5s, 10s, 20s

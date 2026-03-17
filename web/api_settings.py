@@ -9,6 +9,34 @@ from lib.license_guard import require_feature
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Allowlists — only these keys may be set via the Settings API.
+# Anything not listed here is rejected with 400.
+# ---------------------------------------------------------------------------
+_ALLOWED_CONFIG_KEYS = frozenset({
+    'scan.default_timeout', 'scan.max_concurrent', 'scan.retry_count',
+    'reporting.company_name', 'reporting.logo_path', 'reporting.output_format',
+    'notifications.enabled', 'notifications.email', 'notifications.slack_webhook',
+    'ai.provider', 'ai.model', 'ai.temperature', 'ai.max_tokens',
+    'dashboard.refresh_interval', 'dashboard.theme',
+    'logging.level', 'logging.file',
+})
+
+_ALLOWED_PATH_KEYS = frozenset({
+    'data_dir', 'reports_dir', 'exports_dir', 'scans_dir', 'plugins_dir',
+    'templates_dir', 'evidence_dir', 'backup_dir',
+})
+
+
+def _validate_keys(keys: set[str], allowed: frozenset[str], category: str) -> None:
+    """Raise ValueError if any key is not in the allowlist."""
+    rejected = keys - allowed
+    if rejected:
+        raise ValueError(
+            f"Unknown {category} key(s): {', '.join(sorted(rejected))}. "
+            f"Allowed keys: {', '.join(sorted(allowed))}"
+        )
+
 
 def handle_settings_request(
     request_path: str,
@@ -36,6 +64,7 @@ def _handle_config(
     body: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if body is not None:
+        _validate_keys(set(body.keys()), _ALLOWED_CONFIG_KEYS, "config")
         for key, value in body.items():
             cfg.set(key, value)
         logger.info("Updated config keys: %s", list(body.keys()))
@@ -47,6 +76,7 @@ def _handle_paths(
     body: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if body is not None:
+        _validate_keys(set(body.keys()), _ALLOWED_PATH_KEYS, "path")
         for key, value in body.items():
             paths.set(key, value)
         logger.info("Updated path keys: %s", list(body.keys()))

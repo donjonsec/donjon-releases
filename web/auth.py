@@ -227,17 +227,20 @@ class APIKeyAuth:
 
         # Admin paths require admin key
         if self.is_admin_path(path):
+            found = False
             for registered in self._admin_keys:
                 if hmac.compare_digest(api_key, registered):
-                    return True
-            return False
+                    found = True
+            return found
 
-        # Constant-time comparison to prevent timing attacks
+        # Constant-time comparison to prevent timing attacks.
+        # Iterate ALL keys with boolean accumulator to avoid early-exit
+        # timing oracle that leaks key count or match position.
+        found = False
         for registered in self._keys:
             if hmac.compare_digest(api_key, registered):
-                return True
-
-        return False
+                found = True
+        return found
 
     def get_auth_error_response(self, path: str = '') -> Dict:
         """Return a JSON-serialisable error body for 401/403 responses."""

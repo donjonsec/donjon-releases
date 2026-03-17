@@ -20,6 +20,7 @@ Safe simulation only — checks DEFENSES, never exploits.
 """
 
 import os
+import shlex
 import sys
 import re
 import subprocess
@@ -736,10 +737,10 @@ class AdversaryScanner(BaseScanner):
     # -------------------------------------------------------------------
 
     def _run_cmd(self, cmd: str, timeout: int = 30) -> Optional[str]:
-        """Execute a shell command, return stdout or None."""
+        """Execute a command, return stdout or None."""
         try:
-            proc = subprocess.run(  # nosec B602 — all commands are hardcoded literals
-                cmd, shell=True, capture_output=True, text=True, timeout=timeout,
+            proc = subprocess.run(
+                shlex.split(cmd), shell=False, capture_output=True, text=True, timeout=timeout,
             )
             if proc.returncode != 0:
                 return None

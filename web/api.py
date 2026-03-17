@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 import traceback
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -220,11 +221,15 @@ class DonjonAPI:
     Independent of transport layer (stdlib or Flask).
     """
 
+    _AUTH_FAIL_WINDOW = 60   # seconds
+    _AUTH_FAIL_MAX = 10      # max failures before lockout
+
     def __init__(self, auth: Optional[APIKeyAuth] = None):
         self.auth = auth or get_auth()
         self.routes: List[Route] = []
         self._start_time = datetime.now(timezone.utc)
         self._agents: Dict[str, Dict] = {}  # agent_id -> last check-in
+        self._auth_failures: Dict[str, List[float]] = {}
         self._register_routes()
 
     # ---- route registration helpers -------------------------------------
@@ -245,12 +250,26 @@ class DonjonAPI:
 
     def dispatch(self, method: str, path: str, query: Dict[str, str],
                  body: Optional[Dict], api_key: Optional[str] = None,
+                 source_ip: str = '0.0.0.0',
                  ) -> Tuple[bytes, int, str]:
         """
         Route a request and return (body_bytes, status, content_type).
         """
+        # --- Rate limiting on auth failures --------------------------------
+        now = time.time()
+        if source_ip in self._auth_failures:
+            recent = [t for t in self._auth_failures[source_ip]
+                      if now - t < self._AUTH_FAIL_WINDOW]
+            self._auth_failures[source_ip] = recent
+            if len(recent) >= self._AUTH_FAIL_MAX:
+                return json_response({
+                    'error': 'rate_limited',
+                    'message': 'Too many authentication failures. Try again later.',
+                }, 429)
+
         # --- Authentication -----------------------------------------------
         if not self.auth.authenticate(path, api_key):
+            self._auth_failures.setdefault(source_ip, []).append(now)
             return json_response(self.auth.get_auth_error_response(), 401)
 
         # --- Tier enforcement ---------------------------------------------
@@ -287,8 +306,32 @@ class DonjonAPI:
 
         lm = get_license_manager()
         tier = lm.get_tier()
+
+        # --- Defense-in-depth: route-level tier enforcement ------------------
+        # This runs BEFORE individual handler checks, providing a second layer.
+        # Even if a handler forgets to call require_tier(), this gate blocks.
+        _ROUTE_TIER_MAP = {
+            '/api/v1/rbac': 'enterprise',
+            '/api/v1/sso': 'enterprise',
+            '/api/v1/tenants': 'enterprise',
+            '/api/v1/audit': 'enterprise',
+            '/api/v1/mssp': 'managed',
+        }
+        from lib.license_guard import TIER_ORDER
+        current_idx = TIER_ORDER.index(tier) if tier in TIER_ORDER else 0
+        for prefix, required_tier in _ROUTE_TIER_MAP.items():
+            if path.startswith(prefix):
+                required_idx = TIER_ORDER.index(required_tier)
+                if current_idx < required_idx:
+                    return json_response({
+                        'error': True,
+                        'message': f'This feature requires a {required_tier} license',
+                        'upgrade_required': required_tier,
+                    }, 403)
+                break  # matched a prefix, no need to check more
+
         if tier in ("pro", "enterprise", "managed"):
-            return None  # paid tiers have no restrictions
+            return None  # paid tiers: skip community-specific limits below
 
         # -- Schedules: community cannot create/update schedules -----------
         if path.startswith('/api/v1/schedules') and method in ('POST', 'PUT'):
@@ -1092,7 +1135,7 @@ class DonjonAPI:
     def _list_scans(self, query: Dict, **kw) -> Tuple[bytes, int, str]:
         if not get_evidence_manager:
             return error_response('Evidence module not available', 503)
-        limit = int(query.get('limit', '50'))
+        limit = min(int(query.get('limit', '50')), 1000)
         sessions = get_evidence_manager().get_all_sessions(limit=limit)
         return json_response({'count': len(sessions), 'sessions': sessions})
 
@@ -1115,6 +1158,10 @@ class DonjonAPI:
     # ------------------------------------------------------------------
 
     def _list_findings(self, query: Dict, **kw) -> Tuple[bytes, int, str]:
+        # TODO(security): When RBAC is active, verify the requesting API key
+        # owns or has access to this session/finding. Currently all authenticated
+        # users share the evidence database — acceptable for single-user
+        # deployments but needs scoping for multi-user Enterprise.
         if not get_evidence_manager:
             return error_response('Evidence module not available', 503)
         em = get_evidence_manager()
@@ -1138,6 +1185,10 @@ class DonjonAPI:
         return json_response({'count': len(findings), 'findings': findings})
 
     def _get_finding(self, params: Dict, **kw) -> Tuple[bytes, int, str]:
+        # TODO(security): When RBAC is active, verify the requesting API key
+        # owns or has access to this session/finding. Currently all authenticated
+        # users share the evidence database — acceptable for single-user
+        # deployments but needs scoping for multi-user Enterprise.
         if not get_evidence_manager:
             return error_response('Evidence module not available', 503)
         import sqlite3
@@ -1481,12 +1532,37 @@ class DonjonAPI:
     # Discovery
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _validate_cidr(cidr: str) -> Optional[str]:
+        """Validate CIDR is a private/internal network. Returns error msg or None."""
+        if cidr == 'auto':
+            return None
+        try:
+            import ipaddress
+            net = ipaddress.ip_network(cidr, strict=False)
+            if not net.is_private:
+                return f"CIDR {cidr} is not a private network. Only RFC-1918/RFC-4193 ranges allowed."
+            # Block link-local and metadata endpoints
+            if net.is_link_local or net.overlaps(ipaddress.ip_network('169.254.0.0/16')):
+                return f"CIDR {cidr} includes link-local addresses (potential SSRF target)."
+        except ValueError as e:
+            return f"Invalid CIDR: {e}"
+        return None
+
     def _discovery_scan(self, body: Optional[Dict], **kw) -> Tuple[bytes, int, str]:
         if not get_discovery_engine:
             return error_response('Discovery module not available', 503)
         body = body or {}
         cidr = body.get('cidr', 'auto')
+        cidr_err = self._validate_cidr(cidr)
+        if cidr_err:
+            return error_response(cidr_err, 400)
         methods = body.get('methods', ['arp', 'icmp', 'tcp'])
+        # Validate methods against allowlist
+        allowed_methods = {'arp', 'icmp', 'tcp', 'udp', 'syn'}
+        invalid = set(methods) - allowed_methods
+        if invalid:
+            return error_response(f"Invalid discovery methods: {invalid}", 400)
         engine = get_discovery_engine()
         hosts = engine.discover_network(cidr=cidr, methods=methods)
         if get_audit_trail:
@@ -1516,9 +1592,14 @@ class DonjonAPI:
     def _audit_log(self, query: Dict, **kw) -> Tuple[bytes, int, str]:
         if not get_audit_trail:
             return error_response('Audit module not available', 503)
+        try:
+            from lib.license_guard import require_feature, LicenseError
+            require_feature("audit_trail")
+        except LicenseError:
+            return error_response('Audit log requires Enterprise license', 403)
         at = get_audit_trail()
         entries = at.get_log(
-            limit=int(query.get('limit', '100')),
+            limit=min(int(query.get('limit', '100')), 1000),
             action=query.get('action'),
             actor=query.get('actor'),
             since=query.get('since'),
@@ -1602,7 +1683,7 @@ class DonjonAPI:
                           **kw) -> Tuple[bytes, int, str]:
         if not get_scheduler:
             return error_response('Scheduler module not available', 503)
-        limit = int(query.get('limit', '20'))
+        limit = min(int(query.get('limit', '20')), 1000)
         runs = get_scheduler().get_run_history(params['id'], limit=limit)
         return json_response({'count': len(runs), 'runs': runs})
 
@@ -1610,17 +1691,20 @@ class DonjonAPI:
     # Notifications
     # ------------------------------------------------------------------
 
-    _SECRET_FIELDS = frozenset({
-        'smtp_pass', 'auth_token', 'secret_access_key',
-        'access_key_id', 'webhook_url',
-    })
+    @staticmethod
+    def _is_secret_field(name: str) -> bool:
+        """Detect secret fields by pattern rather than explicit allowlist."""
+        lower = name.lower()
+        return any(s in lower for s in (
+            'pass', 'secret', 'token', 'key', 'credential', 'auth', 'private',
+        ))
 
     @staticmethod
     def _mask_config(config: Dict) -> Dict:
         """Mask sensitive config fields for API responses."""
         masked = {}
         for k, v in config.items():
-            if k in DonjonAPI._SECRET_FIELDS and isinstance(v, str) and len(v) > 2:
+            if DonjonAPI._is_secret_field(k) and isinstance(v, str) and len(v) > 2:
                 masked[k] = v[:2] + '********'
             else:
                 masked[k] = v
@@ -1708,7 +1792,7 @@ class DonjonAPI:
             return error_response('Notification module not available', 503)
         nm = get_notification_manager()
         history = nm.get_notification_history(
-            limit=int(query.get('limit', '50')),
+            limit=min(int(query.get('limit', '50')), 1000),
             event_type=query.get('event_type'),
             status=query.get('status'),
         )
@@ -2257,8 +2341,9 @@ class DonjonHTTPHandler(BaseHTTPRequestHandler):
         path, query, body = self._parse_request()
         api_key = self._get_api_key()
 
+        source_ip = self.client_address[0] if self.client_address else '0.0.0.0'
         resp_body, status, content_type = self.api.dispatch(
-            method, path, query, body, api_key
+            method, path, query, body, api_key, source_ip=source_ip
         )
 
         self.send_response(status)
