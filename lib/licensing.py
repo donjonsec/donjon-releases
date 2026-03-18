@@ -499,6 +499,20 @@ class LicenseManager:
         This is a deliberate security decision: partial trust is dangerous.
         """
         if not self.license_path.exists():
+            # Check for trial license as fallback
+            trial_path = self.license_path.parent / "trial-license.json"
+            if trial_path.exists():
+                try:
+                    from lib.trial_license import _status
+                    status = _status()
+                    if status.get("active"):
+                        self._tier = status.get("tier", "pro")
+                        self._license = {"tier": self._tier, "trial": True,
+                                         "expires": status.get("expires", "")}
+                        logger.info("Trial license active: tier=%s", self._tier)
+                        return
+                except Exception as exc:
+                    logger.debug("Trial license check failed: %s", exc)
             self._tier = "community"
             return
 
