@@ -156,6 +156,39 @@ try:
 except ImportError:
     handle_mssp_reporting_request = None
 
+# Gap-closure v2 API modules
+try:
+    from web.api_intel import handle_intel_request
+except ImportError:
+    handle_intel_request = None
+
+try:
+    from web.api_compliance_overlap import handle_overlap_request
+except ImportError:
+    handle_overlap_request = None
+
+try:
+    from web.api_trial import handle_trial_request
+except ImportError:
+    handle_trial_request = None
+
+try:
+    from lib.tool_status import check_all_tools, check_scanner_requirements
+except ImportError:
+    check_all_tools = None
+    check_scanner_requirements = None
+
+try:
+    from lib.scan_profiles import ScanProfileManager
+except ImportError:
+    ScanProfileManager = None
+
+try:
+    from lib.data_retention import run_cleanup, get_data_stats
+except ImportError:
+    run_cleanup = None
+    get_data_stats = None
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -591,6 +624,37 @@ class DonjonAPI:
             self._post('/api/v1/mssp/reports/cross-client', self._api_mssp_reports_cross_client)
             self._get('/api/v1/mssp/license/status', self._api_mssp_license_status)
 
+        # -- Intel Management (gap-closure v2) ---------------------------------
+        if handle_intel_request is not None:
+            self._get('/api/v1/intel/status', self._api_intel_status)
+            self._post('/api/v1/intel/update', self._api_intel_update)
+
+        # -- Compliance Overlap (gap-closure v2) --------------------------------
+        if handle_overlap_request is not None:
+            self._get('/api/v1/compliance/overlap', self._api_compliance_overlap)
+
+        # -- Trial License (gap-closure v2) ------------------------------------
+        if handle_trial_request is not None:
+            self._post('/api/v1/license/trial', self._api_trial_activate)
+            self._get('/api/v1/license/trial/status', self._api_trial_status)
+
+        # -- Tool Status (gap-closure v2) --------------------------------------
+        if check_all_tools is not None:
+            self._get('/api/v1/tools', self._api_tools_list)
+            self._get('/api/v1/tools/<scanner_id>', self._api_tools_scanner)
+
+        # -- Scan Profiles (gap-closure v2) ------------------------------------
+        if ScanProfileManager is not None:
+            self._get('/api/v1/profiles', self._api_profiles_list)
+            self._post('/api/v1/profiles', self._api_profile_create)
+            self._get('/api/v1/profiles/<profile_id>', self._api_profile_get)
+            self._delete('/api/v1/profiles/<profile_id>', self._api_profile_delete)
+
+        # -- System Storage (gap-closure v2) -----------------------------------
+        if get_data_stats is not None:
+            self._get('/api/v1/system/storage', self._api_storage_stats)
+            self._post('/api/v1/system/cleanup', self._api_storage_cleanup)
+
         # -- Legal ---------------------------------------------------------
         self._get('/api/v1/legal/eula', self._legal_eula)
 
@@ -962,6 +1026,119 @@ class DonjonAPI:
     # Legal
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Gap-closure v2 adapters
+    # ------------------------------------------------------------------
+
+    def _api_intel_status(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_intel_request("status", None)
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_intel_update(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_intel_request("update", body)
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_compliance_overlap(self, query: Dict = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            frameworks = (query or {}).get("frameworks", "").split(",")
+            frameworks = [f.strip() for f in frameworks if f.strip()]
+            result = handle_overlap_request(frameworks)
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_trial_activate(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_trial_request("activate", body)
+            if "error" in result:
+                return error_response(result["error"], result.get("status", 400))
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_trial_status(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            result = handle_trial_request("status", None)
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_tools_list(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            tools = check_all_tools()
+            return json_response({"tools": tools})
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_tools_scanner(self, params: Dict = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            scanner_id = (params or {}).get("scanner_id", "")
+            result = check_scanner_requirements(scanner_id)
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_profiles_list(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            pm = ScanProfileManager()
+            profiles = pm.list_profiles()
+            return json_response({"count": len(profiles), "profiles": profiles})
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_profile_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            pm = ScanProfileManager()
+            profile_id = pm.save_profile(body or {})
+            return json_response({"profile_id": profile_id}, 201)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_profile_get(self, params: Dict = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            pm = ScanProfileManager()
+            profile = pm.load_profile((params or {}).get("profile_id", ""))
+            if not profile:
+                return error_response("Profile not found", 404)
+            return json_response(profile)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_profile_delete(self, params: Dict = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            pm = ScanProfileManager()
+            pm.delete_profile((params or {}).get("profile_id", ""))
+            return json_response({"deleted": True})
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_storage_stats(self, **kw) -> Tuple[bytes, int, str]:
+        try:
+            stats = get_data_stats()
+            return json_response(stats)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_storage_cleanup(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
+        try:
+            from lib.license_guard import require_feature, LicenseError
+            require_feature("settings")
+        except LicenseError:
+            return error_response("Cleanup requires Pro license", 403)
+        except ImportError:
+            pass
+        try:
+            result = run_cleanup(body or {})
+            return json_response(result)
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
     def _legal_eula(self, **kw) -> Tuple[bytes, int, str]:
         try:
             from lib.eula import get_eula_text, EULA_VERSION, get_acceptance_record
@@ -999,7 +1176,7 @@ class DonjonAPI:
         }
         return json_response({
             'status': 'healthy',
-            'version': '7.0',
+            'version': '7.3.0',
             'uptime_seconds': round(uptime, 2),
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'modules': modules,
