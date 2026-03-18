@@ -2746,6 +2746,10 @@ def check_source_compilation(report: AuditReport) -> None:
             continue
         if ".claude" in str(py_file):
             continue
+        # Skip vendored third-party tools (Python 2 code)
+        rel = str(py_file.relative_to(PROJECT_ROOT))
+        if "tools/nmap" in rel or "tools/openvas" in rel or "vendor" in rel:
+            continue
         total += 1
         try:
             py_compile.compile(str(py_file), doraise=True)
