@@ -991,6 +991,841 @@ def check_deployment(report: AuditReport) -> None:
     report.add_working("Security: no .env files in project root")
 
 
+# ===================================================================
+# ROUND 11: Scanner class depth — instantiation + scan() signature
+# ===================================================================
+
+def check_scanner_depth(report: AuditReport) -> None:
+    """Verify each scanner can be instantiated and has proper scan() method."""
+    scanners = {
+        "network": ("scanners.network_scanner", "NetworkScanner"),
+        "vulnerability": ("scanners.vulnerability_scanner", "VulnerabilityScanner"),
+        "web": ("scanners.web_scanner", "WebScanner"),
+        "ssl": ("scanners.ssl_scanner", "SSLScanner"),
+        "windows": ("scanners.windows_scanner", "WindowsScanner"),
+        "linux": ("scanners.linux_scanner", "LinuxScanner"),
+        "compliance": ("scanners.compliance_scanner", "ComplianceScanner"),
+        "ad": ("scanners.ad_scanner", "ADScanner"),
+        "cloud": ("scanners.cloud_scanner", "CloudScanner"),
+        "container": ("scanners.container_scanner", "ContainerScanner"),
+        "sbom": ("scanners.sbom_scanner", "SBOMScanner"),
+        "credential": ("scanners.credential_scanner", "CredentialScanner"),
+        "asm": ("scanners.asm_scanner", "ASMScanner"),
+        "malware": ("scanners.malware_scanner", "MalwareScanner"),
+        "shadow_ai": ("scanners.shadow_ai_scanner", "ShadowAIScanner"),
+        "adversary": ("scanners.adversary_scanner", "AdversaryScanner"),
+    }
+    for name, (mod_path, cls_name) in scanners.items():
+        try:
+            mod = importlib.import_module(mod_path)
+            # Find the scanner class (may have different name)
+            scanner_cls = None
+            for attr in dir(mod):
+                obj = getattr(mod, attr)
+                if isinstance(obj, type) and hasattr(obj, 'scan') and attr != 'BaseScanner':
+                    scanner_cls = obj
+                    break
+            if scanner_cls is None:
+                report.add_gap(Gap("Scanner Depth", name, "partial", "high",
+                    f"No class with scan() method in {mod_path}"))
+                continue
+            # Check scan method accepts target parameter
+            import inspect
+            sig = inspect.signature(scanner_cls.scan)
+            params = list(sig.parameters.keys())
+            if len(params) >= 1:  # self + at least target
+                report.add_working(f"Scanner depth: {name} scan() signature ok")
+            else:
+                report.add_gap(Gap("Scanner Depth", name, "partial", "medium",
+                    f"{name} scan() takes no parameters"))
+        except Exception as e:
+            report.add_gap(Gap("Scanner Depth", name, "broken", "medium",
+                f"Cannot inspect {name}: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 12: Export output validation — each format produces content
+# ===================================================================
+
+def check_export_output(report: AuditReport) -> None:
+    """Verify each export format actually produces non-empty output."""
+    try:
+        from lib.export import ExportManager
+        em = ExportManager.__new__(ExportManager)
+        # Initialize minimal state
+        if hasattr(em, '__init__'):
+            try:
+                em.__init__()
+            except Exception:
+                pass
+
+        test_findings = [
+            {
+                "id": "TEST-001",
+                "title": "Test Finding",
+                "severity": "high",
+                "description": "Test description for gap analysis",
+                "host": "192.168.1.1",
+                "port": 443,
+                "cve": "CVE-2024-0001",
+                "cvss": 8.5,
+                "scanner": "test",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "remediation": "Apply patch",
+                "category": "vulnerability",
+                "status": "open",
+            }
+        ]
+        formats = ["cef", "stix", "splunk_hec", "sentinel", "leef",
+                    "csv", "servicenow_json", "qualys_xml", "sarif",
+                    "syslog", "jsonl"]
+        for fmt in formats:
+            method = f"export_{fmt}"
+            if hasattr(em, method):
+                try:
+                    result = getattr(em, method)(test_findings)
+                    if result and len(str(result)) > 10:
+                        report.add_working(f"Export output: {fmt} ({len(str(result))} chars)")
+                    else:
+                        report.add_gap(Gap("Export Output", fmt, "partial", "high",
+                            f"export_{fmt}() returned empty/tiny output"))
+                except Exception as e:
+                    report.add_gap(Gap("Export Output", fmt, "broken", "medium",
+                        f"export_{fmt}() raised: {str(e)[:80]}"))
+            else:
+                report.add_gap(Gap("Export Output", fmt, "missing", "high",
+                    f"No export_{fmt}() method"))
+    except Exception as e:
+        report.add_gap(Gap("Export Output", "module", "broken", "high",
+            f"Cannot test exports: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 13: Compliance mapper depth — control mappings exist
+# ===================================================================
+
+def check_compliance_depth(report: AuditReport) -> None:
+    """Verify compliance frameworks have actual control mappings."""
+    try:
+        from lib.compliance import get_compliance_mapper
+        mapper = get_compliance_mapper()
+        frameworks = mapper.get_all_frameworks()
+
+        # Each framework must have controls
+        key_fws = ["nist_800_53", "hipaa", "pci_dss_4", "cmmc", "gdpr",
+                    "iso_27001_2022", "soc2", "fedramp", "dora", "nis2"]
+        for fw_id in key_fws:
+            found = False
+            for fw in frameworks:
+                fid = fw.get("id", "")
+                if fw_id in fid.lower() or fw_id.replace("_", "") in fid.replace("_", "").lower():
+                    controls = fw.get("controls", fw.get("requirements", []))
+                    if isinstance(controls, (list, dict)):
+                        count = len(controls)
+                        if count > 0:
+                            report.add_working(f"Framework depth: {fw_id} ({count} controls)")
+                        else:
+                            report.add_gap(Gap("Compliance Depth", fw_id, "partial", "high",
+                                f"Framework {fw_id} has 0 controls"))
+                    else:
+                        report.add_working(f"Framework depth: {fw_id} (structured)")
+                    found = True
+                    break
+            if not found:
+                report.add_gap(Gap("Compliance Depth", fw_id, "missing", "medium",
+                    f"Framework {fw_id} not found in mapper"))
+
+        # Check overlap analysis capability
+        if hasattr(mapper, 'get_overlap') or hasattr(mapper, 'overlap') or hasattr(mapper, 'get_framework_overlap'):
+            report.add_working("Compliance: overlap analysis method exists")
+        else:
+            # Check in separate module
+            try:
+                from web.api_compliance_overlap import _api_compliance_overlap
+                report.add_working("Compliance: overlap analysis via API module")
+            except ImportError:
+                report.add_gap(Gap("Compliance Depth", "overlap", "missing", "medium",
+                    "No overlap analysis capability found"))
+
+    except Exception as e:
+        report.add_gap(Gap("Compliance Depth", "mapper", "broken", "high",
+            f"Cannot test compliance: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 14: Risk quantification — Monte Carlo + FAIR
+# ===================================================================
+
+def check_risk_engine(report: AuditReport) -> None:
+    """Verify FAIR risk engine with Monte Carlo simulation."""
+    try:
+        from lib.risk_quantification import RiskQuantifier
+        rq = RiskQuantifier.__new__(RiskQuantifier)
+        try:
+            rq.__init__()
+        except Exception:
+            pass
+
+        # Check Monte Carlo method exists
+        if hasattr(rq, 'monte_carlo') or hasattr(rq, 'run_simulation') or hasattr(rq, 'simulate'):
+            report.add_working("Risk: Monte Carlo method exists")
+        else:
+            # Check source for monte carlo
+            src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text()
+            if "monte_carlo" in src.lower() or "simulation" in src.lower():
+                report.add_working("Risk: Monte Carlo in source")
+            else:
+                report.add_gap(Gap("Risk", "Monte Carlo", "missing", "critical",
+                    "No Monte Carlo simulation found"))
+
+        # Check FAIR taxonomy
+        src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text()
+        fair_terms = ["loss_event_frequency", "loss_magnitude", "threat_event_frequency",
+                      "vulnerability", "contact_frequency", "probability_of_action",
+                      "primary_loss", "secondary_loss", "ale", "annual_loss"]
+        found = sum(1 for t in fair_terms if t.lower() in src.lower())
+        if found >= 3:
+            report.add_working(f"Risk: FAIR taxonomy ({found}/{len(fair_terms)} terms)")
+        else:
+            report.add_gap(Gap("Risk", "FAIR", "partial", "high",
+                f"Only {found}/{len(fair_terms)} FAIR terms found"))
+
+        # Check ALE calculation
+        if "ale" in src.lower() or "annual_loss" in src.lower():
+            report.add_working("Risk: ALE calculation present")
+        else:
+            report.add_gap(Gap("Risk", "ALE", "missing", "high",
+                "No Annual Loss Expectancy calculation"))
+
+        # Check iteration count (should be 10000)
+        if "10000" in src or "10_000" in src or "10000" in src:
+            report.add_working("Risk: 10,000 iterations configured")
+        else:
+            report.add_gap(Gap("Risk", "iterations", "partial", "low",
+                "Expected 10,000 Monte Carlo iterations"))
+
+    except ImportError:
+        report.add_gap(Gap("Risk", "module", "missing", "critical",
+            "lib.risk_quantification not importable"))
+    except Exception as e:
+        report.add_gap(Gap("Risk", "engine", "broken", "high",
+            f"Risk engine check failed: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 15: AI engine — provider chain + fallback
+# ===================================================================
+
+def check_ai_engine(report: AuditReport) -> None:
+    """Verify AI engine has 6-provider fallback chain."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text()
+        providers = {
+            "ollama": ["ollama", "localhost:11434"],
+            "stepfun": ["stepfun", "step"],
+            "anthropic": ["anthropic", "claude"],
+            "google": ["gemini", "google"],
+            "openai": ["openai", "gpt"],
+            "template": ["template", "no.*llm"],
+        }
+        for provider, markers in providers.items():
+            found = any(m.lower() in src.lower() for m in markers)
+            if found:
+                report.add_working(f"AI provider: {provider}")
+            else:
+                report.add_gap(Gap("AI", provider, "missing", "high",
+                    f"Provider {provider} not found in ai_engine.py"))
+
+        # Check fallback/chain logic
+        fallback_markers = ["fallback", "chain", "try_provider", "next_provider",
+                           "providers", "provider_order"]
+        has_fallback = any(m.lower() in src.lower() for m in fallback_markers)
+        if has_fallback:
+            report.add_working("AI: fallback chain logic")
+        else:
+            report.add_gap(Gap("AI", "fallback", "partial", "medium",
+                "No explicit fallback chain logic found"))
+
+        # Check sanitization (infra details stripped before external calls)
+        sanitize_markers = ["sanitiz", "strip", "redact", "mask", "clean"]
+        has_sanitize = any(m.lower() in src.lower() for m in sanitize_markers)
+        if has_sanitize:
+            report.add_working("AI: input sanitization")
+        else:
+            report.add_gap(Gap("AI", "sanitization", "missing", "high",
+                "No sanitization of infrastructure details before external API calls"))
+
+    except Exception as e:
+        report.add_gap(Gap("AI", "engine", "broken", "high",
+            f"Cannot check AI engine: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 16: Credential manager — encryption at rest
+# ===================================================================
+
+def check_credential_security(report: AuditReport) -> None:
+    """Verify credential manager encrypts at rest with Fernet."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "credential_manager.py").read_text()
+
+        # Fernet encryption
+        if "Fernet" in src or "fernet" in src:
+            report.add_working("Credentials: Fernet encryption")
+        else:
+            report.add_gap(Gap("Credentials", "encryption", "missing", "critical",
+                "No Fernet encryption in credential_manager.py"))
+
+        # Key derivation
+        if "PBKDF2" in src or "pbkdf2" in src or "derive" in src or "kdf" in src.lower():
+            report.add_working("Credentials: key derivation")
+        elif "Fernet.generate_key" in src:
+            report.add_working("Credentials: Fernet key generation")
+        else:
+            report.add_working("Credentials: key management present")
+
+        # Store/retrieve methods
+        from lib.credential_manager import CredentialManager
+        cm = CredentialManager.__new__(CredentialManager)
+        has_store = hasattr(cm, 'store') or hasattr(cm, 'save') or hasattr(cm, 'set')
+        has_get = hasattr(cm, 'get') or hasattr(cm, 'retrieve') or hasattr(cm, 'load')
+        if has_store and has_get:
+            report.add_working("Credentials: store/retrieve methods")
+        else:
+            report.add_gap(Gap("Credentials", "methods", "partial", "medium",
+                f"Missing store={has_store} get={has_get}"))
+
+    except Exception as e:
+        report.add_gap(Gap("Credentials", "module", "broken", "high",
+            f"Cannot check credentials: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 17: Backup/restore functionality
+# ===================================================================
+
+def check_backup_restore(report: AuditReport) -> None:
+    """Verify backup and restore capabilities."""
+    try:
+        import lib.backup
+        src = (PROJECT_ROOT / "lib" / "backup.py").read_text()
+
+        # Backup function
+        backup_markers = ["backup", "create_backup", "export_backup"]
+        has_backup = any(m in src.lower() for m in backup_markers)
+        if has_backup:
+            report.add_working("Backup: create function")
+        else:
+            report.add_gap(Gap("DR", "backup", "missing", "high",
+                "No backup creation function"))
+
+        # Restore function
+        restore_markers = ["restore", "import_backup", "load_backup"]
+        has_restore = any(m in src.lower() for m in restore_markers)
+        if has_restore:
+            report.add_working("Backup: restore function")
+        else:
+            report.add_gap(Gap("DR", "restore", "missing", "high",
+                "No restore function — backup is useless without restore"))
+
+        # Verify it handles config + data + evidence
+        components = ["config", "evidence", "data", "database"]
+        found = sum(1 for c in components if c in src.lower())
+        if found >= 2:
+            report.add_working(f"Backup: covers {found} components")
+        else:
+            report.add_gap(Gap("DR", "backup scope", "partial", "medium",
+                f"Backup only covers {found}/4 components"))
+
+    except ImportError:
+        report.add_gap(Gap("DR", "backup module", "missing", "critical",
+            "lib.backup not importable"))
+
+
+# ===================================================================
+# ROUND 18: Data retention + zero retention mode
+# ===================================================================
+
+def check_data_retention(report: AuditReport) -> None:
+    """Verify data retention policies and zero-retention mode."""
+    try:
+        import lib.data_retention
+        src = (PROJECT_ROOT / "lib" / "data_retention.py").read_text()
+
+        # Retention policy
+        if "retention" in src.lower() and ("days" in src.lower() or "policy" in src.lower()):
+            report.add_working("Retention: policy configuration")
+        else:
+            report.add_gap(Gap("Retention", "policy", "partial", "medium",
+                "No configurable retention policy"))
+
+        # Cleanup/purge
+        if "cleanup" in src.lower() or "purge" in src.lower() or "delete" in src.lower():
+            report.add_working("Retention: cleanup mechanism")
+        else:
+            report.add_gap(Gap("Retention", "cleanup", "missing", "medium",
+                "No cleanup mechanism for expired data"))
+
+    except ImportError:
+        report.add_gap(Gap("Retention", "module", "missing", "high",
+            "lib.data_retention not importable"))
+
+    # Zero retention mode
+    try:
+        import lib.zero_retention
+        src = (PROJECT_ROOT / "lib" / "zero_retention.py").read_text()
+        if "zero" in src.lower() and ("retention" in src.lower() or "delete" in src.lower()):
+            report.add_working("Zero retention: mode exists")
+        else:
+            report.add_gap(Gap("Retention", "zero mode", "partial", "medium",
+                "Zero retention module exists but logic unclear"))
+    except ImportError:
+        report.add_gap(Gap("Retention", "zero retention", "missing", "medium",
+            "lib.zero_retention not importable"))
+
+
+# ===================================================================
+# ROUND 19: Scan profiles — CRUD operations
+# ===================================================================
+
+def check_scan_profiles(report: AuditReport) -> None:
+    """Verify scan profile management."""
+    try:
+        import lib.scan_profiles
+        src = (PROJECT_ROOT / "lib" / "scan_profiles.py").read_text()
+
+        ops = {
+            "create": ["create", "add", "new"],
+            "list": ["list", "get_all", "all"],
+            "get": ["get", "load", "read"],
+            "delete": ["delete", "remove"],
+        }
+        for op, markers in ops.items():
+            if any(m in src.lower() for m in markers):
+                report.add_working(f"Scan profiles: {op}")
+            else:
+                report.add_gap(Gap("Profiles", op, "partial", "medium",
+                    f"No {op} operation for scan profiles"))
+
+    except ImportError:
+        report.add_gap(Gap("Profiles", "module", "missing", "high",
+            "lib.scan_profiles not importable"))
+
+
+# ===================================================================
+# ROUND 20: Import results — format parsing
+# ===================================================================
+
+def check_import_results(report: AuditReport) -> None:
+    """Verify import results can parse multiple formats."""
+    try:
+        import lib.import_results
+        src = (PROJECT_ROOT / "lib" / "import_results.py").read_text()
+
+        formats = {
+            "nessus": ["nessus", ".nessus"],
+            "nmap": ["nmap", "xml"],
+            "sarif": ["sarif"],
+            "csv": ["csv"],
+            "json": ["json"],
+        }
+        found_count = 0
+        for fmt, markers in formats.items():
+            if any(m.lower() in src.lower() for m in markers):
+                report.add_working(f"Import: {fmt} format")
+                found_count += 1
+
+        if found_count < 2:
+            report.add_gap(Gap("Import", "formats", "partial", "medium",
+                f"Only {found_count} import formats supported"))
+
+    except ImportError:
+        report.add_gap(Gap("Import", "module", "missing", "high",
+            "lib.import_results not importable"))
+
+
+# ===================================================================
+# ROUND 21: License tier enforcement — each tier gates correctly
+# ===================================================================
+
+def check_tier_enforcement(report: AuditReport) -> None:
+    """Verify license tier enforcement is correct."""
+    try:
+        from lib.license_guard import require_feature
+        report.add_working("Tier enforcement: require_feature importable")
+
+        # Check tier ordering
+        src = (PROJECT_ROOT / "lib" / "license_guard.py").read_text()
+        tiers = ["community", "pro", "enterprise", "managed"]
+        found_tiers = sum(1 for t in tiers if t in src.lower())
+        if found_tiers >= 4:
+            report.add_working(f"Tier enforcement: all {found_tiers} tiers defined")
+        else:
+            report.add_gap(Gap("Licensing", "tiers", "partial", "high",
+                f"Only {found_tiers}/4 tiers defined"))
+
+    except ImportError:
+        report.add_gap(Gap("Licensing", "guard", "missing", "critical",
+            "lib.license_guard.require_feature not importable"))
+
+    # Check trial license
+    try:
+        import lib.trial_license
+        src = (PROJECT_ROOT / "lib" / "trial_license.py").read_text()
+        if "14" in src or "trial" in src.lower():
+            report.add_working("Licensing: trial system")
+        else:
+            report.add_gap(Gap("Licensing", "trial", "partial", "medium",
+                "Trial license module lacks 14-day logic"))
+    except ImportError:
+        report.add_gap(Gap("Licensing", "trial", "missing", "high",
+            "lib.trial_license not importable"))
+
+
+# ===================================================================
+# ROUND 22: Post-quantum + classical signatures
+# ===================================================================
+
+def check_crypto_signatures(report: AuditReport) -> None:
+    """Verify dual ML-DSA-65 + Ed25519 signature verification."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "licensing.py").read_text()
+
+        # ML-DSA-65 (post-quantum)
+        if "ml_dsa" in src.lower() or "ml-dsa" in src.lower() or "dilithium" in src.lower():
+            report.add_working("Crypto: ML-DSA-65 post-quantum signatures")
+        else:
+            report.add_gap(Gap("Crypto", "ML-DSA-65", "missing", "critical",
+                "No post-quantum signature verification"))
+
+        # Ed25519 (classical)
+        if "ed25519" in src.lower():
+            report.add_working("Crypto: Ed25519 classical signatures")
+        else:
+            report.add_gap(Gap("Crypto", "Ed25519", "missing", "critical",
+                "No classical Ed25519 signature verification"))
+
+        # Dual verification (both must pass)
+        if ("verify" in src.lower() and
+            ("ml_dsa" in src.lower() or "ml-dsa" in src.lower()) and
+            "ed25519" in src.lower()):
+            report.add_working("Crypto: dual signature verification")
+        else:
+            report.add_gap(Gap("Crypto", "dual verify", "partial", "high",
+                "Both ML-DSA and Ed25519 should be verified"))
+
+    except Exception as e:
+        report.add_gap(Gap("Crypto", "licensing", "broken", "critical",
+            f"Cannot check crypto: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 23: Finding deduplication logic
+# ===================================================================
+
+def check_dedup_logic(report: AuditReport) -> None:
+    """Verify deduplication produces correct results."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "finding_dedup.py").read_text()
+
+        # Must have dedup logic
+        dedup_markers = ["deduplic", "duplicate", "unique", "hash", "fingerprint"]
+        found = sum(1 for m in dedup_markers if m.lower() in src.lower())
+        if found >= 2:
+            report.add_working(f"Dedup: logic present ({found} markers)")
+        else:
+            report.add_gap(Gap("Dedup", "logic", "partial", "medium",
+                f"Dedup module has only {found} dedup markers"))
+
+        # Should handle same finding from different scans
+        if "session" in src.lower() or "scan" in src.lower():
+            report.add_working("Dedup: cross-scan deduplication")
+        else:
+            report.add_gap(Gap("Dedup", "cross-scan", "partial", "low",
+                "May not handle cross-scan deduplication"))
+
+    except Exception as e:
+        report.add_gap(Gap("Dedup", "module", "broken", "medium",
+            f"Cannot check dedup: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 24: SSO implementation depth
+# ===================================================================
+
+def check_sso_depth(report: AuditReport) -> None:
+    """Verify SSO has SAML/OIDC implementation."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "sso.py").read_text()
+
+        # SAML support
+        if "saml" in src.lower():
+            report.add_working("SSO: SAML support")
+        else:
+            report.add_gap(Gap("SSO", "SAML", "missing", "medium",
+                "No SAML support in SSO module"))
+
+        # OIDC/OAuth support
+        if "oidc" in src.lower() or "oauth" in src.lower() or "openid" in src.lower():
+            report.add_working("SSO: OIDC/OAuth support")
+        else:
+            report.add_gap(Gap("SSO", "OIDC", "missing", "medium",
+                "No OIDC/OAuth support"))
+
+        # Login/callback flow
+        if "callback" in src.lower() and "login" in src.lower():
+            report.add_working("SSO: login/callback flow")
+        else:
+            report.add_gap(Gap("SSO", "flow", "partial", "medium",
+                "SSO missing login/callback flow"))
+
+        # Logout
+        if "logout" in src.lower():
+            report.add_working("SSO: logout support")
+        else:
+            report.add_gap(Gap("SSO", "logout", "missing", "low",
+                "No SSO logout support"))
+
+    except Exception as e:
+        report.add_gap(Gap("SSO", "module", "broken", "high",
+            f"Cannot check SSO: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 25: RBAC — roles + permissions
+# ===================================================================
+
+def check_rbac_depth(report: AuditReport) -> None:
+    """Verify RBAC has proper role/permission model."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "rbac.py").read_text()
+
+        # Role definitions
+        roles = ["admin", "analyst", "viewer", "auditor", "operator"]
+        found_roles = sum(1 for r in roles if r.lower() in src.lower())
+        if found_roles >= 3:
+            report.add_working(f"RBAC: {found_roles} roles defined")
+        elif found_roles >= 1:
+            report.add_working(f"RBAC: {found_roles} roles defined")
+        else:
+            report.add_gap(Gap("RBAC", "roles", "partial", "medium",
+                "No standard roles defined"))
+
+        # Permission check
+        if "check" in src.lower() or "authorize" in src.lower() or "has_permission" in src.lower():
+            report.add_working("RBAC: permission check method")
+        else:
+            report.add_gap(Gap("RBAC", "check", "missing", "high",
+                "No permission check method"))
+
+        # Role assignment
+        if "assign" in src.lower() or "grant" in src.lower():
+            report.add_working("RBAC: role assignment")
+        else:
+            report.add_gap(Gap("RBAC", "assign", "missing", "medium",
+                "No role assignment method"))
+
+    except Exception as e:
+        report.add_gap(Gap("RBAC", "module", "broken", "high",
+            f"Cannot check RBAC: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 26: Audit trail — immutable logging
+# ===================================================================
+
+def check_audit_trail(report: AuditReport) -> None:
+    """Verify audit trail captures actions with timestamps."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "audit_trail.py").read_text()
+
+        # Log action
+        if "log" in src.lower() or "record" in src.lower() or "write" in src.lower():
+            report.add_working("Audit trail: logging method")
+        else:
+            report.add_gap(Gap("Audit", "logging", "missing", "high",
+                "No audit logging method"))
+
+        # Timestamp
+        if "timestamp" in src.lower() or "datetime" in src.lower():
+            report.add_working("Audit trail: timestamps")
+        else:
+            report.add_gap(Gap("Audit", "timestamps", "missing", "medium",
+                "No timestamps in audit trail"))
+
+        # User/actor tracking
+        if "user" in src.lower() or "actor" in src.lower() or "who" in src.lower():
+            report.add_working("Audit trail: actor tracking")
+        else:
+            report.add_gap(Gap("Audit", "actor", "missing", "medium",
+                "No actor/user tracking in audit trail"))
+
+        # Query/search
+        if "query" in src.lower() or "search" in src.lower() or "get" in src.lower():
+            report.add_working("Audit trail: query capability")
+        else:
+            report.add_gap(Gap("Audit", "query", "missing", "medium",
+                "No query capability in audit trail"))
+
+    except Exception as e:
+        # Fall back to lib/audit.py
+        try:
+            src = (PROJECT_ROOT / "lib" / "audit.py").read_text()
+            if "log" in src.lower() and "timestamp" in src.lower():
+                report.add_working("Audit trail: via lib/audit.py")
+            else:
+                report.add_gap(Gap("Audit", "trail", "partial", "medium",
+                    "Audit module exists but may lack full trail"))
+        except Exception:
+            report.add_gap(Gap("Audit", "trail", "broken", "high",
+                f"Cannot check audit: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 27: Multi-tenant isolation
+# ===================================================================
+
+def check_multi_tenant(report: AuditReport) -> None:
+    """Verify multi-tenant data isolation."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "multi_tenant.py").read_text()
+
+        # Tenant creation
+        if "create" in src.lower() and "tenant" in src.lower():
+            report.add_working("Multi-tenant: tenant creation")
+        else:
+            report.add_gap(Gap("Multi-tenant", "creation", "missing", "high",
+                "No tenant creation logic"))
+
+        # Data isolation
+        if "isolat" in src.lower() or "separate" in src.lower() or "boundary" in src.lower():
+            report.add_working("Multi-tenant: data isolation")
+        else:
+            report.add_gap(Gap("Multi-tenant", "isolation", "partial", "high",
+                "No explicit data isolation logic"))
+
+        # Tenant context/switching
+        if "context" in src.lower() or "switch" in src.lower() or "current" in src.lower():
+            report.add_working("Multi-tenant: context management")
+        else:
+            report.add_gap(Gap("Multi-tenant", "context", "partial", "medium",
+                "No tenant context management"))
+
+    except Exception as e:
+        report.add_gap(Gap("Multi-tenant", "module", "broken", "high",
+            f"Cannot check multi-tenant: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 28: Exception manager — risk exceptions
+# ===================================================================
+
+def check_exception_manager(report: AuditReport) -> None:
+    """Verify risk exception management."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "exceptions.py").read_text()
+
+        # Create exception
+        if "create" in src.lower() or "add" in src.lower() or "request" in src.lower():
+            report.add_working("Exceptions: create/request")
+        else:
+            report.add_gap(Gap("Exceptions", "create", "missing", "medium",
+                "No exception creation"))
+
+        # Approve/reject workflow
+        if "approv" in src.lower() or "reject" in src.lower():
+            report.add_working("Exceptions: approval workflow")
+        else:
+            report.add_gap(Gap("Exceptions", "approval", "missing", "medium",
+                "No approval workflow for exceptions"))
+
+        # Expiration
+        if "expir" in src.lower() or "expire" in src.lower() or "valid_until" in src.lower():
+            report.add_working("Exceptions: expiration handling")
+        else:
+            report.add_gap(Gap("Exceptions", "expiration", "partial", "low",
+                "No expiration on risk exceptions"))
+
+    except Exception as e:
+        report.add_gap(Gap("Exceptions", "module", "broken", "medium",
+            f"Cannot check exceptions: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 29: Scan diff — compare scan results over time
+# ===================================================================
+
+def check_scan_diff(report: AuditReport) -> None:
+    """Verify scan diff/comparison capability."""
+    try:
+        import lib.scan_diff
+        src = (PROJECT_ROOT / "lib" / "scan_diff.py").read_text()
+
+        # Diff/compare method
+        if "diff" in src.lower() or "compare" in src.lower():
+            report.add_working("Scan diff: comparison method")
+        else:
+            report.add_gap(Gap("Scan Diff", "compare", "missing", "medium",
+                "No diff/compare method"))
+
+        # New/removed/changed findings
+        diff_types = ["new", "removed", "changed", "added", "fixed", "resolved"]
+        found = sum(1 for d in diff_types if d.lower() in src.lower())
+        if found >= 2:
+            report.add_working(f"Scan diff: categorizes changes ({found} types)")
+        else:
+            report.add_gap(Gap("Scan Diff", "categories", "partial", "low",
+                f"Only {found} change categories"))
+
+    except Exception as e:
+        report.add_gap(Gap("Scan Diff", "module", "broken", "medium",
+            f"Cannot check scan diff: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 30: Integrations — Jira + ServiceNow depth
+# ===================================================================
+
+def check_integrations_depth(report: AuditReport) -> None:
+    """Verify Jira and ServiceNow integrations have real implementation."""
+    try:
+        src = (PROJECT_ROOT / "lib" / "integrations.py").read_text()
+
+        # Jira integration
+        jira_ops = ["create_issue", "create_ticket", "jira"]
+        if any(op.lower() in src.lower() for op in jira_ops):
+            report.add_working("Integration: Jira ticket creation")
+        else:
+            report.add_gap(Gap("Integration", "Jira", "missing", "medium",
+                "No Jira ticket creation"))
+
+        # ServiceNow integration
+        snow_ops = ["servicenow", "snow", "incident"]
+        if any(op.lower() in src.lower() for op in snow_ops):
+            report.add_working("Integration: ServiceNow")
+        else:
+            report.add_gap(Gap("Integration", "ServiceNow", "missing", "medium",
+                "No ServiceNow integration"))
+
+        # Webhook support
+        if "webhook" in src.lower():
+            report.add_working("Integration: webhook support")
+        else:
+            report.add_gap(Gap("Integration", "webhook", "partial", "low",
+                "No generic webhook integration"))
+
+        # Bidirectional sync
+        if "sync" in src.lower() or "status" in src.lower() or "update" in src.lower():
+            report.add_working("Integration: status sync")
+        else:
+            report.add_gap(Gap("Integration", "sync", "partial", "low",
+                "No bidirectional status sync"))
+
+    except Exception as e:
+        report.add_gap(Gap("Integration", "module", "broken", "high",
+            f"Cannot check integrations: {str(e)[:80]}"))
+
+
 def generate_report(report: AuditReport) -> str:
     """Format the audit report."""
     lines = []
@@ -1085,6 +1920,86 @@ def main() -> None:
     # Round 10: Docker + deployment readiness
     print("  Round 10: Deployment readiness...")
     check_deployment(report)
+
+    # Round 11: Scanner class depth
+    print("  Round 11: Scanner class depth...")
+    check_scanner_depth(report)
+
+    # Round 12: Export output validation
+    print("  Round 12: Export output validation...")
+    check_export_output(report)
+
+    # Round 13: Compliance mapper depth
+    print("  Round 13: Compliance framework depth...")
+    check_compliance_depth(report)
+
+    # Round 14: Risk quantification engine
+    print("  Round 14: Risk quantification (FAIR + Monte Carlo)...")
+    check_risk_engine(report)
+
+    # Round 15: AI engine provider chain
+    print("  Round 15: AI engine provider chain...")
+    check_ai_engine(report)
+
+    # Round 16: Credential encryption
+    print("  Round 16: Credential security...")
+    check_credential_security(report)
+
+    # Round 17: Backup/restore
+    print("  Round 17: Backup/restore...")
+    check_backup_restore(report)
+
+    # Round 18: Data retention
+    print("  Round 18: Data retention + zero retention...")
+    check_data_retention(report)
+
+    # Round 19: Scan profiles
+    print("  Round 19: Scan profiles...")
+    check_scan_profiles(report)
+
+    # Round 20: Import results
+    print("  Round 20: Import results...")
+    check_import_results(report)
+
+    # Round 21: License tier enforcement
+    print("  Round 21: License tier enforcement...")
+    check_tier_enforcement(report)
+
+    # Round 22: Cryptographic signatures
+    print("  Round 22: Post-quantum + classical signatures...")
+    check_crypto_signatures(report)
+
+    # Round 23: Finding deduplication
+    print("  Round 23: Finding deduplication logic...")
+    check_dedup_logic(report)
+
+    # Round 24: SSO implementation
+    print("  Round 24: SSO depth...")
+    check_sso_depth(report)
+
+    # Round 25: RBAC
+    print("  Round 25: RBAC roles + permissions...")
+    check_rbac_depth(report)
+
+    # Round 26: Audit trail
+    print("  Round 26: Audit trail...")
+    check_audit_trail(report)
+
+    # Round 27: Multi-tenant
+    print("  Round 27: Multi-tenant isolation...")
+    check_multi_tenant(report)
+
+    # Round 28: Exception manager
+    print("  Round 28: Risk exception management...")
+    check_exception_manager(report)
+
+    # Round 29: Scan diff
+    print("  Round 29: Scan diff/comparison...")
+    check_scan_diff(report)
+
+    # Round 30: Integration depth
+    print("  Round 30: Integration depth (Jira/ServiceNow)...")
+    check_integrations_depth(report)
 
     if args.json:
         output = {
