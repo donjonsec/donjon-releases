@@ -280,6 +280,8 @@ def generate_shell() -> str:
         ("patch-verification", "\u2699", "Patch Verification"),
         ("schedules",          "\u23F0", "Schedules"),
         ("ai-assistant",       "\u2728", "AI Assistant"),
+        ("trends",             "\u2197", "Trends"),
+        ("lifecycle",          "\u267B", "License"),
         ("settings",           "\u2638", "Settings"),
     ]
 
@@ -369,11 +371,30 @@ def generate_shell() -> str:
         + [t[0] for t in nav_enterprise]
         + [t[0] for t in nav_mssp]
     )
+    # Load sub-module HTML generators
+    _tab_html = {}
+    try:
+        from web.dashboard_scan_center import generate_scan_center
+        _tab_html["scan-center"] = generate_scan_center()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_lifecycle import generate_lifecycle
+        _tab_html["lifecycle"] = generate_lifecycle()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_trends import generate_trends
+        _tab_html["trends"] = generate_trends()
+    except Exception:
+        pass
+
     for tab_id in all_tabs:
         active = ' active' if tab_id == 'overview' else ''
+        inner = _tab_html.get(tab_id, '<div class="tab-loading">Loading\u2026</div>')
         parts.append(
             '<div class="tab-content' + active + '" id="tab-' + tab_id + '">'
-            '<div class="tab-loading">Loading\u2026</div>'
+            + inner +
             '</div>'
         )
 
