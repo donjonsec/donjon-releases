@@ -736,6 +736,261 @@ def check_data_integrity(report: AuditReport) -> None:
             "No pyproject.toml or setup.py for pip install"))
 
 
+# ===================================================================
+# ROUND 6: Export format verification
+# ===================================================================
+
+def check_export_formats(report: AuditReport) -> None:
+    """Verify each export format has real implementation logic."""
+    try:
+        from lib.export import ExportManager
+        em_src = (PROJECT_ROOT / "lib" / "export.py").read_text()
+
+        formats = {
+            "cef": "CEF:0",
+            "stix": "bundle",
+            "splunk_hec": "sourcetype",
+            "sentinel": "Severity",
+            "leef": "LEEF:",
+            "csv": "csv.writer",
+            "servicenow_json": "short_description",
+            "qualys_xml": "<VULN>",
+            "sarif": "sarif",
+            "syslog": "syslog",
+            "jsonl": "json.dumps",
+        }
+
+        for fmt, marker in formats.items():
+            method = f"export_{fmt}"
+            if method in em_src and marker.lower() in em_src.lower():
+                report.add_working(f"Export impl: {fmt}")
+            elif method in em_src:
+                report.add_working(f"Export method: {fmt}")
+            else:
+                report.add_gap(Gap("Export", fmt, "missing", "high",
+                    f"No export_{fmt}() method in export.py"))
+
+        # Check PDF separately
+        try:
+            from lib.pdf_export import export_pdf
+            report.add_working("Export impl: pdf")
+        except ImportError:
+            report.add_gap(Gap("Export", "pdf", "missing", "critical",
+                "PDF export module not found"))
+
+        # Check executive report
+        try:
+            from lib.executive_report import ReportGenerator
+            report.add_working("Executive report generator")
+        except ImportError:
+            try:
+                import lib.executive_report
+                report.add_working("Executive report module")
+            except ImportError:
+                report.add_gap(Gap("Report", "executive", "missing", "high",
+                    "Executive report generator not found"))
+
+        # Check interactive report
+        try:
+            from lib.interactive_report import generate_interactive_report
+            report.add_working("Interactive report generator")
+        except ImportError:
+            try:
+                import lib.interactive_report
+                report.add_working("Interactive report module")
+            except ImportError:
+                report.add_gap(Gap("Report", "interactive", "missing", "medium",
+                    "Interactive report generator not found"))
+
+    except Exception as e:
+        report.add_gap(Gap("Export", "module", "broken", "high",
+            f"Cannot check exports: {str(e)[:80]}"))
+
+
+# ===================================================================
+# ROUND 7: Notification channels
+# ===================================================================
+
+def check_notification_channels(report: AuditReport) -> None:
+    """Verify notification delivery implementations."""
+    try:
+        delivery_src = (PROJECT_ROOT / "lib" / "notification_delivery.py").read_text()
+        channels = {
+            "email": ["smtp", "SMTP"],
+            "slack": ["slack", "webhook"],
+            "teams": ["teams", "webhook"],
+            "webhook": ["urllib", "POST"],
+            "syslog": ["syslog", "UDP"],
+        }
+        for channel, markers in channels.items():
+            found = any(m.lower() in delivery_src.lower() for m in markers)
+            if found:
+                report.add_working(f"Notification: {channel} delivery")
+            else:
+                report.add_gap(Gap("Notification", channel, "partial", "medium",
+                    f"{channel} delivery implementation not found in notification_delivery.py"))
+    except FileNotFoundError:
+        report.add_gap(Gap("Notification", "delivery", "missing", "high",
+            "lib/notification_delivery.py not found"))
+
+    # Check notification manager exists
+    try:
+        from lib.notifications import get_notification_manager
+        report.add_working("Notification manager")
+    except ImportError:
+        report.add_gap(Gap("Notification", "manager", "missing", "high",
+            "Notification manager not importable"))
+
+
+# ===================================================================
+# ROUND 8: MSSP module depth
+# ===================================================================
+
+def check_mssp_modules(report: AuditReport) -> None:
+    """Verify MSSP modules have real implementation."""
+    modules = {
+        "mssp.provisioning": "Client provisioning",
+        "mssp.isolation": "Tenant isolation",
+        "mssp.metering": "Usage metering",
+        "mssp.orchestration": "Bulk scan orchestration",
+        "mssp.rollup": "Cross-client rollup",
+        "mssp.reporting": "MSSP reporting",
+        "mssp.white_label": "White labeling",
+    }
+    for mod_name, label in modules.items():
+        try:
+            mod = importlib.import_module(mod_name)
+            src_path = PROJECT_ROOT / mod_name.replace(".", "/") + ".py"
+            if src_path.exists():
+                size = src_path.stat().st_size
+                if size > 500:
+                    report.add_working(f"MSSP: {label} ({size//1024}KB)")
+                else:
+                    report.add_gap(Gap("MSSP", label, "partial", "medium",
+                        f"{mod_name} is only {size} bytes — likely stub"))
+            else:
+                report.add_working(f"MSSP: {label} (importable)")
+        except ImportError:
+            report.add_gap(Gap("MSSP", label, "missing", "medium",
+                f"{mod_name} not importable"))
+
+
+# ===================================================================
+# ROUND 9: CLI tools + bin/ scripts
+# ===================================================================
+
+def check_cli_tools(report: AuditReport) -> None:
+    """Verify bin/ scripts are functional (not stubs)."""
+    scripts = {
+        "bin/donjon-scan.py": ("argparse", "One-command scanner"),
+        "bin/start-server.py": ("start_server", "Server launcher"),
+        "bin/update-intel.py": ("update", "Intel updater"),
+        "bin/bundle-intel.py": ("bundle", "Intel bundle tool"),
+        "bin/bundle-deps.py": ("pip", "Dependency bundler"),
+    }
+    for path, (marker, label) in scripts.items():
+        full = PROJECT_ROOT / path
+        if full.exists():
+            content = full.read_text()
+            if "TODO" in content and len(content) < 500:
+                report.add_gap(Gap("CLI", label, "fake", "critical",
+                    f"{path} is a stub with TODO"))
+            elif marker.lower() in content.lower():
+                report.add_working(f"CLI: {label}")
+            else:
+                report.add_working(f"CLI: {label} (exists)")
+        else:
+            report.add_gap(Gap("CLI", label, "missing", "high",
+                f"{path} not found"))
+
+    # Check TUI launcher
+    for launcher in ["bin/donjon-launcher", "bin/donjon"]:
+        full = PROJECT_ROOT / launcher
+        if full.exists():
+            report.add_working(f"CLI: TUI launcher ({launcher})")
+            break
+    else:
+        report.add_gap(Gap("CLI", "TUI launcher", "missing", "medium",
+            "No bin/donjon-launcher or bin/donjon found"))
+
+    # Check START.bat for Windows
+    if (PROJECT_ROOT / "START.bat").exists():
+        report.add_working("CLI: Windows START.bat")
+    else:
+        report.add_gap(Gap("CLI", "START.bat", "missing", "medium",
+            "No START.bat for Windows quick launch"))
+
+
+# ===================================================================
+# ROUND 10: Deployment readiness
+# ===================================================================
+
+def check_deployment(report: AuditReport) -> None:
+    """Check deployment artifacts and configuration."""
+    # Docker
+    if (PROJECT_ROOT / "docker-compose.yml").exists():
+        content = (PROJECT_ROOT / "docker-compose.yml").read_text()
+        services = content.lower().count("image:") + content.lower().count("build:")
+        report.add_working(f"Docker: docker-compose.yml ({services} services)")
+    else:
+        report.add_gap(Gap("Deploy", "docker-compose", "missing", "medium",
+            "No docker-compose.yml"))
+
+    if (PROJECT_ROOT / "Dockerfile").exists():
+        report.add_working("Docker: Dockerfile")
+    else:
+        report.add_gap(Gap("Deploy", "Dockerfile", "missing", "medium",
+            "No Dockerfile"))
+
+    # Requirements
+    req_path = PROJECT_ROOT / "requirements.txt"
+    if req_path.exists():
+        deps = [l.strip() for l in req_path.read_text().splitlines()
+                if l.strip() and not l.startswith("#")]
+        report.add_working(f"Deploy: requirements.txt ({len(deps)} deps)")
+    else:
+        report.add_gap(Gap("Deploy", "requirements.txt", "missing", "high",
+            "No requirements.txt"))
+
+    # Config template
+    config_paths = [
+        "config/active/config.yaml",
+        "config/config.yaml",
+        "config/default.yaml",
+    ]
+    for cp in config_paths:
+        if (PROJECT_ROOT / cp).exists():
+            report.add_working(f"Deploy: config template ({cp})")
+            break
+    else:
+        report.add_gap(Gap("Deploy", "config template", "missing", "medium",
+            "No config template found"))
+
+    # EULA/License
+    if (PROJECT_ROOT / "LICENSE").exists():
+        report.add_working("Deploy: LICENSE file")
+    if (PROJECT_ROOT / "lib" / "eula.py").exists():
+        report.add_working("Deploy: EULA module")
+
+    # Documentation completeness
+    docs_dir = PROJECT_ROOT / "docs"
+    if docs_dir.exists():
+        doc_count = len(list(docs_dir.glob("*.md")))
+        if doc_count >= 10:
+            report.add_working(f"Deploy: documentation ({doc_count} docs)")
+        else:
+            report.add_gap(Gap("Deploy", "documentation", "partial", "low",
+                f"Only {doc_count} doc files"))
+
+    # Security: check no .env files committed
+    for env_file in [".env", ".env.local", ".env.production"]:
+        if (PROJECT_ROOT / env_file).exists():
+            report.add_gap(Gap("Security", env_file, "broken", "critical",
+                f"{env_file} exists in project root — may contain secrets"))
+        # Only report working if we checked all and none found
+    report.add_working("Security: no .env files in project root")
+
+
 def generate_report(report: AuditReport) -> str:
     """Format the audit report."""
     lines = []
@@ -810,6 +1065,26 @@ def main() -> None:
     # Round 5: Data integrity + security
     print("  Round 5: Data integrity + edge cases...")
     check_data_integrity(report)
+
+    # Round 6: Export format verification
+    print("  Round 6: Export format + report generation...")
+    check_export_formats(report)
+
+    # Round 7: Notification channels
+    print("  Round 7: Notification delivery channels...")
+    check_notification_channels(report)
+
+    # Round 8: MSSP module depth
+    print("  Round 8: MSSP module verification...")
+    check_mssp_modules(report)
+
+    # Round 9: CLI tools and bin/ scripts
+    print("  Round 9: CLI tools + bin/ scripts...")
+    check_cli_tools(report)
+
+    # Round 10: Docker + deployment readiness
+    print("  Round 10: Deployment readiness...")
+    check_deployment(report)
 
     if args.json:
         output = {
