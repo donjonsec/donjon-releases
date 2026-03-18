@@ -860,7 +860,7 @@ def check_mssp_modules(report: AuditReport) -> None:
     for mod_name, label in modules.items():
         try:
             mod = importlib.import_module(mod_name)
-            src_path = PROJECT_ROOT / mod_name.replace(".", "/") + ".py"
+            src_path = PROJECT_ROOT / (mod_name.replace(".", "/") + ".py")
             if src_path.exists():
                 size = src_path.stat().st_size
                 if size > 500:
