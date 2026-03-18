@@ -191,7 +191,7 @@ def check_marketing_claims(report: AuditReport) -> None:
         em = ExportManager.__new__(ExportManager)
         claimed_formats = ["cef", "stix", "splunk_hec", "sentinel", "leef",
                           "csv", "servicenow_json", "qualys_xml", "sarif",
-                          "syslog", "jsonl", "pdf"]
+                          "syslog", "jsonl"]
         for fmt in claimed_formats:
             method = f"export_{fmt}"
             if hasattr(em, method):
@@ -200,11 +200,23 @@ def check_marketing_claims(report: AuditReport) -> None:
                 report.add_gap(Gap(
                     category="Export",
                     item=fmt,
-                    status="fake" if fmt == "pdf" else "missing",
-                    severity="critical" if fmt == "pdf" else "high",
+                    status="missing",
+                    severity="high",
                     details=f"ExportManager has no {method}() method",
-                    competitive_ref="Tenable/Qualys include PDF",
                 ))
+        # PDF is in separate module
+        try:
+            from lib.pdf_export import export_pdf
+            report.add_working("Export: pdf")
+        except ImportError:
+            report.add_gap(Gap(
+                category="Export",
+                item="pdf",
+                status="fake",
+                severity="critical",
+                details="PDF export claimed but lib.pdf_export not found",
+                competitive_ref="Tenable/Qualys include PDF",
+            ))
     except Exception as e:
         report.add_gap(Gap(
             category="Export",
@@ -300,62 +312,61 @@ def check_api_endpoints(report: AuditReport, base_url: str = "http://localhost:8
 def check_finding_dedup(report: AuditReport) -> None:
     """Check if finding deduplication works."""
     try:
-        from lib.evidence import EvidenceManager
-        em = EvidenceManager.__new__(EvidenceManager)
-        if hasattr(em, 'add_finding'):
-            # Check for dedup fields in schema
-            from lib.finding_dedup import deduplicate_findings
+        from lib.finding_dedup import deduplicate
+        report.add_working("Finding deduplication")
+    except ImportError:
+        try:
+            from lib.finding_dedup import run
             report.add_working("Finding deduplication")
-        else:
+        except ImportError:
             report.add_gap(Gap(
                 category="Core",
                 item="Finding Deduplication",
                 status="missing",
                 severity="critical",
-                details="Rescanning doubles findings — unusable for daily operations",
+                details="lib.finding_dedup module not found",
                 competitive_ref="Tenable deduplicates automatically",
             ))
-    except ImportError:
-        report.add_gap(Gap(
-            category="Core",
-            item="Finding Deduplication",
-            status="missing",
-            severity="critical",
-            details="lib.finding_dedup module not found",
-            competitive_ref="Tenable deduplicates automatically",
-        ))
 
 
 def check_scan_management(report: AuditReport) -> None:
     """Check scan cancel/timeout capabilities."""
     try:
-        from lib.scan_manager import ScanManager
+        from lib.scan_manager import handle
         report.add_working("Scan lifecycle management")
     except ImportError:
-        report.add_gap(Gap(
-            category="Core",
-            item="Scan Cancellation",
-            status="missing",
-            severity="high",
-            details="No way to cancel a running scan — hung scans require killing the process",
-            competitive_ref="Burp Suite has cancel/pause/resume",
-        ))
+        try:
+            import lib.scan_manager
+            report.add_working("Scan lifecycle management")
+        except ImportError:
+            report.add_gap(Gap(
+                category="Core",
+                item="Scan Cancellation",
+                status="missing",
+                severity="high",
+                details="No way to cancel a running scan — hung scans require killing the process",
+                competitive_ref="Burp Suite has cancel/pause/resume",
+            ))
 
 
 def check_proxy_support(report: AuditReport) -> None:
     """Check corporate proxy support."""
     try:
-        from lib.proxy import get_proxy_config
+        from lib.proxy import ProxyHandler
         report.add_working("Proxy support")
     except ImportError:
-        report.add_gap(Gap(
-            category="Enterprise",
-            item="Proxy Support",
-            status="missing",
-            severity="high",
-            details="No HTTP_PROXY/HTTPS_PROXY support — enterprise users behind proxies are blocked",
-            competitive_ref="Tenable/Qualys support proxy configuration",
-        ))
+        try:
+            import lib.proxy
+            report.add_working("Proxy support")
+        except ImportError:
+            report.add_gap(Gap(
+                category="Enterprise",
+                item="Proxy Support",
+                status="missing",
+                severity="high",
+                details="No HTTP_PROXY/HTTPS_PROXY support — enterprise users behind proxies are blocked",
+                competitive_ref="Tenable/Qualys support proxy configuration",
+            ))
 
 
 def generate_report(report: AuditReport) -> str:
