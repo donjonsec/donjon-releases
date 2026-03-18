@@ -147,3 +147,25 @@ def _deliver_log(config: dict[str, Any], message: str) -> dict[str, str | bool]:
         level = logging.INFO
     logger.log(level, "%s", message)
     return {"delivered": True, "error": ""}
+
+
+def _deliver_syslog(config: dict[str, Any], message: str) -> dict[str, str | bool]:
+    """Send notification via UDP syslog (RFC 5424)."""
+    import socket
+    host = str(config.get("host", "localhost"))
+    port = int(config.get("port", 514))
+    facility = int(config.get("facility", 1))  # user-level
+    severity = int(config.get("severity", 6))  # informational
+    priority = facility * 8 + severity
+    # RFC 5424 header
+    import datetime
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    hostname = socket.gethostname()
+    syslog_msg = f"<{priority}>1 {ts} {hostname} donjon-platform - - - {message}"
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(syslog_msg.encode("utf-8")[:2048], (host, port))
+        sock.close()
+        return {"delivered": True, "error": ""}
+    except Exception as exc:
+        return {"delivered": False, "error": str(exc)}
