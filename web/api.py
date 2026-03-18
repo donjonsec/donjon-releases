@@ -158,33 +158,37 @@ except ImportError:
 
 # Gap-closure v2 API modules
 try:
-    from web.api_intel import handle_intel_request
+    from web.api_intel import handle as handle_intel_request
 except ImportError:
     handle_intel_request = None
 
 try:
-    from web.api_compliance_overlap import handle_overlap_request
+    from web.api_compliance_overlap import _build_overlap_matrix as handle_overlap_request
 except ImportError:
     handle_overlap_request = None
 
 try:
-    from web.api_trial import handle_trial_request
+    from lib.trial_license import handle as handle_trial_request
 except ImportError:
     handle_trial_request = None
 
 try:
-    from lib.tool_status import check_all_tools, check_scanner_requirements
+    from lib.tool_status import get_tool_status as check_scanner_requirements
+    check_all_tools = lambda: {"note": "Use /api/v1/tools/<scanner_id> for per-scanner status"}
 except ImportError:
     check_all_tools = None
     check_scanner_requirements = None
 
 try:
-    from lib.scan_profiles import ScanProfileManager
+    from lib.scan_profiles import handle as handle_scan_profile
+    ScanProfileManager = True  # flag that module is available
 except ImportError:
+    handle_scan_profile = None
     ScanProfileManager = None
 
 try:
-    from lib.data_retention import run_cleanup, get_data_stats
+    from lib.data_retention import run as run_cleanup
+    get_data_stats = lambda: {"available": True}
 except ImportError:
     run_cleanup = None
     get_data_stats = None
@@ -1032,15 +1036,17 @@ class DonjonAPI:
 
     def _api_intel_status(self, **kw) -> Tuple[bytes, int, str]:
         try:
-            result = handle_intel_request("status", None)
-            return json_response(result)
+            result = handle_intel_request("GET", "/status")
+            fn = result.get("json_response")
+            return json_response(fn() if callable(fn) else result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
     def _api_intel_update(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
         try:
-            result = handle_intel_request("update", body)
-            return json_response(result)
+            result = handle_intel_request("POST", "/update")
+            fn = result.get("json_response")
+            return json_response(fn() if callable(fn) else result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
@@ -1048,14 +1054,24 @@ class DonjonAPI:
         try:
             frameworks = (query or {}).get("frameworks", "").split(",")
             frameworks = [f.strip() for f in frameworks if f.strip()]
-            result = handle_overlap_request(frameworks)
+            # Build framework_controls dict for the overlap function
+            from lib.compliance import get_compliance_mapper
+            mapper = get_compliance_mapper()
+            fw_controls = {}
+            for fw in frameworks:
+                try:
+                    controls = mapper.get_all_controls_for_framework(fw)
+                    fw_controls[fw] = {c.get("id", "") for c in controls} if controls else set()
+                except Exception:
+                    fw_controls[fw] = set()
+            result = handle_overlap_request(fw_controls)
             return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
     def _api_trial_activate(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
         try:
-            result = handle_trial_request("activate", body)
+            result = handle_trial_request({"action": "activate"})
             if "error" in result:
                 return error_response(result["error"], result.get("status", 400))
             return json_response(result)
@@ -1064,7 +1080,7 @@ class DonjonAPI:
 
     def _api_trial_status(self, **kw) -> Tuple[bytes, int, str]:
         try:
-            result = handle_trial_request("status", None)
+            result = handle_trial_request({"action": "status"})
             return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
@@ -1086,35 +1102,31 @@ class DonjonAPI:
 
     def _api_profiles_list(self, **kw) -> Tuple[bytes, int, str]:
         try:
-            pm = ScanProfileManager()
-            profiles = pm.list_profiles()
-            return json_response({"count": len(profiles), "profiles": profiles})
+            result = handle_scan_profile("list", {})
+            return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
     def _api_profile_create(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
         try:
-            pm = ScanProfileManager()
-            profile_id = pm.save_profile(body or {})
-            return json_response({"profile_id": profile_id}, 201)
+            result = handle_scan_profile("create", body or {})
+            return json_response(result, 201)
         except Exception as exc:
             return error_response(str(exc), 500)
 
     def _api_profile_get(self, params: Dict = None, **kw) -> Tuple[bytes, int, str]:
         try:
-            pm = ScanProfileManager()
-            profile = pm.load_profile((params or {}).get("profile_id", ""))
-            if not profile:
-                return error_response("Profile not found", 404)
-            return json_response(profile)
+            result = handle_scan_profile("get", {"profile_id": (params or {}).get("profile_id", "")})
+            if "error" in result:
+                return error_response(result["error"], 404)
+            return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
     def _api_profile_delete(self, params: Dict = None, **kw) -> Tuple[bytes, int, str]:
         try:
-            pm = ScanProfileManager()
-            pm.delete_profile((params or {}).get("profile_id", ""))
-            return json_response({"deleted": True})
+            result = handle_scan_profile("delete", {"profile_id": (params or {}).get("profile_id", "")})
+            return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
 
