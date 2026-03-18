@@ -3506,15 +3506,15 @@ def check_risklens_parity(report: AuditReport) -> None:
         report.add_gap(Gap("Competitive", "vs RiskLens: depth", "partial", "medium",
             f"Risk module only {size//1024}KB — light for RiskLens replacement"))
 
-    # FAIR components
+    # FAIR components (may use abbreviations: LEF, LM, ALE)
     fair_components = [
-        ("loss_event_frequency", "Loss Event Frequency"),
-        ("loss_magnitude", "Loss Magnitude"),
-        ("annual_loss", "Annual Loss Expectancy"),
-        ("monte_carlo", "Monte Carlo Simulation"),
+        (["loss_event_frequency", "lef"], "Loss Event Frequency"),
+        (["loss_magnitude", "lm "], "Loss Magnitude"),
+        (["annual_loss", "ale"], "Annual Loss Expectancy"),
+        (["monte_carlo", "simulation"], "Monte Carlo Simulation"),
     ]
-    for marker, label in fair_components:
-        if marker.lower() in src.lower():
+    for markers, label in fair_components:
+        if any(m.lower() in src.lower() for m in markers):
             report.add_working(f"vs RiskLens: {label}")
         else:
             report.add_gap(Gap("Competitive", f"vs RiskLens: {label}", "partial", "medium",
