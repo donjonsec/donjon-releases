@@ -1887,8 +1887,8 @@ def check_cmmc_readiness(report: AuditReport) -> None:
         report.add_working("CMMC: POA&M tracking (remediation)")
 
         # Audit trail for assessor review
-        from lib.audit import AuditLog
-        report.add_working("CMMC: audit log for assessor")
+        from lib.audit import get_audit_trail
+        report.add_working("CMMC: audit trail for assessor")
 
     except ImportError as e:
         report.add_gap(Gap("CMMC", str(e).split("'")[1] if "'" in str(e) else "module",
@@ -1925,7 +1925,7 @@ def check_fedramp_readiness(report: AuditReport) -> None:
                 "FedRAMP requires NIST 800-53 baseline"))
 
         # Continuous monitoring (scheduler)
-        from lib.scheduler import Scheduler
+        from lib.scheduler import SchedulerManager
         report.add_working("FedRAMP: continuous monitoring (scheduler)")
 
     except ImportError as e:
