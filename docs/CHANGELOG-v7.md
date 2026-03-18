@@ -1,7 +1,34 @@
-# Donjon Platform v7.0 - Release Notes
+# Donjon Platform v7.x - Release Notes
 
-**Release Date:** February 2026
+**Latest:** v7.3.0 (March 2026)
 **Previous Version:** v6.0
+
+---
+
+## v7.3.0 — Deep Validation Release (2026-03-18)
+
+### Quality Assurance
+- **595-check gap analyzer** across 100 rounds — every advertised feature validated
+- 13 persona-driven validation rounds (government auditor, pentester, CISO, MSSP operator, first-time user, incident responder, CI/CD engineer, compliance officer, competitor sales engineer, procurement officer, sysadmin, developer)
+- Competitive parity verified against Tenable, Qualys, RiskLens, Drata
+- Edge case testing: Unicode, large datasets, circular imports, source compilation, path portability
+- Marketing claims cross-checked against implementation reality
+
+### New Dashboard Modules
+- **License Lifecycle tab** (`web/dashboard_lifecycle.py`) — tier status, trial countdown, feature matrix, upgrade prompts, empty states
+- **Compliance Trends tab** (`web/dashboard_trends.py`) — inline SVG charts for compliance score trends, finding velocity, risk exposure (ALE), severity distribution donut, framework coverage bars
+
+### Fixes
+- All version strings synchronized to 7.3.0 across pyproject.toml, config, README, dashboard
+- Export methods validated end-to-end with real output (11 formats)
+- FAIR risk abbreviations (LEF/LM/ALE) properly recognized in competitive parity checks
+- Vendored Python 2 tools excluded from compilation checks
+- Dashboard shell footer corrected from "v2.0" to "v7.3.0"
+
+### Stats
+- 168 unit tests passing (137 unit + 31 blind red team), 0 failures
+- 595 gap analyzer checks, 100% pass rate
+- 0 security vulnerabilities (red team validated)
 
 ---
 

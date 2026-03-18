@@ -339,7 +339,7 @@ def generate_shell() -> str:
     parts.append(
         '<div class="sidebar-footer">'
         '<span style="font-size:0.75rem;color:#6B7280;">'
-        'Donjon Platform v2.0'
+        'Donjon Platform v7.3.0'
         '</span>'
         '</div>'
     )

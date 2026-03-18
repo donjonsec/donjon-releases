@@ -1,7 +1,7 @@
 # Donjon Platform — Product Roadmap
 
-**Last Updated:** 2026-02-20
-**Current Version:** v7.0.0
+**Last Updated:** 2026-03-18
+**Current Version:** v7.3.0
 **Branch:** develop
 
 ---

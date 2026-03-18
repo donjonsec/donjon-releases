@@ -17,7 +17,7 @@ The configuration file is loaded by `lib/config.py` at startup. Changes take eff
 ## Platform
 
 ```yaml
-version: '7.0.0'
+version: '7.3.0'
 
 platform:
   name: Donjon Platform
@@ -27,7 +27,7 @@ platform:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `version` | string | `7.0.0` | Platform version identifier |
+| `version` | string | `7.3.0` | Platform version identifier |
 | `platform.mode` | string | `auto` | Deployment mode. `auto` uses detection logic. |
 | `platform.auto_detect_networks` | bool | `true` | Enable automatic network range discovery |
 
@@ -158,7 +158,7 @@ network:
   auto_detect: true            # Auto-discover networks from active interfaces
   scan_ranges: []              # Manual network ranges (e.g., ['192.168.1.0/24'])
   exclude_ranges:
-    - 127.0.0.0/8              # Loopback always excluded
+    - 127.3.0.0/8              # Loopback always excluded
   dns_resolution: true         # Resolve hostnames during scanning
 ```
 
@@ -396,7 +396,7 @@ integrations:
 ## Example: Healthcare Organization
 
 ```yaml
-version: '7.0.0'
+version: '7.3.0'
 
 platform:
   mode: auto
@@ -433,7 +433,7 @@ cloud:
 ## Example: CI/CD Pipeline
 
 ```yaml
-version: '7.0.0'
+version: '7.3.0'
 
 platform:
   mode: auto

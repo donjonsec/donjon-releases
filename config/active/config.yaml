@@ -1,7 +1,7 @@
-# Donjon v7.0 Configuration
+# Donjon v7.3 Configuration
 # 365-day retention for compliance
 
-version: '7.0.0'
+version: '7.3.0'
 
 platform:
   name: Donjon

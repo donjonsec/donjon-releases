@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-7.2.0-blue?style=for-the-badge" alt="Version 7.2.0">
+  <img src="https://img.shields.io/badge/version-7.3.0-blue?style=for-the-badge" alt="Version 7.3.0">
   <img src="https://img.shields.io/badge/tests-168%20passing-brightgreen?style=for-the-badge" alt="168 Tests Passing">
   <img src="https://img.shields.io/badge/security-red%20team%20validated-darkgreen?style=for-the-badge" alt="Red Team Validated">
   <img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
@@ -241,7 +241,7 @@ cicd:
 ---
 
 <p align="center">
-  <strong>Donjon Platform v7.2.0</strong> — DonjonSec
+  <strong>Donjon Platform v7.3.0</strong> — DonjonSec
   <br>
   <a href="https://donjonsec.com">donjonsec.com</a>
 </p>

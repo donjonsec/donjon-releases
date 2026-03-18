@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "donjon-platform"
-version = "7.0.0"
+version = "7.3.0"
 description = "Security intelligence platform with FAIR risk quantification, AI analysis, and compliance automation"
 readme = "README.md"
 license = {text = "Proprietary — see LICENSE for EULA"}
