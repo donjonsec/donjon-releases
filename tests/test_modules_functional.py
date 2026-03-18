@@ -213,7 +213,8 @@ class TestConfig:
 class TestDatabaseLayer:
     def test_imports(self):
         from lib.database import get_database
-        db = get_database()
+        # get_database requires a db_name argument
+        db = get_database("evidence")
         assert db is not None
 
 

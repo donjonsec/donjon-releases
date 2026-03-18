@@ -158,8 +158,10 @@ class TestRemediationEndpoints:
 
 class TestComplianceEndpoints:
     def test_nist_report(self):
-        data = _get("/api/v1/reports/compliance/nist_800_53")
-        assert isinstance(data, dict)
+        # Compliance reports may return HTML or JSON
+        code, _, body = _get_raw("/api/v1/reports/compliance/nist_800_53")
+        assert code == 200, f"NIST report returned {code}"
+        assert len(body) > 100, "NIST report too small"
 
     def test_framework_overlap(self):
         data = _get("/api/v1/compliance/overlap?frameworks=nist_800_53,hipaa")
@@ -264,7 +266,10 @@ class TestSecurityErrorHandling:
         assert "Traceback" not in body
 
     def test_sqli_doesnt_crash(self):
-        code, _, _ = _get_raw("/api/v1/findings?severity=high' OR '1'='1")
+        # URL-encode the SQLi payload to avoid Python's URL validation rejecting it
+        import urllib.parse
+        payload = urllib.parse.quote("high' OR '1'='1")
+        code, _, _ = _get_raw(f"/api/v1/findings?severity={payload}")
         assert code != 500, "SQLi in query param caused server error"
 
     def test_oversized_input_handled(self):
