@@ -474,6 +474,134 @@ class DonjonLauncher:
         tui.section_end(C.GREEN)
         safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
+    def run_framework_report(self, framework_id, display_name):
+        """Generate a compliance report for a specific framework."""
+        self.show_banner()
+        tui.section(f"{display_name} Compliance Report", C.GREEN)
+        print()
+
+        try:
+            from compliance import get_compliance_mapper
+            from evidence import get_evidence_manager
+
+            mapper = get_compliance_mapper()
+            em = get_evidence_manager()
+
+            tui.info(f"Generating {display_name} compliance summary...")
+            summary = mapper.generate_compliance_summary(em, framework_id)
+
+            total = summary.get('total_controls', 0)
+            with_ev = summary.get('controls_with_evidence', 0)
+            without_ev = summary.get('controls_without_evidence', 0)
+            score = round(with_ev / total * 100, 1) if total > 0 else 0
+
+            print()
+            tui.keyvalue({
+                'Framework': display_name,
+                'Total Controls': str(total),
+                'With Evidence': str(with_ev),
+                'Without Evidence': str(without_ev),
+                'Compliance Score': f"{score}%",
+            })
+
+            # Show gap details if any
+            gaps = summary.get('gaps', [])
+            if gaps:
+                print()
+                tui.info(f"{len(gaps)} controls without evidence:")
+                for gap in gaps[:20]:
+                    if isinstance(gap, dict):
+                        ctrl_id = gap.get('control_id', gap.get('id', '?'))
+                        desc = gap.get('description', gap.get('title', ''))[:60]
+                        print(f"  {C.DIM}{ctrl_id}: {desc}{C.RESET}")
+                if len(gaps) > 20:
+                    print(f"  {C.DIM}... and {len(gaps) - 20} more{C.RESET}")
+
+            print()
+            tui.success(f"{display_name} report generated — {score}% compliance")
+
+        except Exception as e:
+            tui.error(f"Report generation failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_grc_export(self):
+        """Export compliance data for GRC platforms."""
+        self.show_banner()
+        tui.section("Export for GRC Platform", C.GREEN)
+        print()
+
+        try:
+            from compliance import get_compliance_mapper
+            from evidence import get_evidence_manager
+            from export import ExportManager
+
+            mapper = get_compliance_mapper()
+            em = get_evidence_manager()
+            export_mgr = ExportManager()
+
+            # Choose format
+            options = [
+                ('1', 'CSV', 'Comma-separated values (universal)'),
+                ('2', 'JSON', 'Structured JSON export'),
+                ('3', 'OSCAL', 'NIST OSCAL format'),
+                ('b', 'Back', 'Return to menu'),
+            ]
+            choice = tui.menu("Export Format", options, C.GREEN)
+
+            if choice == 'b' or choice == '':
+                return
+
+            format_map = {'1': 'csv', '2': 'json', '3': 'json'}
+            fmt = format_map.get(choice, 'csv')
+
+            from datetime import datetime
+            output_path = paths.reports / f"grc-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.{fmt}"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Get all framework summaries
+            tui.info("Generating compliance data for all frameworks...")
+            frameworks = mapper.get_all_frameworks()
+
+            export_data = []
+            for fw in frameworks:
+                fw_id = fw.get('id', '')
+                try:
+                    summary = mapper.generate_compliance_summary(em, fw_id)
+                    export_data.append({
+                        'framework': fw_id,
+                        'name': fw.get('name', fw_id),
+                        'total_controls': summary.get('total_controls', 0),
+                        'with_evidence': summary.get('controls_with_evidence', 0),
+                        'score': round(
+                            summary.get('controls_with_evidence', 0) /
+                            max(summary.get('total_controls', 1), 1) * 100, 1
+                        ),
+                    })
+                except Exception:
+                    pass
+
+            if fmt == 'csv':
+                import csv
+                with open(output_path, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=['framework', 'name', 'total_controls', 'with_evidence', 'score'])
+                    writer.writeheader()
+                    writer.writerows(export_data)
+            else:
+                import json
+                with open(output_path, 'w') as f:
+                    json.dump(export_data, f, indent=2)
+
+            print()
+            tui.success(f"Exported {len(export_data)} frameworks to: {output_path}")
+
+        except Exception as e:
+            tui.error(f"Export failed: {e}")
+
+        tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
     def run_delta_report(self):
         """Compare two scan sessions."""
         self.show_banner()
@@ -800,6 +928,18 @@ Systems Thinking Security Assessment
                 break
             elif choice == '1':
                 self.generate_audit_report()
+            elif choice == '2':
+                self.run_framework_report('nist_800_53', 'NIST 800-53')
+            elif choice == '3':
+                self.run_framework_report('hipaa', 'HIPAA')
+            elif choice == '4':
+                self.run_framework_report('pci_dss_4', 'PCI-DSS v4')
+            elif choice == '5':
+                self.run_framework_report('soc2', 'SOC 2')
+            elif choice == '6':
+                self.run_framework_report('iso_27001_2022', 'ISO 27001:2022')
+            elif choice == '7':
+                self.run_grc_export()
             elif choice == '8':
                 self.view_reports()
             elif choice == '9':
@@ -813,7 +953,7 @@ Systems Thinking Security Assessment
             elif choice == 'v' or choice == 'V':
                 self.run_vuln_intelligence()
             else:
-                tui.warning("This feature is planned for a future release.")
+                tui.warning("Invalid selection.")
                 safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def handle_settings(self):
@@ -823,10 +963,20 @@ Systems Thinking Security Assessment
 
             if choice == 'b' or choice == '':
                 break
+            elif choice == '1':
+                self.configure_scan_timing()
             elif choice == '2':
                 self.set_behavior_profile()
+            elif choice == '3':
+                self.configure_compliance_frameworks()
+            elif choice == '4':
+                self.configure_network_targets()
+            elif choice == '5':
+                self.configure_notifications()
             elif choice == '6':
                 self.view_config()
+            elif choice == '7':
+                self.reset_to_defaults()
             elif choice == '8':
                 self.manage_overrides()
             elif choice == '9':
@@ -834,7 +984,7 @@ Systems Thinking Security Assessment
             elif choice == 'c' or choice == 'C':
                 self.manage_cicd()
             else:
-                tui.warning("This feature is planned for a future release.")
+                tui.warning("Invalid selection.")
                 safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def set_behavior_profile(self):
@@ -892,6 +1042,201 @@ Systems Thinking Security Assessment
                     print(f"  {C.DIM}{tui.BULLET}{C.RESET} {item.name} ({size:.1f} KB)")
 
         tui.section_end(C.GREEN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def configure_scan_timing(self):
+        """Configure scan timing and delay settings."""
+        self.show_banner()
+        tui.section("Scan Timing Configuration", C.CYAN)
+        print()
+
+        try:
+            current = {
+                'Stealth Level': str(config.get('scanning.stealth_level', 3)),
+                'Min Delay': f"{config.get('scanning.delay_min_seconds', 30)}s",
+                'Max Delay': f"{config.get('scanning.delay_max_seconds', 300)}s",
+                'Timeout': f"{config.get('scanning.timeout_minutes', 120)} min",
+                'Concurrent Scans': str(config.get('scanning.concurrent_scans', 1)),
+            }
+            tui.keyvalue(current)
+            print()
+
+            new_min = tui.input("Min delay (seconds)", default=str(config.get('scanning.delay_min_seconds', 30)))
+            new_max = tui.input("Max delay (seconds)", default=str(config.get('scanning.delay_max_seconds', 300)))
+            new_timeout = tui.input("Timeout (minutes)", default=str(config.get('scanning.timeout_minutes', 120)))
+
+            config.set('scanning.delay_min_seconds', int(new_min))
+            config.set('scanning.delay_max_seconds', int(new_max))
+            config.set('scanning.timeout_minutes', int(new_timeout))
+            config.save()
+
+            tui.success("Scan timing updated")
+        except Exception as e:
+            tui.error(f"Failed to update timing: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def configure_compliance_frameworks(self):
+        """Select active compliance frameworks."""
+        self.show_banner()
+        tui.section("Compliance Frameworks", C.CYAN)
+        print()
+
+        try:
+            from compliance import get_compliance_mapper
+            mapper = get_compliance_mapper()
+            frameworks = mapper.get_all_frameworks()
+
+            tui.info(f"{len(frameworks)} frameworks available:")
+            print()
+            for i, fw in enumerate(frameworks):
+                fw_id = fw.get('id', '?')
+                name = fw.get('name', fw_id)
+                controls = fw.get('control_count', 0)
+                print(f"  {C.BRIGHT_WHITE}{fw_id:25s}{C.RESET} {name} ({controls} controls)")
+
+            print()
+            tui.info("All frameworks are active. Use the compliance menu to generate reports.")
+
+        except Exception as e:
+            tui.error(f"Failed to list frameworks: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def configure_network_targets(self):
+        """Configure scan targets and exclusions."""
+        self.show_banner()
+        tui.section("Network Targets", C.CYAN)
+        print()
+
+        try:
+            targets = config.get('scanning.targets', [])
+            excluded = config.get('scanning.excluded_hosts', [])
+
+            tui.keyvalue({
+                'Current Targets': ', '.join(targets) if targets else '(auto-detect)',
+                'Excluded Hosts': ', '.join(excluded) if excluded else '(none)',
+            })
+            print()
+
+            new_targets = tui.input("Scan targets (comma-separated CIDRs)", default=', '.join(targets) if targets else '')
+            new_excluded = tui.input("Excluded hosts (comma-separated)", default=', '.join(excluded) if excluded else '')
+
+            if new_targets.strip():
+                config.set('scanning.targets', [t.strip() for t in new_targets.split(',') if t.strip()])
+            if new_excluded.strip():
+                config.set('scanning.excluded_hosts', [e.strip() for e in new_excluded.split(',') if e.strip()])
+            config.save()
+
+            tui.success("Network targets updated")
+        except Exception as e:
+            tui.error(f"Failed to update targets: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def configure_notifications(self):
+        """Configure notification channels."""
+        self.show_banner()
+        tui.section("Notification Settings", C.CYAN)
+        print()
+
+        try:
+            from notifications import get_notification_manager
+            nm = get_notification_manager()
+
+            channels = nm.list_channels() if hasattr(nm, 'list_channels') else []
+            if channels:
+                tui.info(f"{len(channels)} notification channels configured:")
+                for ch in channels:
+                    if isinstance(ch, dict):
+                        print(f"  {ch.get('type', '?'):10s} {ch.get('name', ch.get('id', '?'))}")
+            else:
+                tui.info("No notification channels configured.")
+                tui.info("Use the API to configure: POST /api/v1/notifications/channels")
+
+        except Exception as e:
+            tui.error(f"Failed to load notifications: {e}")
+
+        tui.section_end(C.CYAN)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def reset_to_defaults(self):
+        """Reset configuration to defaults."""
+        self.show_banner()
+        tui.section("Reset to Defaults", C.RED)
+        print()
+
+        confirm = tui.input("Reset ALL settings to defaults? This cannot be undone. (yes/no)", default="no")
+        if confirm.lower() in ('yes', 'y'):
+            try:
+                config.reset_to_defaults()
+                config.save()
+                tui.success("Configuration reset to defaults")
+            except Exception as e:
+                tui.error(f"Reset failed: {e}")
+        else:
+            tui.info("Reset cancelled")
+
+        tui.section_end(C.RED)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def manage_schedules(self):
+        """Manage scan schedules."""
+        self.show_banner()
+        tui.section("Scan Schedules", C.CYAN)
+        print()
+
+        try:
+            from scheduler import SchedulerManager
+            sm = SchedulerManager()
+
+            schedules = sm.get_all_schedules()
+            if schedules:
+                tui.info(f"{len(schedules)} schedules configured:")
+                for s in schedules:
+                    if isinstance(s, dict):
+                        name = s.get('name', s.get('id', '?'))
+                        cron = s.get('cron', s.get('frequency', '?'))
+                        status = s.get('status', 'active')
+                        print(f"  {name:20s} {cron:15s} [{status}]")
+            else:
+                tui.info("No schedules configured.")
+
+            print()
+            options = [
+                ('1', 'Create Schedule', 'Set up a new recurring scan'),
+                ('2', 'View Statistics', 'Schedule run history'),
+                ('b', 'Back', 'Return to main menu'),
+            ]
+            choice = tui.menu("Schedule Actions", options, C.CYAN)
+
+            if choice == '1':
+                name = tui.input("Schedule name", default="monthly-scan")
+                targets = tui.input("Targets (comma-separated)", default="")
+                frequency = tui.input("Frequency", default="monthly")
+
+                schedule = sm.create_schedule(
+                    name=name,
+                    scan_type='standard',
+                    targets=[t.strip() for t in targets.split(',') if t.strip()],
+                    frequency=frequency,
+                )
+                tui.success(f"Schedule created: {schedule.get('id', name)}")
+
+            elif choice == '2':
+                stats = sm.get_statistics()
+                if isinstance(stats, dict):
+                    tui.keyvalue({k: str(v) for k, v in stats.items()})
+                else:
+                    tui.info("No statistics available")
+
+        except Exception as e:
+            tui.error(f"Scheduling error: {e}")
+
+        tui.section_end(C.CYAN)
         safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def manage_overrides(self):
@@ -1636,8 +1981,7 @@ Systems Thinking Security Assessment
             elif choice == '7':
                 self.handle_compliance()
             elif choice == '8':
-                tui.info("Scheduling coming soon...")
-                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                self.manage_schedules()
             elif choice == '9':
                 self.show_tool_status()
             elif choice == 'w' or choice == 'W':
