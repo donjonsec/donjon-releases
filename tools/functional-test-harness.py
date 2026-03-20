@@ -354,10 +354,18 @@ def test_scanners(harness: HarnessResults, target: str, windows_target: str,
                 r.error = 'scan() returned None'
                 r.output_summary = 'No return value'
             elif isinstance(result, dict):
+                # Scanners use different keys for their results
                 findings_count = (
                     result.get('findings_count', 0) or
                     len(result.get('findings', [])) or
+                    len(result.get('vulnerabilities', [])) or
+                    len(result.get('gaps', [])) or
+                    len(result.get('checks', [])) or
+                    result.get('results_count', 0) or
+                    result.get('summary', {}).get('total_findings', 0) or
+                    result.get('summary', {}).get('total_ports', 0) or
                     result.get('summary', {}).get('findings_count', 0) or
+                    result.get('summary', {}).get('total_hosts', 0) or
                     0
                 )
                 r.findings_count = findings_count
