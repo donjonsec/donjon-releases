@@ -66,7 +66,13 @@ class BaseScanner(ABC):
         pass
 
     def human_delay(self):
-        """Add human-like delay between operations."""
+        """Add human-like delay between operations.
+
+        Respects DONJON_TEST_MODE=1 (zero delay) and scan_type='quick'
+        (0-2s delay) to avoid 30-300s waits during testing and fast scans.
+        """
+        if os.environ.get("DONJON_TEST_MODE") == "1":
+            return
         min_delay, max_delay = self.config.get_scan_delay()
         delay = random.uniform(min_delay, max_delay)
         self.scan_logger.debug(f"Human delay: {delay:.1f} seconds")
