@@ -1,0 +1,156 @@
+framework:
+  id: sox
+  name: Sarbanes-Oxley Act (SOX) IT Controls
+  version: "2002"
+  release_date: 2002-07-30
+  description: |
+    SOX Section 302 and 404 require internal controls over financial reporting (ICFR).
+    These IT general controls (ITGCs) support the reliability of financial systems
+    and data integrity for publicly traded companies.
+
+  sources:
+    - url: https://www.sec.gov/about/laws/soa2002.pdf
+      type: pdf
+      check_interval: quarterly
+    - url: https://pcaobus.org/oversight/standards/auditing-standards/details/AS2201
+      type: webpage
+      check_interval: quarterly
+
+  domains:
+    access_controls:
+      name: Access Controls
+      controls:
+        SOX-AC-01:
+          name: User Access Management
+          description: Logical access to financial systems is restricted to authorized personnel
+        SOX-AC-02:
+          name: Privileged Access Management
+          description: Administrative and privileged access to financial applications and databases is restricted and monitored
+        SOX-AC-03:
+          name: Access Provisioning
+          description: Formal process for granting, modifying, and revoking access to financial systems
+        SOX-AC-04:
+          name: Periodic Access Reviews
+          description: User access to financial applications is reviewed at least quarterly
+        SOX-AC-05:
+          name: Segregation of Duties
+          description: Incompatible duties are segregated to prevent fraud and error in financial processing
+        SOX-AC-06:
+          name: Authentication Controls
+          description: Strong authentication mechanisms protect access to financial systems including password policies and MFA
+        SOX-AC-07:
+          name: Remote Access Controls
+          description: Remote access to financial systems is secured through VPN and additional authentication controls
+        SOX-AC-08:
+          name: Service Account Management
+          description: Service accounts used by financial applications are inventoried, secured, and reviewed periodically
+
+    change_management:
+      name: Change Management
+      controls:
+        SOX-CM-01:
+          name: Change Authorization
+          description: All changes to financial systems require formal authorization before implementation
+        SOX-CM-02:
+          name: Change Testing
+          description: Changes to financial applications are tested in a non-production environment before deployment
+        SOX-CM-03:
+          name: Segregation of Development and Production
+          description: Development, test, and production environments are logically separated
+        SOX-CM-04:
+          name: Emergency Change Process
+          description: Emergency changes follow a defined process with retroactive approval and documentation
+        SOX-CM-05:
+          name: Change Documentation
+          description: All changes to financial systems are documented including approval, testing, and deployment records
+        SOX-CM-06:
+          name: Release Management
+          description: Formal release management process ensures only approved code is deployed to production
+
+    operations:
+      name: Computer Operations
+      controls:
+        SOX-OP-01:
+          name: Job Scheduling and Monitoring
+          description: Batch processing jobs for financial data are scheduled, monitored, and failures are investigated
+        SOX-OP-02:
+          name: Backup and Recovery
+          description: Financial data and systems are backed up regularly and recovery procedures are tested
+        SOX-OP-03:
+          name: Incident Management
+          description: IT incidents affecting financial systems are tracked, escalated, and resolved with root cause analysis
+        SOX-OP-04:
+          name: Business Continuity
+          description: Business continuity and disaster recovery plans exist for critical financial systems
+        SOX-OP-05:
+          name: Capacity Management
+          description: System capacity for financial applications is monitored to ensure availability during peak processing
+        SOX-OP-06:
+          name: Third-Party Management
+          description: IT services provided by third parties that support financial reporting are monitored via SOC reports or equivalent
+
+    data_integrity:
+      name: Data Integrity and Interface Controls
+      controls:
+        SOX-DI-01:
+          name: Input Controls
+          description: Automated controls validate completeness and accuracy of data input to financial systems
+        SOX-DI-02:
+          name: Processing Controls
+          description: Automated controls ensure financial transactions are processed completely and accurately
+        SOX-DI-03:
+          name: Output Controls
+          description: Financial reports and outputs are validated for completeness and distributed to authorized recipients only
+        SOX-DI-04:
+          name: Interface Controls
+          description: Data transfers between financial systems are monitored for completeness and accuracy via reconciliation
+        SOX-DI-05:
+          name: Data Conversion Controls
+          description: Data migrations and conversions affecting financial data follow validated procedures with reconciliation
+        SOX-DI-06:
+          name: Database Management
+          description: Direct access to financial databases is restricted and all changes are logged and reviewed
+
+    audit_logging:
+      name: Audit Logging and Monitoring
+      controls:
+        SOX-AL-01:
+          name: Audit Trail Configuration
+          description: Audit logging is enabled for all financial applications capturing user activity and data changes
+        SOX-AL-02:
+          name: Log Protection
+          description: Audit logs for financial systems are protected from unauthorized modification or deletion
+        SOX-AL-03:
+          name: Log Review
+          description: Audit logs for financial systems are reviewed regularly for unauthorized or suspicious activity
+        SOX-AL-04:
+          name: Log Retention
+          description: Audit logs are retained for the period required by SOX (minimum 7 years for relevant records)
+
+    security_management:
+      name: Security Management
+      controls:
+        SOX-SM-01:
+          name: Information Security Policy
+          description: Information security policies governing financial systems are documented and approved by management
+        SOX-SM-02:
+          name: Risk Assessment
+          description: IT risk assessments are performed annually covering threats to financial reporting systems
+        SOX-SM-03:
+          name: Vulnerability Management
+          description: Vulnerability scanning and patching for financial system infrastructure is performed regularly
+        SOX-SM-04:
+          name: Endpoint Protection
+          description: Anti-malware and endpoint protection is deployed on systems that process financial data
+        SOX-SM-05:
+          name: Network Security
+          description: Network segmentation and firewall controls protect financial system infrastructure
+        SOX-SM-06:
+          name: Encryption Controls
+          description: Financial data is encrypted in transit and at rest using approved cryptographic standards
+        SOX-SM-07:
+          name: Security Awareness Training
+          description: Personnel with access to financial systems receive security awareness training annually
+        SOX-SM-08:
+          name: Physical Security
+          description: Physical access to data centers and server rooms hosting financial systems is restricted and monitored

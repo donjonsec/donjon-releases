@@ -1,0 +1,99 @@
+framework:
+  id: ferpa
+  name: Family Educational Rights and Privacy Act (FERPA)
+  version: "2024"
+  release_date: 1974-08-21
+  description: |
+    FERPA protects the privacy of student education records. It applies to all
+    educational agencies and institutions that receive federal funding. The IT
+    security requirements ensure confidentiality, integrity, and availability
+    of education records maintained in electronic systems.
+
+  sources:
+    - url: https://www2.ed.gov/policy/gen/guid/fpco/ferpa/index.html
+      type: webpage
+      check_interval: quarterly
+
+  domains:
+    access_control:
+      name: Access Control
+      controls:
+        FERPA-AC-01:
+          name: Legitimate Educational Interest
+          description: Limit access to education records to school officials with legitimate educational interest
+        FERPA-AC-02:
+          name: Consent for Disclosure
+          description: Obtain written consent before disclosing personally identifiable information from education records
+        FERPA-AC-03:
+          name: Directory Information Controls
+          description: Properly designate and manage directory information with opt-out mechanisms
+        FERPA-AC-04:
+          name: Role-Based Access
+          description: Implement role-based access controls limiting record access to authorized personnel
+        FERPA-AC-05:
+          name: Third-Party Access Controls
+          description: Control and document third-party access to education records via contracts and data sharing agreements
+
+    record_management:
+      name: Record Management
+      controls:
+        FERPA-RM-01:
+          name: Record Disclosure Logging
+          description: Maintain a record of each request for access to and each disclosure of education records
+        FERPA-RM-02:
+          name: Amendment Process
+          description: Provide process for parents/students to request amendment of education records
+        FERPA-RM-03:
+          name: Annual Notification
+          description: Annually notify parents and eligible students of their rights under FERPA
+        FERPA-RM-04:
+          name: Record Retention
+          description: Maintain education records and disclosure logs per institutional retention policies
+        FERPA-RM-05:
+          name: Record Accuracy
+          description: Implement controls to ensure accuracy and integrity of education records
+
+    data_protection:
+      name: Data Protection
+      controls:
+        FERPA-DP-01:
+          name: Encryption of Student Records
+          description: Encrypt education records in transit and at rest to protect personally identifiable information
+        FERPA-DP-02:
+          name: Data Minimization
+          description: Limit collection and storage of student data to what is needed for educational purposes
+        FERPA-DP-03:
+          name: Secure Disposal
+          description: Securely dispose of education records when no longer needed per retention policies
+        FERPA-DP-04:
+          name: Breach Notification
+          description: Establish procedures for notification when unauthorized disclosure of education records occurs
+
+    technical_safeguards:
+      name: Technical Safeguards
+      controls:
+        FERPA-TS-01:
+          name: Authentication Controls
+          description: Implement strong authentication for systems containing education records
+        FERPA-TS-02:
+          name: Audit Logging
+          description: Log access to and changes in education record systems for accountability
+        FERPA-TS-03:
+          name: Network Security
+          description: Protect networks carrying education record data with appropriate security controls
+        FERPA-TS-04:
+          name: Endpoint Security
+          description: Protect endpoints used to access education records with anti-malware and security controls
+        FERPA-TS-05:
+          name: Vulnerability Management
+          description: Perform vulnerability assessments on systems storing education records
+
+    training:
+      name: Training and Awareness
+      controls:
+        FERPA-TR-01:
+          name: FERPA Training
+          description: Train all personnel with access to education records on FERPA requirements
+        FERPA-TR-02:
+          name: Incident Response Training
+          description: Train staff on procedures for reporting potential FERPA violations or data breaches

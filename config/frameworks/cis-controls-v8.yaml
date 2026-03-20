@@ -1,0 +1,575 @@
+framework:
+  id: cis-controls-v8
+  name: CIS Critical Security Controls v8.1
+  version: "8.1"
+  release_date: 2023-06-01
+  description: |
+    The CIS Critical Security Controls (CIS Controls) are a prioritized set of
+    actions that collectively form a defense-in-depth set of best practices to
+    mitigate the most common attacks against systems and networks.
+
+  sources:
+    - url: https://www.cisecurity.org/controls/v8
+      type: webpage
+      check_interval: quarterly
+
+  implementation_groups:
+    IG1:
+      name: Implementation Group 1
+      description: Essential cyber hygiene - the starting point for all organizations
+    IG2:
+      name: Implementation Group 2
+      description: For organizations managing IT infrastructure of multiple departments with varying risk profiles
+    IG3:
+      name: Implementation Group 3
+      description: For organizations employing security experts specializing in different facets of cybersecurity
+
+  controls:
+    CIS-01:
+      name: Inventory and Control of Enterprise Assets
+      description: Actively manage all enterprise assets connected to the infrastructure
+      safeguards:
+        CIS-01.1:
+          name: Establish and Maintain Detailed Enterprise Asset Inventory
+          description: Establish and maintain an accurate, detailed, and up-to-date inventory of all enterprise assets
+        CIS-01.2:
+          name: Address Unauthorized Assets
+          description: Ensure that a process exists to address unauthorized assets on a weekly basis
+        CIS-01.3:
+          name: Utilize an Active Discovery Tool
+          description: Utilize an active discovery tool to identify assets connected to the enterprise network
+        CIS-01.4:
+          name: Use Dynamic Host Configuration Protocol (DHCP) Logging
+          description: Use DHCP logging on all DHCP servers or IP address management tools to update asset inventory
+        CIS-01.5:
+          name: Use a Passive Asset Discovery Tool
+          description: Use a passive discovery tool to identify assets connected to the enterprise network
+
+    CIS-02:
+      name: Inventory and Control of Software Assets
+      description: Actively manage all software on the network so only authorized software is installed
+      safeguards:
+        CIS-02.1:
+          name: Establish and Maintain a Software Inventory
+          description: Establish and maintain a detailed inventory of all licensed software installed on enterprise assets
+        CIS-02.2:
+          name: Ensure Authorized Software is Currently Supported
+          description: Ensure that only currently supported software is designated as authorized
+        CIS-02.3:
+          name: Address Unauthorized Software
+          description: Ensure that unauthorized software is either removed or the inventory is updated in a timely manner
+        CIS-02.4:
+          name: Utilize Automated Software Inventory Tools
+          description: Utilize software inventory tools throughout the enterprise to automate the discovery and documentation
+        CIS-02.5:
+          name: Allowlist Authorized Software
+          description: Use technical controls such as application allowlisting to ensure only authorized software can execute
+        CIS-02.6:
+          name: Allowlist Authorized Libraries
+          description: Use technical controls to ensure only authorized software libraries can load into system processes
+        CIS-02.7:
+          name: Allowlist Authorized Scripts
+          description: Use technical controls such as digital signatures and version control to ensure only authorized scripts can execute
+
+    CIS-03:
+      name: Data Protection
+      description: Develop processes and technical controls to identify, classify, handle, retain, and dispose of data
+      safeguards:
+        CIS-03.1:
+          name: Establish and Maintain a Data Management Process
+          description: Establish and maintain a data management process that addresses data sensitivity, ownership, handling, retention
+        CIS-03.2:
+          name: Establish and Maintain a Data Inventory
+          description: Establish and maintain a data inventory based on the data management process
+        CIS-03.3:
+          name: Configure Data Access Control Lists
+          description: Configure data access control lists based on user need-to-know
+        CIS-03.4:
+          name: Enforce Data Retention
+          description: Retain data according to the data management process with minimum and maximum retention periods
+        CIS-03.5:
+          name: Securely Dispose of Data
+          description: Securely dispose of data as outlined in the data management process
+        CIS-03.6:
+          name: Encrypt Data on End-User Devices
+          description: Encrypt data on end-user devices containing sensitive data
+        CIS-03.7:
+          name: Establish and Maintain a Data Classification Scheme
+          description: Establish and maintain an overall data classification scheme for the enterprise
+        CIS-03.8:
+          name: Document Data Flows
+          description: Document data flows including provider and consumer of data
+        CIS-03.9:
+          name: Encrypt Data on Removable Media
+          description: Encrypt data on removable media
+        CIS-03.10:
+          name: Encrypt Sensitive Data in Transit
+          description: Encrypt sensitive data in transit using trusted channels
+        CIS-03.11:
+          name: Encrypt Sensitive Data at Rest
+          description: Encrypt sensitive data at rest on servers, applications, and databases
+        CIS-03.12:
+          name: Segment Data Processing and Storage Based on Sensitivity
+          description: Segment data processing and storage based on the sensitivity of the data
+        CIS-03.13:
+          name: Deploy a Data Loss Prevention Solution
+          description: Implement an automated tool such as a host-based DLP to identify sensitive data
+        CIS-03.14:
+          name: Log Sensitive Data Access
+          description: Log sensitive data access including modification and disposal
+
+    CIS-04:
+      name: Secure Configuration of Enterprise Assets and Software
+      description: Establish and maintain the secure configuration of enterprise assets and software
+      safeguards:
+        CIS-04.1:
+          name: Establish and Maintain a Secure Configuration Process
+          description: Establish and maintain a secure configuration process for enterprise assets and software
+        CIS-04.2:
+          name: Establish and Maintain a Secure Configuration Process for Network Infrastructure
+          description: Establish and maintain a secure configuration process for network devices
+        CIS-04.3:
+          name: Configure Automatic Session Locking on Enterprise Assets
+          description: Configure automatic session locking on enterprise assets after a defined period of inactivity
+        CIS-04.4:
+          name: Implement and Manage a Firewall on Servers
+          description: Implement and manage a firewall on servers where supported
+        CIS-04.5:
+          name: Implement and Manage a Firewall on End-User Devices
+          description: Implement and manage a host-based firewall or port filtering tool on end-user devices
+        CIS-04.6:
+          name: Securely Manage Enterprise Assets and Software
+          description: Securely manage enterprise assets and software using a security configuration management process
+        CIS-04.7:
+          name: Manage Default Accounts on Enterprise Assets and Software
+          description: Manage default accounts on enterprise assets and software such as root, administrator, and vendor accounts
+        CIS-04.8:
+          name: Uninstall or Disable Unnecessary Services on Enterprise Assets and Software
+          description: Uninstall or disable unnecessary services on enterprise assets and software
+        CIS-04.9:
+          name: Configure Trusted DNS Servers on Enterprise Assets
+          description: Configure trusted DNS servers on enterprise assets
+        CIS-04.10:
+          name: Enforce Automatic Device Lockout on Portable End-User Devices
+          description: Enforce automatic device lockout following a predetermined threshold of local failed authentication attempts
+        CIS-04.11:
+          name: Enforce Remote Wipe Capability on Portable End-User Devices
+          description: Remotely wipe enterprise data from enterprise-owned portable end-user devices when deemed appropriate
+        CIS-04.12:
+          name: Separate Enterprise Workspaces on Mobile End-User Devices
+          description: Ensure separate enterprise workspaces are used on mobile end-user devices
+
+    CIS-05:
+      name: Account Management
+      description: Use processes and tools to assign and manage authorization to credentials for user accounts
+      safeguards:
+        CIS-05.1:
+          name: Establish and Maintain an Inventory of Accounts
+          description: Establish and maintain an inventory of all accounts managed in the enterprise
+        CIS-05.2:
+          name: Use Unique Passwords
+          description: Use unique passwords for all enterprise assets where passwords are used
+        CIS-05.3:
+          name: Disable Dormant Accounts
+          description: Delete or disable any dormant accounts after a period of 45 days of inactivity
+        CIS-05.4:
+          name: Restrict Administrator Privileges to Dedicated Administrator Accounts
+          description: Restrict administrator privileges to dedicated administrator accounts on enterprise assets
+        CIS-05.5:
+          name: Establish and Maintain an Inventory of Service Accounts
+          description: Establish and maintain an inventory of service accounts
+        CIS-05.6:
+          name: Centralize Account Management
+          description: Centralize account management through a directory or identity service
+
+    CIS-06:
+      name: Access Control Management
+      description: Use processes and tools to create, assign, manage, and revoke access credentials and privileges
+      safeguards:
+        CIS-06.1:
+          name: Establish an Access Granting Process
+          description: Establish and follow a process to grant access to enterprise assets and software
+        CIS-06.2:
+          name: Establish an Access Revoking Process
+          description: Establish and follow a process to revoke access to enterprise assets and software
+        CIS-06.3:
+          name: Require MFA for Externally-Exposed Applications
+          description: Require MFA for all externally-exposed enterprise or third-party applications
+        CIS-06.4:
+          name: Require MFA for Remote Network Access
+          description: Require MFA for remote network access
+        CIS-06.5:
+          name: Require MFA for Administrative Access
+          description: Require MFA for all administrative access accounts
+        CIS-06.6:
+          name: Establish and Maintain an Inventory of Authentication and Authorization Systems
+          description: Establish and maintain an inventory of the enterprise authentication and authorization systems
+        CIS-06.7:
+          name: Centralize Access Control
+          description: Centralize access control for all enterprise assets through a directory service or SSO provider
+        CIS-06.8:
+          name: Define and Maintain Role-Based Access Control
+          description: Define and maintain RBAC by determining and documenting access rights necessary for each role
+
+    CIS-07:
+      name: Continuous Vulnerability Management
+      description: Develop a plan to continuously assess and track vulnerabilities on all enterprise assets
+      safeguards:
+        CIS-07.1:
+          name: Establish and Maintain a Vulnerability Management Process
+          description: Establish and maintain a documented vulnerability management process for enterprise assets
+        CIS-07.2:
+          name: Establish and Maintain a Remediation Process
+          description: Establish and maintain a risk-based remediation strategy documented in a remediation process
+        CIS-07.3:
+          name: Perform Automated Operating System Patch Management
+          description: Perform operating system updates on enterprise assets through automated patch management
+        CIS-07.4:
+          name: Perform Automated Application Patch Management
+          description: Perform application updates on enterprise assets through automated patch management
+        CIS-07.5:
+          name: Perform Automated Vulnerability Scans of Internal Enterprise Assets
+          description: Perform automated vulnerability scans of internal enterprise assets on a quarterly basis
+        CIS-07.6:
+          name: Perform Automated Vulnerability Scans of Externally-Exposed Enterprise Assets
+          description: Perform automated vulnerability scans of externally-exposed enterprise assets
+        CIS-07.7:
+          name: Remediate Detected Vulnerabilities
+          description: Remediate detected vulnerabilities in software through processes and tooling on a monthly or more frequent basis
+
+    CIS-08:
+      name: Audit Log Management
+      description: Collect, alert, review, and retain audit logs of events that could help detect, understand, or recover from an attack
+      safeguards:
+        CIS-08.1:
+          name: Establish and Maintain an Audit Log Management Process
+          description: Establish and maintain an audit log management process that defines the enterprise logging requirements
+        CIS-08.2:
+          name: Collect Audit Logs
+          description: Collect audit logs from enterprise assets and log sources
+        CIS-08.3:
+          name: Ensure Adequate Audit Log Storage
+          description: Ensure that logging destinations maintain adequate storage to comply with audit log management process
+        CIS-08.4:
+          name: Standardize Time Synchronization
+          description: Standardize time synchronization using at least two synchronized time sources across enterprise assets
+        CIS-08.5:
+          name: Collect Detailed Audit Logs
+          description: Configure detailed audit logging for enterprise assets containing sensitive data
+        CIS-08.6:
+          name: Collect DNS Query Audit Logs
+          description: Collect DNS query audit logs on enterprise assets where appropriate
+        CIS-08.7:
+          name: Collect URL Request Audit Logs
+          description: Collect URL request audit logs on enterprise assets where appropriate
+        CIS-08.8:
+          name: Collect Command-Line Audit Logs
+          description: Collect command-line audit logs including commands and their arguments for enterprise assets
+        CIS-08.9:
+          name: Centralize Audit Logs
+          description: Centralize audit logs from enterprise assets to the enterprise log analytics tool
+        CIS-08.10:
+          name: Retain Audit Logs
+          description: Retain audit logs across enterprise assets for a minimum of 90 days
+        CIS-08.11:
+          name: Conduct Audit Log Reviews
+          description: Conduct reviews of audit logs to detect anomalies or abnormal events
+        CIS-08.12:
+          name: Collect Service Provider Logs
+          description: Collect service provider logs where supported
+
+    CIS-09:
+      name: Email and Web Browser Protections
+      description: Improve protections and detections of threats from email and web vectors
+      safeguards:
+        CIS-09.1:
+          name: Ensure Use of Only Fully Supported Browsers and Email Clients
+          description: Ensure only fully supported browsers and email clients are allowed to execute
+        CIS-09.2:
+          name: Use DNS Filtering Services
+          description: Use DNS filtering services on all enterprise assets to block access to known malicious domains
+        CIS-09.3:
+          name: Maintain and Enforce Network-Based URL Filters
+          description: Enforce and update network-based URL filters to limit enterprise assets to approved content
+        CIS-09.4:
+          name: Restrict Unnecessary or Unauthorized Browser and Email Client Extensions
+          description: Restrict installation of browser extensions to only approved ones
+        CIS-09.5:
+          name: Implement DMARC
+          description: Implement DMARC to lower the chance of spoofed or modified emails from valid domains
+        CIS-09.6:
+          name: Block Unnecessary File Types
+          description: Block unnecessary file types attempting to enter the enterprise email gateway
+        CIS-09.7:
+          name: Deploy and Maintain Email Server Anti-Malware Protections
+          description: Deploy and maintain email server anti-malware protections such as attachment scanning
+
+    CIS-10:
+      name: Malware Defenses
+      description: Prevent or control the installation, spread, and execution of malicious applications
+      safeguards:
+        CIS-10.1:
+          name: Deploy and Maintain Anti-Malware Software
+          description: Deploy and maintain anti-malware software on all enterprise assets
+        CIS-10.2:
+          name: Configure Automatic Anti-Malware Signature Updates
+          description: Configure automatic updates for anti-malware signature files on all enterprise assets
+        CIS-10.3:
+          name: Disable Autorun and Autoplay for Removable Media
+          description: Disable autorun and autoplay auto-execute functionality for removable media
+        CIS-10.4:
+          name: Configure Automatic Anti-Malware Scanning of Removable Media
+          description: Configure anti-malware software to automatically scan removable media
+        CIS-10.5:
+          name: Enable Anti-Exploitation Features
+          description: Enable anti-exploitation features on enterprise assets and software
+        CIS-10.6:
+          name: Centrally Manage Anti-Malware Software
+          description: Centrally manage anti-malware software
+        CIS-10.7:
+          name: Use Behavior-Based Anti-Malware Software
+          description: Use behavior-based anti-malware software
+
+    CIS-11:
+      name: Data Recovery
+      description: Establish and maintain data recovery practices sufficient to restore in-scope enterprise assets
+      safeguards:
+        CIS-11.1:
+          name: Establish and Maintain a Data Recovery Process
+          description: Establish and maintain a data recovery process including scope of activities and minimum frequency
+        CIS-11.2:
+          name: Perform Automated Backups
+          description: Perform automated backups of in-scope enterprise assets per the data recovery process
+        CIS-11.3:
+          name: Protect Recovery Data
+          description: Protect recovery data with equivalent controls to the original data
+        CIS-11.4:
+          name: Establish and Maintain an Isolated Instance of Recovery Data
+          description: Establish and maintain an isolated instance of recovery data using versioned or immutable backups
+        CIS-11.5:
+          name: Test Data Recovery
+          description: Test backup recovery quarterly or more frequently for a sampling of in-scope enterprise assets
+
+    CIS-12:
+      name: Network Infrastructure Management
+      description: Establish and maintain the secure configuration of network infrastructure
+      safeguards:
+        CIS-12.1:
+          name: Ensure Network Infrastructure is Up-to-Date
+          description: Ensure network infrastructure is kept up-to-date including latest stable versions of security patches
+        CIS-12.2:
+          name: Establish and Maintain a Secure Network Architecture
+          description: Establish and maintain a secure network architecture
+        CIS-12.3:
+          name: Securely Manage Network Infrastructure
+          description: Securely manage network infrastructure via secure protocols
+        CIS-12.4:
+          name: Establish and Maintain Architecture Diagram(s)
+          description: Establish and maintain architecture diagrams and network documentation
+        CIS-12.5:
+          name: Centralize Network Authentication, Authorization, and Auditing (AAA)
+          description: Centralize network AAA
+        CIS-12.6:
+          name: Use of Secure Network Management and Communication Protocols
+          description: Use secure network management and communication protocols
+        CIS-12.7:
+          name: Ensure Remote Devices Utilize a VPN
+          description: Require users to connect VPN before accessing enterprise resources
+        CIS-12.8:
+          name: Establish and Maintain Dedicated Computing Resources for All Administrative Work
+          description: Establish and maintain dedicated computing resources for all administrative tasks
+
+    CIS-13:
+      name: Network Monitoring and Defense
+      description: Operate processes and tooling to establish and maintain comprehensive network monitoring and defense
+      safeguards:
+        CIS-13.1:
+          name: Centralize Security Event Alerting
+          description: Centralize security event alerting across enterprise assets
+        CIS-13.2:
+          name: Deploy a Host-Based Intrusion Detection Solution
+          description: Deploy a host-based IDS solution on enterprise assets
+        CIS-13.3:
+          name: Deploy a Network Intrusion Detection Solution
+          description: Deploy a network IDS solution on enterprise assets
+        CIS-13.4:
+          name: Perform Traffic Filtering Between Network Segments
+          description: Perform traffic filtering between network segments
+        CIS-13.5:
+          name: Manage Access Control for Remote Assets
+          description: Manage access control for assets remotely connecting to enterprise resources
+        CIS-13.6:
+          name: Collect Network Traffic Flow Logs
+          description: Collect network traffic flow logs and/or network traffic
+        CIS-13.7:
+          name: Deploy a Host-Based Intrusion Prevention Solution
+          description: Deploy a host-based IPS solution on enterprise assets
+        CIS-13.8:
+          name: Deploy a Network Intrusion Prevention Solution
+          description: Deploy a network IPS solution
+        CIS-13.9:
+          name: Deploy Port-Level Access Control
+          description: Deploy port-level access control via 802.1X to limit and control which devices can connect
+        CIS-13.10:
+          name: Perform Application Layer Filtering
+          description: Perform application layer filtering with a web application firewall or proxy
+        CIS-13.11:
+          name: Tune Security Event Alerting Thresholds
+          description: Tune security event alerting thresholds monthly or more frequently
+
+    CIS-14:
+      name: Security Awareness and Skills Training
+      description: Establish and maintain a security awareness program to influence workforce behavior
+      safeguards:
+        CIS-14.1:
+          name: Establish and Maintain a Security Awareness Program
+          description: Establish and maintain a security awareness program
+        CIS-14.2:
+          name: Train Workforce Members to Recognize Social Engineering Attacks
+          description: Train workforce members to recognize social engineering attacks
+        CIS-14.3:
+          name: Train Workforce Members on Authentication Best Practices
+          description: Train workforce members on authentication best practices
+        CIS-14.4:
+          name: Train Workforce on Data Handling Best Practices
+          description: Train workforce on how to identify and properly store, transfer, archive, and destroy sensitive data
+        CIS-14.5:
+          name: Train Workforce Members on Causes of Unintentional Data Exposure
+          description: Train workforce members to be aware of causes for unintentional data exposure
+        CIS-14.6:
+          name: Train Workforce Members on Recognizing and Reporting Security Incidents
+          description: Train workforce members to be able to recognize and report a potential incident
+        CIS-14.7:
+          name: Train Workforce on How to Identify and Report if Their Enterprise Assets are Missing Security Updates
+          description: Train workforce to understand how to identify and report out-of-date software patches
+        CIS-14.8:
+          name: Train Workforce on the Dangers of Connecting to and Transmitting Enterprise Data Over Insecure Networks
+          description: Train workforce members on the dangers of connecting to and transmitting data over insecure networks
+        CIS-14.9:
+          name: Conduct Role-Specific Security Awareness and Skills Training
+          description: Conduct role-specific security awareness and skills training
+
+    CIS-15:
+      name: Service Provider Management
+      description: Develop a process to evaluate service providers who hold sensitive data or platform functions
+      safeguards:
+        CIS-15.1:
+          name: Establish and Maintain an Inventory of Service Providers
+          description: Establish and maintain an inventory of service providers
+        CIS-15.2:
+          name: Establish and Maintain a Service Provider Management Policy
+          description: Establish and maintain a service provider management policy
+        CIS-15.3:
+          name: Classify Service Providers
+          description: Classify service providers by involvement level with enterprise data
+        CIS-15.4:
+          name: Ensure Service Provider Contracts Include Security Requirements
+          description: Ensure service provider contracts include security requirements
+        CIS-15.5:
+          name: Assess Service Providers
+          description: Assess service providers consistent with the enterprise service provider management policy
+        CIS-15.6:
+          name: Monitor Service Providers
+          description: Monitor service providers consistent with the enterprise service provider management policy
+        CIS-15.7:
+          name: Securely Decommission Service Providers
+          description: Securely decommission service providers by wiping data, revoking access, etc.
+
+    CIS-16:
+      name: Application Software Security
+      description: Manage the security life cycle of in-house developed, hosted, or acquired software
+      safeguards:
+        CIS-16.1:
+          name: Establish and Maintain a Secure Application Development Process
+          description: Establish and maintain a secure application development process
+        CIS-16.2:
+          name: Establish and Maintain a Process to Accept and Address Software Vulnerabilities
+          description: Establish and maintain a process to accept and address reports of software vulnerabilities
+        CIS-16.3:
+          name: Perform Root Cause Analysis on Security Vulnerabilities
+          description: Perform root cause analysis on security vulnerabilities
+        CIS-16.4:
+          name: Establish and Manage an Inventory of Third-Party Software Components
+          description: Establish and manage an updated inventory of third-party components
+        CIS-16.5:
+          name: Use Up-to-Date and Trusted Third-Party Software Components
+          description: Use up-to-date and trusted third-party software components
+        CIS-16.6:
+          name: Establish and Maintain a Severity Rating System and Process for Application Vulnerabilities
+          description: Establish and maintain a severity rating system for application vulnerabilities
+        CIS-16.7:
+          name: Use Standard Hardening Configuration Templates for Application Infrastructure
+          description: Use standard, industry-recommended hardening configuration templates for application infrastructure
+        CIS-16.8:
+          name: Separate Production and Non-Production Systems
+          description: Maintain separate environments for production, development, and testing
+        CIS-16.9:
+          name: Train Developers in Application Security Concepts and Secure Coding
+          description: Ensure all software development personnel receive training in writing secure code
+        CIS-16.10:
+          name: Apply Secure Design Principles in Application Architectures
+          description: Apply secure design principles in application architectures including defense in depth
+        CIS-16.11:
+          name: Leverage Vetted Modules or Services for Application Security Components
+          description: Leverage vetted modules or services for application security components
+        CIS-16.12:
+          name: Implement Code-Level Security Checks
+          description: Apply static and dynamic analysis tools within the application life cycle
+        CIS-16.13:
+          name: Conduct Application Penetration Testing
+          description: Conduct application penetration testing and address discovered vulnerabilities
+        CIS-16.14:
+          name: Conduct Threat Modeling
+          description: Conduct threat modeling to identify application vulnerabilities and countermeasures
+
+    CIS-17:
+      name: Incident Response Management
+      description: Establish a program to develop and maintain an incident response capability
+      safeguards:
+        CIS-17.1:
+          name: Designate Personnel to Manage Incident Handling
+          description: Designate one key person and at least one backup to manage the incident handling process
+        CIS-17.2:
+          name: Establish and Maintain Contact Information for Reporting Security Incidents
+          description: Establish and maintain contact information for reporting security incidents
+        CIS-17.3:
+          name: Establish and Maintain an Enterprise Process for Reporting Incidents
+          description: Establish and maintain an enterprise process for reporting incidents
+        CIS-17.4:
+          name: Establish and Maintain an Incident Response Process
+          description: Establish and maintain an incident response process that addresses roles, responsibilities, and communication
+        CIS-17.5:
+          name: Assign Key Roles and Responsibilities
+          description: Assign key roles and responsibilities for incident response including legal, IT, information security
+        CIS-17.6:
+          name: Define Mechanisms for Communicating During Incident Response
+          description: Define mechanisms for communicating during incident response
+        CIS-17.7:
+          name: Conduct Routine Incident Response Exercises
+          description: Plan and conduct routine incident response exercises and scenarios
+        CIS-17.8:
+          name: Conduct Post-Incident Reviews
+          description: Conduct post-incident reviews to determine root causes and drive improvement
+        CIS-17.9:
+          name: Establish and Maintain Security Incident Thresholds
+          description: Establish and maintain security incident thresholds including escalation procedures
+
+    CIS-18:
+      name: Penetration Testing
+      description: Test the effectiveness and resiliency of enterprise assets through identifying and exploiting weaknesses
+      safeguards:
+        CIS-18.1:
+          name: Establish and Maintain a Penetration Testing Program
+          description: Establish and maintain a penetration testing program appropriate to the size and complexity of the enterprise
+        CIS-18.2:
+          name: Perform Periodic External Penetration Tests
+          description: Perform periodic external penetration tests based on program requirements
+        CIS-18.3:
+          name: Remediate Penetration Test Findings
+          description: Remediate penetration test findings based on the enterprise policy for remediation scope and prioritization
+        CIS-18.4:
+          name: Validate Security Measures
+          description: Validate security measures after each penetration test
+        CIS-18.5:
+          name: Perform Periodic Internal Penetration Tests
+          description: Perform periodic internal penetration tests based on program requirements

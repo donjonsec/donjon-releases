@@ -15,7 +15,7 @@ from enum import Enum
 class Framework(Enum):
     """Supported compliance frameworks."""
     NIST_800_53 = "NIST-800-53"
-    NIST_CSF = "NIST-CSF"
+    NIST_CSF = "nist_csf_2.0"
     NIST_CSF_2_0 = "nist_csf_2.0"
     NIST_800_171 = "nist_800_171"
     HIPAA = "HIPAA"
@@ -23,12 +23,12 @@ class Framework(Enum):
     SOC2_TYPE2 = "SOC2-Type2"
     PCI_DSS_V4 = "PCI-DSS-v4"
     ISO27001_2022 = "ISO27001-2022"
-    CMMC = "CMMC"
-    FEDRAMP = "FedRAMP"
-    GDPR = "GDPR"
-    SOX = "SOX"
-    HITRUST = "HITRUST"
-    CIS = "CIS"
+    CMMC = "cmmc"
+    FEDRAMP = "fedramp"
+    GDPR = "gdpr"
+    SOX = "sox"
+    HITRUST = "hitrust-csf"
+    CIS = "cis-controls-v8"
     APRA_CPS234 = "apra_cps234"
     CCPA = "ccpa"
     CIS_BENCHMARKS = "cis_benchmarks"
@@ -44,6 +44,10 @@ class Framework(Enum):
     TEXAS_DPSA = "texas_dpsa"
     UK_FCA_RESILIENCE = "uk_fca_resilience"
     VIRGINIA_CDPA = "virginia_cdpa"
+    FERPA = "ferpa"
+    GLBA = "glba"
+    NERC_CIP = "nerc-cip"
+    RHEL_CIS = "rhel_cis"
 
 
 @dataclass

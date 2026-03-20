@@ -1,0 +1,287 @@
+framework:
+  id: hitrust-csf
+  name: HITRUST Common Security Framework (CSF) v11
+  version: "11.0"
+  release_date: 2023-01-01
+  description: |
+    HITRUST CSF provides a comprehensive, prescriptive, and certifiable framework
+    for managing information risk. It harmonizes requirements from ISO 27001/27002,
+    NIST 800-53, HIPAA, PCI DSS, and other frameworks into a single assessment.
+
+  sources:
+    - url: https://hitrustalliance.net/csf
+      type: webpage
+      check_interval: quarterly
+
+  domains:
+    information_protection:
+      name: 01 - Information Protection Program
+      controls:
+        HITRUST-01.a:
+          name: Information Security Management Program
+          description: Establish and maintain a formal information security management program
+        HITRUST-01.b:
+          name: Information Security Coordination
+          description: Coordinate information security activities across the organization
+        HITRUST-01.c:
+          name: Authorization Process for Information Assets
+          description: Define and implement authorization process for new information assets
+        HITRUST-01.d:
+          name: Confidentiality Agreements
+          description: Require confidentiality or non-disclosure agreements for personnel and third parties
+        HITRUST-01.e:
+          name: Contact with Authorities
+          description: Maintain appropriate contacts with relevant authorities
+        HITRUST-01.f:
+          name: Contact with Special Interest Groups
+          description: Maintain appropriate contacts with special interest groups and security forums
+        HITRUST-01.g:
+          name: Independent Review
+          description: Conduct independent review of the information security approach
+
+    endpoint_protection:
+      name: 02 - Endpoint Protection
+      controls:
+        HITRUST-02.a:
+          name: Mobile Device Policy
+          description: Adopt a policy and supporting security measures to manage risks from mobile devices
+        HITRUST-02.b:
+          name: Teleworking
+          description: Implement policy and security measures to protect information accessed or processed at teleworking sites
+        HITRUST-02.c:
+          name: Unattended User Equipment
+          description: Require users to ensure unattended equipment has appropriate protection
+        HITRUST-02.d:
+          name: Removable Media Controls
+          description: Implement procedures for management of removable media
+        HITRUST-02.e:
+          name: Disposal of Media
+          description: Securely dispose of media when no longer required
+
+    portable_media:
+      name: 03 - Portable Media Security
+      controls:
+        HITRUST-03.a:
+          name: Physical Media Transfer
+          description: Protect media containing information against unauthorized access during transport
+        HITRUST-03.b:
+          name: Electronic Messaging
+          description: Protect information involved in electronic messaging
+        HITRUST-03.c:
+          name: Physical Media in Transit
+          description: Protect media containing information from unauthorized access, misuse, or corruption during transportation
+
+    access_control:
+      name: 04 - Access Control
+      controls:
+        HITRUST-04.a:
+          name: Access Control Policy
+          description: Establish, document, and review access control policy based on business requirements
+        HITRUST-04.b:
+          name: User Registration and De-registration
+          description: Implement formal user registration and de-registration process
+        HITRUST-04.c:
+          name: User Access Provisioning
+          description: Implement formal user access provisioning process for all system types
+        HITRUST-04.d:
+          name: Privileged Access Management
+          description: Restrict and control allocation and use of privileged access rights
+        HITRUST-04.e:
+          name: Authentication of Users for External Connections
+          description: Use appropriate authentication methods for external user access
+        HITRUST-04.f:
+          name: Network Routing Control
+          description: Implement routing controls for networks to ensure computer connections do not breach access control policy
+        HITRUST-04.g:
+          name: Secure Log-on Procedures
+          description: Control access to operating systems by secure log-on procedures
+        HITRUST-04.h:
+          name: User Identification and Authentication
+          description: Assign unique identifier to all users and use suitable authentication technique
+        HITRUST-04.i:
+          name: Password Management System
+          description: Implement interactive password management systems ensuring quality passwords
+        HITRUST-04.j:
+          name: Use of System Utilities
+          description: Restrict and tightly control use of system utility programs
+        HITRUST-04.k:
+          name: Session Time-out
+          description: Implement inactive sessions shut down after a defined period of inactivity
+        HITRUST-04.l:
+          name: Limitation of Connection Time
+          description: Restrict connection times for high-risk applications
+
+    network_protection:
+      name: 05 - Network Protection
+      controls:
+        HITRUST-05.a:
+          name: Network Controls
+          description: Manage and control networks to protect information in systems and applications
+        HITRUST-05.b:
+          name: Security of Network Services
+          description: Identify security mechanisms, service levels, and management requirements for all network services
+        HITRUST-05.c:
+          name: Segregation in Networks
+          description: Segregate groups of information services, users, and information systems on networks
+        HITRUST-05.d:
+          name: Network Connection Control
+          description: Restrict capability of users to connect to the network for shared networks
+        HITRUST-05.e:
+          name: External Network Connections
+          description: Implement controls for external connections through firewalls and IDS/IPS
+
+    vulnerability_management:
+      name: 06 - Vulnerability Management
+      controls:
+        HITRUST-06.a:
+          name: Technical Vulnerability Management
+          description: Obtain information about technical vulnerabilities, evaluate exposure, and take appropriate measures
+        HITRUST-06.b:
+          name: Restrictions on Software Installation
+          description: Establish rules governing installation of software by users
+        HITRUST-06.c:
+          name: Patch Management
+          description: Implement timely patching of identified vulnerabilities based on risk
+        HITRUST-06.d:
+          name: Malware Protection
+          description: Implement detection, prevention, and recovery controls for protection against malware
+        HITRUST-06.e:
+          name: Penetration Testing
+          description: Conduct regular penetration testing of the IT environment
+
+    transmission_protection:
+      name: 07 - Transmission Protection
+      controls:
+        HITRUST-07.a:
+          name: Encryption Policy
+          description: Develop and implement policy on use of cryptographic controls
+        HITRUST-07.b:
+          name: Key Management
+          description: Implement key management to support the organization's use of cryptographic techniques
+        HITRUST-07.c:
+          name: Transmission Confidentiality
+          description: Protect information in transit over networks using cryptographic mechanisms
+        HITRUST-07.d:
+          name: Information Exchange Policies
+          description: Establish formal exchange policies, procedures, and controls
+
+    risk_management:
+      name: 08 - Risk Management
+      controls:
+        HITRUST-08.a:
+          name: Risk Assessment Procedures
+          description: Develop and implement a systematic approach to risk management
+        HITRUST-08.b:
+          name: Risk Treatment
+          description: Select appropriate risk treatment options based on assessment results
+        HITRUST-08.c:
+          name: Risk Acceptance
+          description: Obtain management acceptance for residual risks
+
+    configuration_management:
+      name: 09 - Configuration Management
+      controls:
+        HITRUST-09.a:
+          name: Documented Operating Procedures
+          description: Document and maintain operating procedures for information processing facilities
+        HITRUST-09.b:
+          name: Change Management
+          description: Control changes to information processing facilities and systems
+        HITRUST-09.c:
+          name: Separation of Environments
+          description: Separate development, testing, and operational environments
+        HITRUST-09.d:
+          name: Capacity Management
+          description: Monitor and tune resource use and project future capacity requirements
+        HITRUST-09.e:
+          name: System Acceptance
+          description: Establish acceptance criteria for new systems and perform suitable tests during development and prior to acceptance
+
+    audit_logging:
+      name: 10 - Audit Logging and Monitoring
+      controls:
+        HITRUST-10.a:
+          name: Event Logging
+          description: Produce and keep audit logs recording user activities, exceptions, faults, and information security events
+        HITRUST-10.b:
+          name: Protection of Log Information
+          description: Protect logging facilities and log information against tampering and unauthorized access
+        HITRUST-10.c:
+          name: Administrator and Operator Logs
+          description: Log system administrator and operator activities
+        HITRUST-10.d:
+          name: Clock Synchronization
+          description: Synchronize clocks of all relevant information processing systems within the organization
+        HITRUST-10.e:
+          name: Monitoring System Use
+          description: Establish procedures for monitoring use of information processing facilities
+
+    incident_management:
+      name: 11 - Incident Management
+      controls:
+        HITRUST-11.a:
+          name: Reporting Information Security Events
+          description: Report information security events through appropriate management channels
+        HITRUST-11.b:
+          name: Reporting Security Weaknesses
+          description: Require all employees and contractors to report any observed or suspected security weakness
+        HITRUST-11.c:
+          name: Responsibilities and Procedures
+          description: Establish management responsibilities and procedures for incident response
+        HITRUST-11.d:
+          name: Learning from Incidents
+          description: Use knowledge gained from analyzing security incidents to reduce likelihood or impact of future incidents
+        HITRUST-11.e:
+          name: Collection of Evidence
+          description: Establish procedures for collection, acquisition, and preservation of evidence
+
+    business_continuity:
+      name: 12 - Business Continuity Management
+      controls:
+        HITRUST-12.a:
+          name: Business Continuity Planning
+          description: Develop and maintain business continuity plans for information systems
+        HITRUST-12.b:
+          name: Implementing Business Continuity Plans
+          description: Implement business continuity plans to restore and maintain availability of information
+        HITRUST-12.c:
+          name: Testing Business Continuity Plans
+          description: Test and update business continuity plans regularly
+        HITRUST-12.d:
+          name: Redundancy
+          description: Implement sufficient redundancy to meet availability requirements
+
+    privacy:
+      name: 13 - Privacy Practices
+      controls:
+        HITRUST-13.a:
+          name: Consent and Choice
+          description: Provide clear notice and obtain consent for collection and use of personal information
+        HITRUST-13.b:
+          name: Purpose Limitation
+          description: Limit personal information processing to stated purposes
+        HITRUST-13.c:
+          name: Data Minimization
+          description: Limit collection of personal information to what is relevant and necessary
+        HITRUST-13.d:
+          name: Use, Retention, and Disposal
+          description: Limit use and retention of personal information to stated purposes
+        HITRUST-13.e:
+          name: Disclosure and Transfer
+          description: Disclose personal information to third parties only for identified purposes and with consent
+
+    third_party:
+      name: 14 - Third-Party Assurance
+      controls:
+        HITRUST-14.a:
+          name: Third-Party Risk Assessment
+          description: Assess risks associated with third-party access to organizational information systems
+        HITRUST-14.b:
+          name: Third-Party Agreements
+          description: Establish agreements with third parties that include information security requirements
+        HITRUST-14.c:
+          name: Third-Party Service Delivery Management
+          description: Monitor and review services delivered by third parties
+        HITRUST-14.d:
+          name: Supply Chain Risk Management
+          description: Implement supply chain risk management practices for IT products and services

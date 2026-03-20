@@ -1,0 +1,171 @@
+framework:
+  id: nerc-cip
+  name: NERC Critical Infrastructure Protection (CIP) Standards
+  version: "v7"
+  release_date: 2020-01-01
+  description: |
+    NERC CIP standards provide a cybersecurity framework for the bulk electric
+    system (BES) in North America. They define mandatory requirements for the
+    identification and protection of critical cyber assets that support reliable
+    operation of the power grid.
+
+  sources:
+    - url: https://www.nerc.com/pa/Stand/Pages/CIPStandards.aspx
+      type: webpage
+      check_interval: quarterly
+
+  domains:
+    cip_002:
+      name: CIP-002 - BES Cyber System Categorization
+      controls:
+        CIP-002-R1:
+          name: BES Cyber System Identification
+          description: Identify and categorize BES Cyber Systems and associated BES Cyber Assets as high, medium, or low impact
+        CIP-002-R2:
+          name: CIP Senior Manager Approval
+          description: Obtain CIP Senior Manager approval of the identified BES Cyber Systems and their categorization
+
+    cip_003:
+      name: CIP-003 - Security Management Controls
+      controls:
+        CIP-003-R1:
+          name: Cyber Security Policy
+          description: Document and implement one or more cyber security policies addressing CIP topics
+        CIP-003-R2:
+          name: CIP Senior Manager
+          description: Designate a CIP Senior Manager by name with overall authority and responsibility for CIP
+        CIP-003-R3:
+          name: Delegate Authority
+          description: Identify a delegate by name for CIP Senior Manager functions during absence
+        CIP-003-R4:
+          name: Low Impact BES Cyber Systems
+          description: Implement one or more documented cyber security plans for low impact BES Cyber Systems
+
+    cip_004:
+      name: CIP-004 - Personnel and Training
+      controls:
+        CIP-004-R1:
+          name: Security Awareness Program
+          description: Implement a security awareness program for personnel with authorized access to BES Cyber Systems
+        CIP-004-R2:
+          name: Cyber Security Training
+          description: Implement a cyber security training program for personnel with authorized electronic or physical access
+        CIP-004-R3:
+          name: Personnel Risk Assessment
+          description: Implement a personnel risk assessment program for personnel with authorized access
+        CIP-004-R4:
+          name: Access Management
+          description: Implement a program for authorizing, verifying, and revoking provisioned access
+        CIP-004-R5:
+          name: Access Revocation
+          description: Implement process to revoke access to BES Cyber Systems upon personnel termination or transfer
+
+    cip_005:
+      name: CIP-005 - Electronic Security Perimeter
+      controls:
+        CIP-005-R1:
+          name: Electronic Security Perimeter
+          description: Implement one or more documented ESP(s) with defined electronic access points
+        CIP-005-R2:
+          name: Remote Access Management
+          description: Implement controls for remote access to BES Cyber Systems including multi-factor authentication
+        CIP-005-R3:
+          name: Vendor Remote Access
+          description: Require remote access sessions from vendor to be actively monitored
+
+    cip_006:
+      name: CIP-006 - Physical Security of BES Cyber Systems
+      controls:
+        CIP-006-R1:
+          name: Physical Security Plan
+          description: Document and implement a physical security plan with defined Physical Security Perimeters
+        CIP-006-R2:
+          name: Visitor Control Program
+          description: Implement a visitor control program for Physical Security Perimeters
+        CIP-006-R3:
+          name: Physical Access Control Maintenance and Testing
+          description: Implement a maintenance and testing program for physical access controls
+
+    cip_007:
+      name: CIP-007 - System Security Management
+      controls:
+        CIP-007-R1:
+          name: Ports and Services
+          description: Enable only logical network accessible ports and services that are needed for normal and emergency operations
+        CIP-007-R2:
+          name: Security Patch Management
+          description: Implement a patch management process for tracking, evaluating, and installing applicable patches
+        CIP-007-R3:
+          name: Malicious Code Prevention
+          description: Deploy methods to deter, detect, or prevent malicious code
+        CIP-007-R4:
+          name: Security Event Monitoring
+          description: Log events at the BES Cyber System level and review generated alerts
+        CIP-007-R5:
+          name: System Access Controls
+          description: Implement technical and procedural controls for authentication and access
+
+    cip_008:
+      name: CIP-008 - Incident Reporting and Response Planning
+      controls:
+        CIP-008-R1:
+          name: Cyber Security Incident Response Plan
+          description: Document one or more cyber security incident response plans
+        CIP-008-R2:
+          name: Incident Response Plan Implementation and Testing
+          description: Implement and test the cyber security incident response plan at least once every 15 months
+        CIP-008-R3:
+          name: Incident Response Plan Review and Update
+          description: Review and update the incident response plan within 90 days after a test or actual incident
+        CIP-008-R4:
+          name: Notification and Reporting
+          description: Report Cyber Security Incidents to the Electricity Subsector Coordinating Council (ES-ISAC)
+
+    cip_009:
+      name: CIP-009 - Recovery Plans for BES Cyber Systems
+      controls:
+        CIP-009-R1:
+          name: Recovery Plan Specifications
+          description: Document one or more recovery plans for BES Cyber Systems including conditions for activation
+        CIP-009-R2:
+          name: Recovery Plan Implementation and Testing
+          description: Test the recovery plan at least once every 15 calendar months
+        CIP-009-R3:
+          name: Recovery Plan Review and Update
+          description: Review and update recovery plan within 90 days after a test or recovery action
+
+    cip_010:
+      name: CIP-010 - Configuration Change Management and Vulnerability Assessments
+      controls:
+        CIP-010-R1:
+          name: Configuration Change Management
+          description: Develop a baseline configuration and implement a change management process for BES Cyber Systems
+        CIP-010-R2:
+          name: Configuration Monitoring
+          description: Monitor BES Cyber Systems for changes to the baseline configuration at least every 35 days
+        CIP-010-R3:
+          name: Vulnerability Assessments
+          description: Conduct vulnerability assessments of BES Cyber Systems at least once every 15 months
+        CIP-010-R4:
+          name: Transient Cyber Assets and Removable Media
+          description: Implement plans for managing transient cyber assets and removable media
+
+    cip_011:
+      name: CIP-011 - Information Protection
+      controls:
+        CIP-011-R1:
+          name: Information Protection
+          description: Implement one or more documented information protection programs for BES Cyber System information
+        CIP-011-R2:
+          name: BES Cyber Asset Reuse and Disposal
+          description: Implement procedures for reuse and disposal of BES Cyber Assets including data sanitization
+
+    cip_013:
+      name: CIP-013 - Supply Chain Risk Management
+      controls:
+        CIP-013-R1:
+          name: Supply Chain Cyber Security Risk Management Plan
+          description: Develop one or more documented supply chain cyber security risk management plans
+        CIP-013-R2:
+          name: Supply Chain Risk Management Plan Implementation
+          description: Implement the supply chain risk management plan including procurement processes

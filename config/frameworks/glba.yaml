@@ -1,0 +1,135 @@
+framework:
+  id: glba
+  name: Gramm-Leach-Bliley Act (GLBA) Safeguards Rule
+  version: "2023"
+  release_date: 1999-11-12
+  description: |
+    The GLBA Safeguards Rule (updated 2023) requires financial institutions to develop,
+    implement, and maintain an information security program with administrative,
+    technical, and physical safeguards designed to protect customer information.
+
+  sources:
+    - url: https://www.ftc.gov/legal-library/browse/rules/safeguards-rule
+      type: webpage
+      check_interval: quarterly
+
+  domains:
+    program_management:
+      name: Information Security Program Management
+      controls:
+        GLBA-PM-01:
+          name: Qualified Individual
+          description: Designate a qualified individual to oversee and implement the information security program
+        GLBA-PM-02:
+          name: Written Information Security Program
+          description: Develop, implement, and maintain a comprehensive written information security program
+        GLBA-PM-03:
+          name: Board Reporting
+          description: Report regularly to the board or governing body on the status of the information security program
+        GLBA-PM-04:
+          name: Program Scope
+          description: Define the scope of the information security program based on identified risks
+
+    risk_assessment:
+      name: Risk Assessment
+      controls:
+        GLBA-RA-01:
+          name: Risk Assessment
+          description: Conduct periodic risk assessments including identification of reasonably foreseeable internal and external risks
+        GLBA-RA-02:
+          name: Risk Assessment Criteria
+          description: Assess the sufficiency of safeguards in place to control identified risks
+        GLBA-RA-03:
+          name: Risk Assessment Documentation
+          description: Document the risk assessment including identified risks, safeguards, and risk treatment decisions
+
+    access_controls:
+      name: Access Controls
+      controls:
+        GLBA-AC-01:
+          name: Access Controls
+          description: Implement and periodically review access controls including technical and physical controls
+        GLBA-AC-02:
+          name: Authentication Controls
+          description: Implement multi-factor authentication for any individual accessing customer information systems
+        GLBA-AC-03:
+          name: Least Privilege
+          description: Restrict access to customer information to authorized users based on job function
+
+    data_protection:
+      name: Data Protection
+      controls:
+        GLBA-DP-01:
+          name: Encryption of Customer Information
+          description: Encrypt all customer information held or transmitted both in transit and at rest
+        GLBA-DP-02:
+          name: Secure Data Disposal
+          description: Implement secure disposal procedures within two years after last use of customer information
+        GLBA-DP-03:
+          name: Data Inventory
+          description: Maintain an inventory of data, personnel, devices, systems, and facilities containing customer information
+
+    monitoring:
+      name: Monitoring and Testing
+      controls:
+        GLBA-MT-01:
+          name: Continuous Monitoring
+          description: Implement continuous monitoring or periodic penetration testing and vulnerability assessments
+        GLBA-MT-02:
+          name: System Logging and Monitoring
+          description: Implement centralized logging and monitoring of systems handling customer information
+        GLBA-MT-03:
+          name: Intrusion Detection
+          description: Implement intrusion detection systems to detect actual and attempted attacks on customer information systems
+        GLBA-MT-04:
+          name: Annual Penetration Testing
+          description: Conduct annual penetration testing of information systems containing customer information
+        GLBA-MT-05:
+          name: Vulnerability Assessment
+          description: Conduct vulnerability assessments every six months and after material changes
+
+    change_management:
+      name: Change Management
+      controls:
+        GLBA-CH-01:
+          name: Change Management
+          description: Implement policies, procedures, and controls to monitor and manage changes to information systems
+        GLBA-CH-02:
+          name: Secure Development
+          description: Implement secure development practices for in-house developed applications handling customer information
+
+    incident_response:
+      name: Incident Response
+      controls:
+        GLBA-IR-01:
+          name: Incident Response Plan
+          description: Establish a written incident response plan designed to promptly respond to security events
+        GLBA-IR-02:
+          name: Notification Procedures
+          description: Notify the FTC and affected customers in the event of a security event involving customer information
+        GLBA-IR-03:
+          name: Post-Incident Review
+          description: Conduct post-incident analysis and modify the information security program as needed
+
+    training:
+      name: Training and Awareness
+      controls:
+        GLBA-TR-01:
+          name: Security Awareness Training
+          description: Provide security awareness training to all personnel with access to customer information
+        GLBA-TR-02:
+          name: Specialized Training
+          description: Provide specialized training for security personnel responsible for implementing safeguards
+
+    vendor_management:
+      name: Service Provider Oversight
+      controls:
+        GLBA-VM-01:
+          name: Service Provider Selection
+          description: Select service providers capable of maintaining appropriate safeguards for customer information
+        GLBA-VM-02:
+          name: Contractual Requirements
+          description: Require service providers by contract to implement appropriate safeguards
+        GLBA-VM-03:
+          name: Service Provider Monitoring
+          description: Periodically assess service providers based on the risk they present and adequacy of their safeguards
