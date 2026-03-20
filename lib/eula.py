@@ -132,7 +132,7 @@ def prompt_eula_acceptance_tui() -> bool:
             continue
         elif response in ("y", "yes"):
             record_acceptance()
-            tui.ok(f"EULA v{EULA_VERSION} accepted.")
+            tui.success(f"EULA v{EULA_VERSION} accepted.")
             return True
         elif response in ("n", "no"):
             return False
