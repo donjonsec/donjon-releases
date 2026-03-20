@@ -59,18 +59,27 @@ class WebScanner(BaseScanner):
         }
 
         for target in targets:
-            for port in ports:
-                # Determine protocol
-                protocol = 'https' if port in [443, 8443] else 'http'
-                url = f"{protocol}://{target}:{port}"
+            # Parse target — may be a URL or just a host/IP
+            if '://' in target:
+                from urllib.parse import urlparse
+                parsed = urlparse(target)
+                host = parsed.hostname or target
+                target_port = parsed.port
+                protocol = parsed.scheme or 'http'
+                scan_ports = [target_port] if target_port else [443 if protocol == 'https' else 80]
+            else:
+                host = target
+                scan_ports = ports
 
-                self.scan_logger.info(f"Scanning web service at {url}")
+            for port in scan_ports:
+                protocol = 'https' if port in [443, 8443] else 'http'
+                self.scan_logger.info(f"Scanning web service at {protocol}://{host}:{port}")
 
                 try:
-                    findings = self._run_nikto(target, port, protocol, scan_type)
+                    findings = self._run_nikto(host, port, protocol, scan_type)
                     results['findings'].extend(findings)
                 except Exception as e:
-                    self.scan_logger.warning(f"Error scanning {url}: {e}")
+                    self.scan_logger.warning(f"Error scanning {host}:{port}: {e}")
 
                 self.human_delay()
 
