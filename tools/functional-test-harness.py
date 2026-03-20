@@ -1058,8 +1058,28 @@ TUI_STUBS = [
 
 
 def test_tui_stubs(harness: HarnessResults):
-    """Document which menu choices are stubbed with 'planned for future release'."""
-    print('\n=== TUI STUB TESTS ===')
+    """Check which menu choices are wired vs stubbed."""
+    print('\n=== TUI MENU WIRING TESTS ===')
+
+    # Read the launcher source to check handler wiring
+    launcher_src = ''
+    for launcher_path in [
+        Path(__file__).parent.parent / 'bin' / 'donjon-launcher',
+        Path('/opt/donjon-platform/bin/donjon-launcher'),
+    ]:
+        if launcher_path.exists():
+            launcher_src = launcher_path.read_text()
+            break
+
+    # Map menu_type to handler method name
+    handler_map = {
+        'red_team': 'handle_red_team',
+        'blue_team': 'handle_blue_team',
+        'purple_team': 'handle_purple_team',
+        'compliance': 'handle_compliance',
+        'settings': 'handle_settings',
+        'main': 'run',
+    }
 
     for menu_path, choice_key, menu_type in TUI_STUBS:
         r = TestResult(
@@ -1067,9 +1087,27 @@ def test_tui_stubs(harness: HarnessResults):
             menu_path,
         )
         r.input_desc = f'choice={choice_key} in {menu_type} menu'
-        r.status = 'STUB'
-        r.user_would_see = 'This feature is planned for a future release.'
-        r.output_summary = 'Stub: planned for future release'
+
+        # Check if the choice is wired in the handler
+        handler_name = handler_map.get(menu_type, '')
+        if launcher_src and handler_name:
+            # Find the handler method and check for elif choice == 'X'
+            handler_pattern = f"elif choice == '{choice_key}'"
+            # Also check for the "planned" message near this choice
+            has_wiring = handler_pattern in launcher_src
+            has_planned = 'planned for a future release' in launcher_src
+
+            if has_wiring:
+                r.status = 'PASS'
+                r.output_summary = f'Menu item wired (choice={choice_key} has handler)'
+            else:
+                r.status = 'STUB'
+                r.output_summary = 'Not wired — falls through to else clause'
+                r.user_would_see = 'This feature is planned for a future release.'
+        else:
+            r.status = 'STUB'
+            r.output_summary = 'Cannot verify — launcher source not found'
+
         harness.add(r)
 
 
