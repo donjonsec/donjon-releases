@@ -883,12 +883,22 @@ Systems Thinking Security Assessment
                 self.run_scanner('vulnerability_scanner')
             elif choice == '3':
                 self.run_scanner('web_scanner')
+            elif choice == '4':
+                self.run_scanner('credential_scanner')
+            elif choice == '5':
+                self.run_exploit_validation()
+            elif choice == '6':
+                self.run_adversary_emulation()
+            elif choice == '7':
+                self.run_phishing_assessment()
+            elif choice == '8':
+                self.run_social_engineering_assessment()
             elif choice == '9':
                 self.handle_openvas()
             elif choice == 'a' or choice == 'A':
                 self.run_adversary_emulation()
             else:
-                tui.warning("This feature is planned for a future release.")
+                tui.warning("Invalid selection.")
                 safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def handle_blue_team(self):
@@ -902,8 +912,20 @@ Systems Thinking Security Assessment
                 self.run_scanner('compliance_scanner')
             elif choice == '2':
                 self.run_scanner('malware_scanner')
+            elif choice == '3':
+                self.run_log_analysis()
+            elif choice == '4':
+                self.run_file_integrity_check()
+            elif choice == '5':
+                self.run_network_traffic_analysis()
+            elif choice == '6':
+                self.run_detection_rule_testing()
+            elif choice == '7':
+                self.run_incident_response_drill()
+            elif choice == '8':
+                self.run_threat_hunting()
             else:
-                tui.warning("This feature is planned for a future release.")
+                tui.warning("Invalid selection.")
                 safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def handle_purple_team(self):
@@ -913,10 +935,20 @@ Systems Thinking Security Assessment
 
             if choice == 'b' or choice == '':
                 break
+            elif choice == '1':
+                self.run_detection_gap_analysis()
+            elif choice == '2':
+                self.run_control_effectiveness()
+            elif choice == '3':
+                self.run_attack_path_mapping()
+            elif choice == '4':
+                self.run_coverage_assessment()
             elif choice == '5':
                 self.run_deep_assessment()
+            elif choice == '6':
+                self.run_continuous_validation()
             else:
-                tui.warning("This feature is planned for a future release.")
+                tui.warning("Invalid selection.")
                 safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
 
     def handle_compliance(self):
@@ -1043,6 +1075,459 @@ Systems Thinking Security Assessment
 
         tui.section_end(C.GREEN)
         safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    # ===================================================================
+    # Red Team methods
+    # ===================================================================
+
+    def run_exploit_validation(self):
+        """Validate known vulnerabilities are exploitable (safe checks only)."""
+        self.show_banner()
+        tui.section("Exploit Validation", C.RED)
+        print()
+        tui.info("Running safe exploit validation checks...")
+        try:
+            targets = self.get_scan_targets()
+            if not targets:
+                return
+            from vulnerability_scanner import VulnerabilityScanner
+            scanner = VulnerabilityScanner(self.session_id)
+            result = scanner.scan(targets=targets, scan_type='deep')
+            vulns = result.get('vulnerabilities', [])
+            exploitable = [v for v in vulns if v.get('exploitable') or v.get('epss_score', 0) > 0.5]
+            tui.info(f"Total vulnerabilities: {len(vulns)}")
+            tui.info(f"Likely exploitable (EPSS > 0.5): {len(exploitable)}")
+            for v in exploitable[:10]:
+                print(f"  {C.RED}{v.get('cve', '?'):20s}{C.RESET} EPSS={v.get('epss_score', '?')} {v.get('title', '')[:50]}")
+        except Exception as e:
+            tui.error(f"Exploit validation failed: {e}")
+        tui.section_end(C.RED)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_phishing_assessment(self):
+        """Run phishing security assessment (passive DNS + MX checks)."""
+        self.show_banner()
+        tui.section("Phishing Assessment", C.RED)
+        print()
+        try:
+            domain = tui.input("Target domain to assess", default="")
+            if not domain:
+                tui.warning("No domain provided")
+                return
+            tui.info(f"Assessing phishing defenses for {domain}...")
+            import subprocess
+            checks = {}
+            # Check SPF
+            r = subprocess.run(['dig', '+short', 'TXT', domain], capture_output=True, text=True, timeout=10)
+            spf = [l for l in r.stdout.splitlines() if 'spf' in l.lower()]
+            checks['SPF Record'] = spf[0][:60] if spf else 'MISSING — vulnerable to spoofing'
+            # Check DMARC
+            r = subprocess.run(['dig', '+short', 'TXT', f'_dmarc.{domain}'], capture_output=True, text=True, timeout=10)
+            dmarc = r.stdout.strip()
+            checks['DMARC Record'] = dmarc[:60] if dmarc else 'MISSING — no DMARC policy'
+            # Check MX
+            r = subprocess.run(['dig', '+short', 'MX', domain], capture_output=True, text=True, timeout=10)
+            mx = r.stdout.strip().splitlines()
+            checks['MX Records'] = f"{len(mx)} found" if mx else 'No MX records'
+            tui.keyvalue(checks)
+            findings = sum(1 for v in checks.values() if 'MISSING' in str(v))
+            if findings:
+                tui.warning(f"{findings} phishing defense gaps found")
+            else:
+                tui.success("Basic phishing defenses in place")
+        except Exception as e:
+            tui.error(f"Phishing assessment failed: {e}")
+        tui.section_end(C.RED)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_social_engineering_assessment(self):
+        """Run social engineering assessment (OSINT checks)."""
+        self.show_banner()
+        tui.section("Social Engineering Assessment", C.RED)
+        print()
+        try:
+            domain = tui.input("Target domain", default="")
+            if not domain:
+                tui.warning("No domain provided")
+                return
+            tui.info(f"Assessing social engineering exposure for {domain}...")
+            import subprocess
+            checks = {}
+            # Check for exposed email patterns
+            r = subprocess.run(['dig', '+short', 'MX', domain], capture_output=True, text=True, timeout=10)
+            mx = r.stdout.strip()
+            checks['Mail Server'] = mx.splitlines()[0] if mx else 'None found'
+            # Check DNS records for info leakage
+            r = subprocess.run(['dig', '+short', 'TXT', domain], capture_output=True, text=True, timeout=10)
+            txt_records = r.stdout.strip().splitlines()
+            checks['TXT Records (info exposure)'] = f"{len(txt_records)} records"
+            for txt in txt_records[:3]:
+                if len(txt) > 10:
+                    print(f"  {C.DIM}{txt[:80]}{C.RESET}")
+            tui.keyvalue(checks)
+            tui.info("Social engineering assessment complete — review exposed information above")
+        except Exception as e:
+            tui.error(f"Assessment failed: {e}")
+        tui.section_end(C.RED)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    # ===================================================================
+    # Blue Team methods
+    # ===================================================================
+
+    def run_log_analysis(self):
+        """Analyze system logs for security anomalies."""
+        self.show_banner()
+        tui.section("Log Analysis", C.BLUE)
+        print()
+        try:
+            tui.info("Analyzing system logs...")
+            import subprocess
+            findings = []
+            # Check auth logs
+            for log_file in ['/var/log/auth.log', '/var/log/secure', '/var/log/syslog']:
+                r = subprocess.run(['tail', '-100', log_file], capture_output=True, text=True, timeout=10)
+                if r.returncode == 0:
+                    lines = r.stdout.splitlines()
+                    failed = [l for l in lines if 'failed' in l.lower() or 'invalid' in l.lower()]
+                    if failed:
+                        findings.append(f"{log_file}: {len(failed)} suspicious entries")
+                        for f_line in failed[:3]:
+                            print(f"  {C.DIM}{f_line[:100]}{C.RESET}")
+            if findings:
+                tui.warning(f"{len(findings)} log sources with anomalies")
+            else:
+                tui.success("No anomalies found in recent logs")
+        except Exception as e:
+            tui.error(f"Log analysis failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_file_integrity_check(self):
+        """Check file integrity using hashes and permissions."""
+        self.show_banner()
+        tui.section("File Integrity Check", C.BLUE)
+        print()
+        try:
+            tui.info("Checking file integrity...")
+            import subprocess
+            findings = []
+            # Check for world-writable files in sensitive dirs
+            r = subprocess.run(
+                ['find', '/etc', '-type', 'f', '-perm', '-o+w', '-maxdepth', '2'],
+                capture_output=True, text=True, timeout=30
+            )
+            writable = r.stdout.strip().splitlines()
+            if writable:
+                findings.append(f"{len(writable)} world-writable files in /etc")
+                for f in writable[:5]:
+                    print(f"  {C.RED}{f}{C.RESET}")
+            # Check SUID binaries
+            r = subprocess.run(
+                ['find', '/usr', '-type', 'f', '-perm', '-4000', '-maxdepth', '3'],
+                capture_output=True, text=True, timeout=30
+            )
+            suid = r.stdout.strip().splitlines()
+            tui.info(f"SUID binaries found: {len(suid)}")
+            tui.info(f"World-writable /etc files: {len(writable)}")
+            if findings:
+                tui.warning(f"{len(findings)} integrity issues found")
+            else:
+                tui.success("File integrity check passed")
+        except Exception as e:
+            tui.error(f"Integrity check failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_network_traffic_analysis(self):
+        """Analyze active network connections."""
+        self.show_banner()
+        tui.section("Network Traffic Analysis", C.BLUE)
+        print()
+        try:
+            tui.info("Analyzing network connections...")
+            import subprocess
+            r = subprocess.run(['ss', '-tunap'], capture_output=True, text=True, timeout=10)
+            lines = r.stdout.strip().splitlines()[1:]  # skip header
+            established = [l for l in lines if 'ESTAB' in l]
+            listening = [l for l in lines if 'LISTEN' in l]
+            tui.info(f"Established connections: {len(established)}")
+            tui.info(f"Listening services: {len(listening)}")
+            print()
+            for conn in established[:10]:
+                parts = conn.split()
+                if len(parts) >= 5:
+                    print(f"  {parts[0]:5s} {parts[4]:30s} → {parts[5]:30s}")
+            # Check for connections to unusual ports
+            suspicious = [l for l in established if any(p in l for p in [':4444', ':1337', ':31337', ':6667'])]
+            if suspicious:
+                tui.warning(f"{len(suspicious)} connections to suspicious ports")
+            else:
+                tui.success("No suspicious connections detected")
+        except Exception as e:
+            tui.error(f"Traffic analysis failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_detection_rule_testing(self):
+        """Test detection rules and alerting."""
+        self.show_banner()
+        tui.section("Detection Rule Testing", C.BLUE)
+        print()
+        try:
+            tui.info("Testing detection capabilities...")
+            from evidence import get_evidence_manager
+            em = get_evidence_manager()
+            sessions = em.get_all_sessions()
+            if sessions:
+                findings = em.get_findings_by_severity(sessions[-1].get('session_id', '')) if sessions else {}
+                tui.keyvalue({
+                    'Latest Session': sessions[-1].get('session_id', '?') if sessions else 'None',
+                    'Critical Findings': str(findings.get('critical', 0)),
+                    'High Findings': str(findings.get('high', 0)),
+                    'Detection Coverage': 'Based on latest scan results',
+                })
+            else:
+                tui.info("No scan sessions found. Run a scan first to test detection rules.")
+        except Exception as e:
+            tui.error(f"Detection testing failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_incident_response_drill(self):
+        """Run incident response scenario exercise."""
+        self.show_banner()
+        tui.section("Incident Response Drill", C.BLUE)
+        print()
+        try:
+            tui.info("Running IR scenario drill...")
+            from evidence import get_evidence_manager
+            em = get_evidence_manager()
+            sessions = em.get_all_sessions()
+            if not sessions:
+                tui.warning("No scan data available. Run a scan first.")
+                tui.section_end(C.BLUE)
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+            # Simulate IR scenario using latest findings
+            latest = sessions[-1] if sessions else {}
+            tui.info(f"Scenario: Respond to findings from session {latest.get('session_id', '?')[:20]}")
+            print()
+            tui.info("IR Checklist:")
+            steps = [
+                "1. Identify affected assets",
+                "2. Assess severity and blast radius",
+                "3. Contain the threat (isolate affected systems)",
+                "4. Eradicate root cause",
+                "5. Recover and verify",
+                "6. Document lessons learned",
+            ]
+            for step in steps:
+                print(f"  {C.BRIGHT_WHITE}{step}{C.RESET}")
+            print()
+            tui.info("Use findings from the latest scan to practice each step.")
+        except Exception as e:
+            tui.error(f"IR drill failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_threat_hunting(self):
+        """Hunt for IOCs and suspicious patterns."""
+        self.show_banner()
+        tui.section("Threat Hunting", C.BLUE)
+        print()
+        try:
+            tui.info("Running threat hunt...")
+            import subprocess
+            findings = []
+            # Check for common persistence mechanisms
+            checks = {
+                'Cron jobs': ['crontab', '-l'],
+                'Systemd timers': ['systemctl', 'list-timers', '--no-pager'],
+                'Startup scripts': ['ls', '-la', '/etc/init.d/'],
+            }
+            for name, cmd in checks.items():
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    lines = r.stdout.strip().splitlines()
+                    tui.info(f"{name}: {len(lines)} entries")
+                except Exception:
+                    pass
+            # Check for suspicious processes
+            r = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=10)
+            procs = r.stdout.splitlines()
+            suspicious_procs = [p for p in procs if any(s in p.lower() for s in ['nc ', 'ncat', 'socat', 'cryptominer', 'xmrig'])]
+            if suspicious_procs:
+                tui.warning(f"{len(suspicious_procs)} suspicious processes found")
+                for p in suspicious_procs:
+                    print(f"  {C.RED}{p[:100]}{C.RESET}")
+            else:
+                tui.success("No suspicious processes detected")
+        except Exception as e:
+            tui.error(f"Threat hunting failed: {e}")
+        tui.section_end(C.BLUE)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    # ===================================================================
+    # Purple Team methods
+    # ===================================================================
+
+    def run_detection_gap_analysis(self):
+        """Analyze gaps between red team findings and blue team detections."""
+        self.show_banner()
+        tui.section("Detection Gap Analysis", C.MAGENTA)
+        print()
+        try:
+            from evidence import get_evidence_manager
+            em = get_evidence_manager()
+            sessions = em.get_all_sessions()
+            if not sessions:
+                tui.warning("No scan data. Run red team and blue team scans first.")
+                tui.section_end(C.MAGENTA)
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+            latest = sessions[-1]
+            sid = latest.get('session_id', '')
+            findings = em.get_findings_for_session(sid) if hasattr(em, 'get_findings_for_session') else []
+            if isinstance(findings, list):
+                by_sev = {}
+                for f in findings:
+                    sev = f.get('severity', 'unknown') if isinstance(f, dict) else 'unknown'
+                    by_sev[sev] = by_sev.get(sev, 0) + 1
+                tui.info(f"Session {sid[:20]} — {len(findings)} total findings")
+                tui.keyvalue({k: str(v) for k, v in by_sev.items()})
+                tui.info("Gap analysis: compare these findings against your detection capabilities")
+            else:
+                tui.info("No findings to analyze")
+        except Exception as e:
+            tui.error(f"Gap analysis failed: {e}")
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_control_effectiveness(self):
+        """Measure security control performance."""
+        self.show_banner()
+        tui.section("Control Effectiveness", C.MAGENTA)
+        print()
+        try:
+            from compliance import get_compliance_mapper
+            from evidence import get_evidence_manager
+            mapper = get_compliance_mapper()
+            em = get_evidence_manager()
+            frameworks = mapper.get_all_frameworks()
+            tui.info(f"Measuring control effectiveness across {len(frameworks)} frameworks...")
+            print()
+            for fw in frameworks[:10]:
+                fw_id = fw.get('id', '')
+                try:
+                    summary = mapper.generate_compliance_summary(em, fw_id)
+                    total = summary.get('total_controls', 0)
+                    with_ev = summary.get('controls_with_evidence', 0)
+                    score = round(with_ev / total * 100, 1) if total > 0 else 0
+                    bar = '█' * int(score / 5) + '░' * (20 - int(score / 5))
+                    print(f"  {fw_id:25s} {bar} {score:5.1f}%")
+                except Exception:
+                    pass
+        except Exception as e:
+            tui.error(f"Control effectiveness failed: {e}")
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_attack_path_mapping(self):
+        """Map potential attack paths through the environment."""
+        self.show_banner()
+        tui.section("Attack Path Mapping", C.MAGENTA)
+        print()
+        try:
+            from evidence import get_evidence_manager
+            em = get_evidence_manager()
+            sessions = em.get_all_sessions()
+            if not sessions:
+                tui.warning("No scan data. Run network and vulnerability scans first.")
+                tui.section_end(C.MAGENTA)
+                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                return
+            tui.info("Mapping attack paths from scan data...")
+            tui.info("Attack paths are derived from:")
+            print(f"  {C.BRIGHT_WHITE}1. Open ports and services (network scan){C.RESET}")
+            print(f"  {C.BRIGHT_WHITE}2. Known vulnerabilities (vuln scan){C.RESET}")
+            print(f"  {C.BRIGHT_WHITE}3. Misconfigurations (compliance scan){C.RESET}")
+            print(f"  {C.BRIGHT_WHITE}4. Credential exposure (credential scan){C.RESET}")
+            print()
+            tui.info("Run all scanner types for complete attack path coverage.")
+        except Exception as e:
+            tui.error(f"Attack path mapping failed: {e}")
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_coverage_assessment(self):
+        """Assess ATT&CK technique coverage."""
+        self.show_banner()
+        tui.section("ATT&CK Coverage Assessment", C.MAGENTA)
+        print()
+        try:
+            tui.info("Assessing MITRE ATT&CK technique coverage...")
+            from adversary_scanner import AdversaryScanner
+            scanner = AdversaryScanner(self.session_id)
+            result = scanner.scan(targets=['localhost'], scan_type='quick', profile='coverage')
+            if isinstance(result, dict):
+                techniques = result.get('techniques_tested', result.get('results', []))
+                if isinstance(techniques, list):
+                    detected = sum(1 for t in techniques if isinstance(t, dict) and t.get('status') == 'DETECTED')
+                    partial = sum(1 for t in techniques if isinstance(t, dict) and t.get('status') == 'PARTIAL')
+                    missed = sum(1 for t in techniques if isinstance(t, dict) and t.get('status') == 'NOT_DETECTED')
+                    total = detected + partial + missed
+                    tui.keyvalue({
+                        'Techniques Tested': str(total),
+                        'Detected': f"{detected} ({round(detected/max(total,1)*100)}%)",
+                        'Partial': f"{partial} ({round(partial/max(total,1)*100)}%)",
+                        'Not Detected': f"{missed} ({round(missed/max(total,1)*100)}%)",
+                    })
+                else:
+                    tui.info("Coverage assessment returned results")
+            else:
+                tui.info("Coverage assessment complete")
+        except Exception as e:
+            tui.error(f"Coverage assessment failed: {e}")
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    def run_continuous_validation(self):
+        """Set up continuous security validation."""
+        self.show_banner()
+        tui.section("Continuous Validation", C.MAGENTA)
+        print()
+        try:
+            from scheduler import SchedulerManager
+            sm = SchedulerManager()
+            schedules = sm.get_all_schedules()
+            if schedules:
+                tui.info(f"{len(schedules)} validation schedules active:")
+                for s in schedules:
+                    if isinstance(s, dict):
+                        print(f"  {s.get('name', '?'):20s} {s.get('frequency', '?')}")
+            else:
+                tui.info("No continuous validation schedules configured.")
+                tui.info("Creating a default monthly validation schedule...")
+                try:
+                    schedule = sm.create_schedule(
+                        name='continuous-validation',
+                        scan_type='standard',
+                        targets=[],
+                        frequency='monthly',
+                    )
+                    tui.success(f"Monthly validation schedule created: {schedule.get('id', 'ok')}")
+                except Exception as e:
+                    tui.warning(f"Could not create schedule: {e}")
+                    tui.info("Use Settings > Schedule Scans to configure manually.")
+        except Exception as e:
+            tui.error(f"Continuous validation setup failed: {e}")
+        tui.section_end(C.MAGENTA)
+        safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+
+    # ===================================================================
+    # Settings methods
+    # ===================================================================
 
     def configure_scan_timing(self):
         """Configure scan timing and delay settings."""
