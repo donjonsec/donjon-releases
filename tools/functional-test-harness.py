@@ -1293,12 +1293,12 @@ def test_notifications(harness: HarnessResults):
 # ---------------------------------------------------------------------------
 
 COMPLIANCE_FRAMEWORKS = [
-    ('NIST-800-53', 'Main > Compliance > NIST 800-53 Report'),
-    ('HIPAA', 'Main > Compliance > HIPAA Report'),
-    ('PCI-DSS-v4', 'Main > Compliance > PCI-DSS Report'),
-    ('CMMC', 'Main > Compliance > (CMMC)'),
-    ('SOC2-Type2', 'Main > Compliance > SOC 2 Report'),
-    ('ISO27001-2022', 'Main > Compliance > ISO 27001 Report'),
+    ('nist_800_53', 'Main > Compliance > NIST 800-53 Report'),
+    ('hipaa', 'Main > Compliance > HIPAA Report'),
+    ('pci_dss_4', 'Main > Compliance > PCI-DSS Report'),
+    ('cmmc', 'Main > Compliance > CMMC Report'),
+    ('soc2', 'Main > Compliance > SOC 2 Report'),
+    ('iso_27001_2022', 'Main > Compliance > ISO 27001 Report'),
 ]
 
 
