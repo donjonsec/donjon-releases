@@ -221,7 +221,7 @@ class NetworkScanner(BaseScanner):
         cmd = [
             str(self.nmap_path),
             *scan_flags,
-            port_arg,
+            *port_arg.split(),
             '--max-retries', '2',
             '--host-timeout', '5m',
             host
