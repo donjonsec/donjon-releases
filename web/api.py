@@ -1196,50 +1196,47 @@ class DonjonAPI:
 
     def _stats(self, **kw) -> Tuple[bytes, int, str]:
         stats: Dict[str, Any] = {}
-        if get_asset_inventory:
+
+        def _safe_stat(name, fn):
+            """Run a stat collection with timeout protection."""
             try:
-                stats['assets'] = get_asset_inventory().get_statistics()
+                stats[name] = fn()
             except Exception as e:
-                stats['assets'] = {'error': str(e)}
+                stats[name] = {'error': str(e)}
+
+        if get_asset_inventory:
+            _safe_stat('assets', lambda: get_asset_inventory().get_statistics())
         if get_evidence_manager:
-            try:
+            def _evidence_stats():
                 em = get_evidence_manager()
-                sessions = em.get_all_sessions(limit=1)
-                stats['sessions_total'] = len(em.get_all_sessions(limit=10000))
+                sessions = em.get_all_sessions(limit=100)
                 findings = em.get_findings_by_severity(status='open')
-                stats['open_findings'] = len(findings)
                 by_sev: Dict[str, int] = {}
                 for f in findings:
                     s = f.get('severity', 'INFO')
                     by_sev[s] = by_sev.get(s, 0) + 1
-                stats['findings_by_severity'] = by_sev
-            except Exception as e:
-                stats['evidence'] = {'error': str(e)}
+                return {
+                    'sessions_total': len(sessions),
+                    'open_findings': len(findings),
+                    'findings_by_severity': by_sev,
+                }
+            _safe_stat('evidence', _evidence_stats)
+            # Flatten evidence stats to top level for backward compat
+            if isinstance(stats.get('evidence'), dict) and 'sessions_total' in stats.get('evidence', {}):
+                ev = stats.pop('evidence')
+                stats['sessions_total'] = ev['sessions_total']
+                stats['open_findings'] = ev['open_findings']
+                stats['findings_by_severity'] = ev['findings_by_severity']
         if get_remediation_tracker:
-            try:
-                stats['remediation'] = get_remediation_tracker().get_statistics()
-            except Exception as e:
-                stats['remediation'] = {'error': str(e)}
+            _safe_stat('remediation', lambda: get_remediation_tracker().get_statistics())
         if get_risk_register:
-            try:
-                stats['risks'] = get_risk_register().get_statistics()
-            except Exception as e:
-                stats['risks'] = {'error': str(e)}
+            _safe_stat('risks', lambda: get_risk_register().get_statistics())
         if get_exception_manager:
-            try:
-                stats['exceptions'] = get_exception_manager().get_statistics()
-            except Exception as e:
-                stats['exceptions'] = {'error': str(e)}
+            _safe_stat('exceptions', lambda: get_exception_manager().get_statistics())
         if get_audit_trail:
-            try:
-                stats['audit'] = get_audit_trail().get_statistics()
-            except Exception as e:
-                stats['audit'] = {'error': str(e)}
+            _safe_stat('audit', lambda: get_audit_trail().get_statistics())
         if get_discovery_engine:
-            try:
-                stats['discovery'] = get_discovery_engine().get_statistics()
-            except Exception as e:
-                stats['discovery'] = {'error': str(e)}
+            _safe_stat('discovery', lambda: get_discovery_engine().get_statistics())
         stats['agents'] = {
             'connected': len(self._agents),
             'agent_ids': list(self._agents.keys()),
