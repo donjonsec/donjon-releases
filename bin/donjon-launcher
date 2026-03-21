@@ -607,6 +607,18 @@ class DonjonLauncher:
 
             print()
             tui.success(f"Assessment complete! Session: {results.get('session_id', 'N/A')}")
+        except KeyboardInterrupt:
+            print()
+            tui.warning("Assessment cancelled by user.")
+            # Mark session cancelled if orchestrator created one
+            if get_evidence_manager:
+                try:
+                    _em = get_evidence_manager()
+                    if orchestrator.session_id:
+                        _em.end_session(orchestrator.session_id,
+                                        {'cancelled': True}, status='cancelled')
+                except Exception:
+                    pass
         except Exception as e:
             tui.error(f"Assessment failed: {e}")
 
@@ -639,6 +651,17 @@ class DonjonLauncher:
 
             print()
             tui.success(f"Audit complete! Session: {results.get('session_id', 'N/A')}")
+        except KeyboardInterrupt:
+            print()
+            tui.warning("Audit cancelled by user.")
+            if get_evidence_manager:
+                try:
+                    _em = get_evidence_manager()
+                    if orchestrator.session_id:
+                        _em.end_session(orchestrator.session_id,
+                                        {'cancelled': True}, status='cancelled')
+                except Exception:
+                    pass
         except Exception as e:
             tui.error(f"Audit failed: {e}")
 
@@ -2750,47 +2773,52 @@ Systems Thinking Security Assessment
                 print("Exiting. Run setup to install required tools.")
                 return
 
-        # Main loop
+        # Main loop — Ctrl+C during any operation returns here (Issue #4)
         while True:
-            self.show_banner(force=True)
-            choice = self.show_main_menu()
+            try:
+                self.show_banner(force=True)
+                choice = self.show_main_menu()
 
-            if choice == 'q' or choice == 'Q':
-                tui.info("Goodbye!")
-                break
-            elif choice == '1':
-                self.handle_red_team()
-            elif choice == '2':
-                self.handle_blue_team()
-            elif choice == '3':
-                self.handle_purple_team()
-            elif choice == '4':
-                self.run_quick_scan()
-            elif choice == '5':
-                self.run_standard_assessment()
-            elif choice == '6':
-                self.run_deep_assessment()
-            elif choice == '7':
-                self.handle_compliance()
-            elif choice == '8':
-                self.manage_schedules()
-            elif choice == '9':
-                self.show_tool_status()
-            elif choice == 'w' or choice == 'W':
-                self.run_windows_scan()
-            elif choice == 'l' or choice == 'L':
-                self.run_linux_scan()
-            elif choice == 'd' or choice == 'D':
-                self.show_dashboard()
-            elif choice == 'x' or choice == 'X':
-                self.export_data()
-            elif choice == 's' or choice == 'S':
-                self.handle_settings()
-            elif choice == 'h' or choice == 'H':
-                self.show_help()
-            else:
-                tui.warning("Invalid option")
-                safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+                if choice == 'q' or choice == 'Q':
+                    tui.info("Goodbye!")
+                    break
+                elif choice == '1':
+                    self.handle_red_team()
+                elif choice == '2':
+                    self.handle_blue_team()
+                elif choice == '3':
+                    self.handle_purple_team()
+                elif choice == '4':
+                    self.run_quick_scan()
+                elif choice == '5':
+                    self.run_standard_assessment()
+                elif choice == '6':
+                    self.run_deep_assessment()
+                elif choice == '7':
+                    self.handle_compliance()
+                elif choice == '8':
+                    self.manage_schedules()
+                elif choice == '9':
+                    self.show_tool_status()
+                elif choice == 'w' or choice == 'W':
+                    self.run_windows_scan()
+                elif choice == 'l' or choice == 'L':
+                    self.run_linux_scan()
+                elif choice == 'd' or choice == 'D':
+                    self.show_dashboard()
+                elif choice == 'x' or choice == 'X':
+                    self.export_data()
+                elif choice == 's' or choice == 'S':
+                    self.handle_settings()
+                elif choice == 'h' or choice == 'H':
+                    self.show_help()
+                else:
+                    tui.warning("Invalid option")
+                    safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            except KeyboardInterrupt:
+                # Ctrl+C returns to menu instead of killing the app
+                print(f"\n{C.YELLOW}  Scan cancelled. Returning to menu...{C.RESET}")
+                continue
 
     def run_windows_scan(self):
         """Run a local Windows security assessment."""

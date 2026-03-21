@@ -193,15 +193,27 @@ class EvidenceManager:
         paths.session_dir(session_id)
         return session_id
 
-    def end_session(self, session_id: str, summary: Optional[Dict] = None):
-        """End a scanning session."""
+    def end_session(self, session_id: str, summary: Optional[Dict] = None,
+                    status: str = 'completed'):
+        """End a scanning session.
+
+        Parameters
+        ----------
+        session_id : str
+            The session to close.
+        summary : dict, optional
+            Summary data to store.
+        status : str
+            Final status — ``'completed'``, ``'cancelled'``, ``'failed'``, etc.
+        """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 UPDATE sessions
-                SET end_time = ?, status = 'completed', summary = ?
+                SET end_time = ?, status = ?, summary = ?
                 WHERE session_id = ?
             ''', (
                 datetime.now(timezone.utc).isoformat(),
+                status,
                 json.dumps(summary or {}),
                 session_id
             ))
