@@ -152,30 +152,32 @@ class TUI:
         """Display the main banner."""
         self.refresh_size()
         width = min(65, self.term_width - 4)
+        inner = width - 2  # space between box walls
+
+        # Use text shield [S] instead of emoji for cross-platform alignment
+        shield = '[S]'
 
         print(f"{C.MAGENTA}")
-        print(self.BOX_TL + self.BOX_H * (width - 2) + self.BOX_TR)
+        print(self.BOX_TL + self.BOX_H * inner + self.BOX_TR)
 
-        # Title line
-        title_line = f"  {self.SHIELD}  {title}  {self.SHIELD}  "
-        # Emoji chars (len <= 2) render wider than len() reports; ASCII substitutes don't
-        emoji_offset = (4 - len(self.SHIELD)) * 2 if len(self.SHIELD) < 3 else 0
-        padding = width - 2 - len(title_line) + emoji_offset
-        print(self.BOX_V + title_line + ' ' * padding + self.BOX_V)
+        # Title line — center it
+        title_text = f"  {shield}  {title}  {shield}"
+        pad = inner - len(title_text)
+        print(self.BOX_V + title_text + ' ' * max(pad, 0) + self.BOX_V)
 
         # Version line
-        ver_line = f"  Version {version} - Systems Thinking Security  "
-        padding = width - 2 - len(ver_line)
-        print(self.BOX_V + ver_line + ' ' * padding + self.BOX_V)
+        ver_text = f"  Version {version} - Systems Thinking Security"
+        pad = inner - len(ver_text)
+        print(self.BOX_V + ver_text + ' ' * max(pad, 0) + self.BOX_V)
 
         if subtitle:
-            print(self.BOX_LT + self.BOX_H * (width - 2) + self.BOX_RT)
-            sub_padding = width - 2 - len(subtitle)
-            left_pad = sub_padding // 2
-            right_pad = sub_padding - left_pad
+            print(self.BOX_LT + self.BOX_H * inner + self.BOX_RT)
+            pad = inner - len(subtitle)
+            left_pad = max(pad // 2, 0)
+            right_pad = max(pad - left_pad, 0)
             print(self.BOX_V + ' ' * left_pad + subtitle + ' ' * right_pad + self.BOX_V)
 
-        print(self.BOX_BL + self.BOX_H * (width - 2) + self.BOX_BR)
+        print(self.BOX_BL + self.BOX_H * inner + self.BOX_BR)
         print(f"{C.RESET}")
 
     def section(self, title: str, color=None):

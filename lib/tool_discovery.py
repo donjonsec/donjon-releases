@@ -71,7 +71,7 @@ TOOLS: Dict[str, ToolInfo] = {
         check_cmd='nikto -Version',
         version_cmd='nikto -Version 2>&1 | grep -i version | head -1',
         install_apt='nikto',
-        install_cmd='pip install nikto',
+        install_cmd='git clone --depth 1 https://github.com/sullo/nikto.git && cd nikto/program && echo "Add nikto/program to PATH"',
         install_url='https://github.com/sullo/nikto',
     ),
     'nuclei': ToolInfo(
