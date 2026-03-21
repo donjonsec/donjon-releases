@@ -167,7 +167,7 @@ class TestConfig(unittest.TestCase):
         from config import config
         frameworks = config.get_frameworks()
         self.assertIsInstance(frameworks, list)
-        self.assertIn('NIST-800-53', frameworks)
+        self.assertIn('nist_800_53', frameworks)
 
     def test_get_retention_days(self):
         from config import config
@@ -239,7 +239,7 @@ class TestEvidenceManager(unittest.TestCase):
         )
         # Should not raise
         self.em.map_to_control(
-            evidence_id, 'NIST-800-53', 'RA-5',
+            evidence_id, 'nist_800_53', 'RA-5',
             control_name='Vulnerability Scanning',
             control_family='Risk Assessment',
         )
@@ -287,7 +287,7 @@ class TestEvidenceManager(unittest.TestCase):
         self.assertTrue(len(finding_id) > 0)
 
         self.em.map_to_control(
-            evidence_id, 'NIST-800-53', 'RA-5',
+            evidence_id, 'nist_800_53', 'RA-5',
             control_name='Vulnerability Monitoring and Scanning',
             control_family='Risk Assessment',
         )
@@ -456,9 +456,9 @@ class TestCompliance(unittest.TestCase):
     def test_get_supported_frameworks(self):
         frameworks = self.mapper.get_supported_frameworks()
         self.assertIsInstance(frameworks, list)
-        self.assertIn('NIST-800-53', frameworks)
-        self.assertIn('HIPAA', frameworks)
-        self.assertIn('PCI-DSS-v4', frameworks)
+        self.assertIn('nist_800_53', frameworks)
+        self.assertIn('hipaa', frameworks)
+        self.assertIn('pci_dss_4', frameworks)
 
     def test_get_controls_for_finding(self):
         controls = self.mapper.get_controls_for_finding('open_port')
@@ -468,13 +468,13 @@ class TestCompliance(unittest.TestCase):
         # Check for at least one framework key
         has_framework = any(
             fw in controls
-            for fw in ['NIST-800-53', 'PCI-DSS-v4', 'HIPAA']
+            for fw in ['nist_800_53', 'pci_dss_4', 'hipaa']
         )
         self.assertTrue(has_framework)
 
     def test_get_control(self):
         from compliance import Control
-        control = self.mapper.get_control('NIST-800-53', 'AC-2')
+        control = self.mapper.get_control('nist_800_53', 'AC-2')
         self.assertIsNotNone(control)
         self.assertIsInstance(control, Control)
 

@@ -1126,7 +1126,7 @@ if __name__ == "__main__":
     p2 = rg.save_report(risk_html, "risk_report_test")
     print(f"Risk report saved: {p2}")
 
-    comp_html = rg.generate_compliance_report("NIST-800-53")
+    comp_html = rg.generate_compliance_report("nist_800_53")
     p3 = rg.save_report(comp_html, "compliance_nist_test")
     print(f"Compliance report saved: {p3}")
 

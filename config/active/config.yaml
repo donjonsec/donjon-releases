@@ -40,16 +40,16 @@ evidence:
 
 compliance:
   frameworks:
-    - NIST-800-53
-    - HIPAA
+    - nist_800_53
+    - hipaa
     - SOC1-Type2
-    - SOC2-Type2
-    - PCI-DSS-v4
-    - ISO27001-2022
-    - CMMC
-    - FedRAMP
-    - GDPR
-    - SOX
+    - soc2
+    - pci_dss_4
+    - iso_27001_2022
+    - cmmc
+    - fedramp
+    - gdpr
+    - sox
   auto_map_findings: true
   generate_attestations: true
   include_remediation: true

@@ -529,14 +529,14 @@ def test_data_flow(harness: HarnessResults, target: str, session_id: str):
 
     # --- Compliance mapping ---
     r = TestResult('dataflow.compliance_mapping', 'Data Flow')
-    r.input_desc = 'ComplianceMapper.generate_compliance_summary(em, "NIST-800-53")'
+    r.input_desc = 'ComplianceMapper.generate_compliance_summary(em, "nist_800_53")'
     t0 = time.time()
     try:
         from lib.compliance import get_compliance_mapper
         from lib.evidence import get_evidence_manager
         mapper = get_compliance_mapper()
         em = get_evidence_manager()
-        summary = mapper.generate_compliance_summary(em, 'NIST-800-53')
+        summary = mapper.generate_compliance_summary(em, 'nist_800_53')
         r.duration_seconds = time.time() - t0
 
         total = summary.get('total_controls', 0)
@@ -549,7 +549,7 @@ def test_data_flow(harness: HarnessResults, target: str, session_id: str):
                 r.error = 'No controls have mapped evidence'
         else:
             r.status = 'FAIL'
-            r.error = 'No controls defined for NIST-800-53'
+            r.error = 'No controls defined for nist_800_53'
     except Exception as exc:
         r.duration_seconds = time.time() - t0
         r.status = 'ERROR'

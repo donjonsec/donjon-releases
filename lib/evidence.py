@@ -163,6 +163,30 @@ class EvidenceManager:
             except Exception:
                 pass
 
+            # Migrate old uppercase framework IDs to canonical lowercase IDs
+            _fw_renames = {
+                'NIST-800-53': 'nist_800_53',
+                'HIPAA': 'hipaa',
+                'PCI-DSS-v4': 'pci_dss_4',
+                'SOC2-Type2': 'soc2',
+                'ISO27001-2022': 'iso_27001_2022',
+            }
+            for old_id, new_id in _fw_renames.items():
+                try:
+                    conn.execute(
+                        'UPDATE control_mappings SET framework = ? WHERE framework = ?',
+                        (new_id, old_id),
+                    )
+                except Exception:
+                    pass
+                try:
+                    conn.execute(
+                        'UPDATE attestations SET framework = ? WHERE framework = ?',
+                        (new_id, old_id),
+                    )
+                except Exception:
+                    pass
+
     def _generate_id(self, prefix: str) -> str:
         """Generate unique ID with prefix."""
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
@@ -609,7 +633,7 @@ if __name__ == '__main__':
     print(f"Created evidence: {evd}")
 
     # Test mapping
-    em.map_to_control(evd, 'NIST-800-53', 'RA-5', 'Vulnerability Scanning',
+    em.map_to_control(evd, 'nist_800_53', 'RA-5', 'Vulnerability Scanning',
                       'Risk Assessment')
     print("Mapped to NIST RA-5")
 

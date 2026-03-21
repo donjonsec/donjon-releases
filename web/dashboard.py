@@ -1380,7 +1380,7 @@ tr:hover td { background: rgba(108,99,255,0.06); }
     function loadCompliance() {
         fetchAPI('/stats').then(function(data) {
             if (!data) { $('compliance-scores').innerHTML = '<div class="loading">Unable to load</div>'; return; }
-            var frameworks = ['NIST-800-53', 'HIPAA', 'PCI-DSS-v4', 'SOC2-Type2', 'ISO27001-2022'];
+            var frameworks = ['nist_800_53', 'hipaa', 'pci_dss_4', 'soc2', 'iso_27001_2022'];
             var html = '';
             frameworks.forEach(function(fw) {
                 html += '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:0.85rem"><span>'+ escapeHtml(fw) +'</span><a href="/api/v1/reports/compliance/'+ encodeURIComponent(fw) +'" target="_blank" style="font-size:0.75rem">View Report</a></div><div class="progress-bar"><div class="progress-fill" style="width:0%;background:var(--accent)"></div></div></div>';

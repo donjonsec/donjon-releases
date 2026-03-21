@@ -607,7 +607,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Export compliance data')
-    parser.add_argument('framework', nargs='?', default='NIST-800-53',
+    parser.add_argument('framework', nargs='?', default='nist_800_53',
                        help='Compliance framework to export')
     parser.add_argument('--format',
                        choices=['oscal', 'csv', 'drata', 'vanta', 'sarif', 'all', 'package'],

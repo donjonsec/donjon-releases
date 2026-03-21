@@ -27,7 +27,7 @@ class AuditReportGenerator:
 
     # Compliance requirement citations
     REQUIREMENT_CITATIONS = {
-        'NIST-800-53': {
+        'nist_800_53': {
             'AC-1': 'NIST SP 800-53 Rev. 5, AC-1: Access Control Policy and Procedures',
             'AC-2': 'NIST SP 800-53 Rev. 5, AC-2: Account Management',
             'AC-3': 'NIST SP 800-53 Rev. 5, AC-3: Access Enforcement',
@@ -51,7 +51,7 @@ class AuditReportGenerator:
             'SI-3': 'NIST SP 800-53 Rev. 5, SI-3: Malicious Code Protection',
             'SI-4': 'NIST SP 800-53 Rev. 5, SI-4: System Monitoring',
         },
-        'HIPAA': {
+        'hipaa': {
             '164.308(a)(1)': 'HIPAA Security Rule 45 CFR § 164.308(a)(1): Security Management Process',
             '164.308(a)(3)': 'HIPAA Security Rule 45 CFR § 164.308(a)(3): Workforce Security',
             '164.308(a)(4)': 'HIPAA Security Rule 45 CFR § 164.308(a)(4): Information Access Management',
@@ -68,7 +68,7 @@ class AuditReportGenerator:
             '164.312(d)': 'HIPAA Security Rule 45 CFR § 164.312(d): Person or Entity Authentication',
             '164.312(e)(1)': 'HIPAA Security Rule 45 CFR § 164.312(e)(1): Transmission Security',
         },
-        'PCI-DSS-v4': {
+        'pci_dss_4': {
             '1.1': 'PCI DSS v4.0, Requirement 1.1: Network Security Controls Defined and Understood',
             '1.2': 'PCI DSS v4.0, Requirement 1.2: Network Security Controls Configured and Maintained',
             '2.1': 'PCI DSS v4.0, Requirement 2.1: Processes to Protect Systems',
@@ -92,7 +92,7 @@ class AuditReportGenerator:
             '11.4': 'PCI DSS v4.0, Requirement 11.4: Penetration Testing Performed',
             '12.1': 'PCI DSS v4.0, Requirement 12.1: Information Security Policy',
         },
-        'SOC2-Type2': {
+        'soc2': {
             'CC1.1': 'SOC 2 Trust Services Criteria, CC1.1: COSO Principle 1 - Integrity and Ethical Values',
             'CC2.1': 'SOC 2 Trust Services Criteria, CC2.1: COSO Principle 13 - Quality Information',
             'CC3.1': 'SOC 2 Trust Services Criteria, CC3.1: COSO Principle 6 - Risk Assessment',
@@ -123,7 +123,7 @@ class AuditReportGenerator:
             'ITGC-08': 'SSAE 18 / SOC 1, ITGC-08: Backup and Recovery',
             'ITGC-09': 'SSAE 18 / SOC 1, ITGC-09: Incident Management',
         },
-        'ISO27001-2022': {
+        'iso_27001_2022': {
             '5.1': 'ISO/IEC 27001:2022, Control 5.1: Policies for Information Security',
             '5.15': 'ISO/IEC 27001:2022, Control 5.15: Access Control',
             '5.17': 'ISO/IEC 27001:2022, Control 5.17: Authentication Information',

@@ -14,15 +14,15 @@ from enum import Enum
 
 class Framework(Enum):
     """Supported compliance frameworks."""
-    NIST_800_53 = "NIST-800-53"
+    NIST_800_53 = "nist_800_53"
     NIST_CSF = "nist_csf_2.0"
     NIST_CSF_2_0 = "nist_csf_2.0"
     NIST_800_171 = "nist_800_171"
-    HIPAA = "HIPAA"
+    HIPAA = "hipaa"
     SOC1_TYPE2 = "SOC1-Type2"
-    SOC2_TYPE2 = "SOC2-Type2"
-    PCI_DSS_V4 = "PCI-DSS-v4"
-    ISO27001_2022 = "ISO27001-2022"
+    SOC2_TYPE2 = "soc2"
+    PCI_DSS_V4 = "pci_dss_4"
+    ISO27001_2022 = "iso_27001_2022"
     CMMC = "cmmc"
     FEDRAMP = "fedramp"
     GDPR = "gdpr"
@@ -84,299 +84,299 @@ class ComplianceMapper:
         self.controls: Dict[str, Dict[str, Control]] = {}
 
         # NIST 800-53 Rev 5 Controls (key security controls)
-        self.controls['NIST-800-53'] = {
-            'AC-1': Control('NIST-800-53', 'AC-1', 'Policy and Procedures', 'Access Control',
+        self.controls['nist_800_53'] = {
+            'AC-1': Control('nist_800_53', 'AC-1', 'Policy and Procedures', 'Access Control',
                            'Access control policy and procedures', ['Policy review', 'Document inspection'],
                            ['policy_document', 'procedure_document']),
-            'AC-2': Control('NIST-800-53', 'AC-2', 'Account Management', 'Access Control',
+            'AC-2': Control('nist_800_53', 'AC-2', 'Account Management', 'Access Control',
                            'Manage system accounts', ['Account listing review', 'Access review'],
                            ['user_list', 'access_report', 'account_audit']),
-            'AC-3': Control('NIST-800-53', 'AC-3', 'Access Enforcement', 'Access Control',
+            'AC-3': Control('nist_800_53', 'AC-3', 'Access Enforcement', 'Access Control',
                            'Enforce approved authorizations', ['Access testing', 'Permission review'],
                            ['access_test_results', 'permission_matrix']),
-            'AC-6': Control('NIST-800-53', 'AC-6', 'Least Privilege', 'Access Control',
+            'AC-6': Control('nist_800_53', 'AC-6', 'Least Privilege', 'Access Control',
                            'Employ least privilege principle', ['Privilege review', 'Role analysis'],
                            ['privilege_report', 'role_mapping']),
-            'AU-2': Control('NIST-800-53', 'AU-2', 'Event Logging', 'Audit and Accountability',
+            'AU-2': Control('nist_800_53', 'AU-2', 'Event Logging', 'Audit and Accountability',
                            'Define auditable events', ['Log configuration review'],
                            ['log_config', 'audit_policy']),
-            'AU-6': Control('NIST-800-53', 'AU-6', 'Audit Record Review', 'Audit and Accountability',
+            'AU-6': Control('nist_800_53', 'AU-6', 'Audit Record Review', 'Audit and Accountability',
                            'Review and analyze audit records', ['Log review process'],
                            ['log_review_report', 'siem_alerts']),
-            'CA-7': Control('NIST-800-53', 'CA-7', 'Continuous Monitoring', 'Assessment',
+            'CA-7': Control('nist_800_53', 'CA-7', 'Continuous Monitoring', 'Assessment',
                            'Continuous monitoring strategy', ['Monitoring review'],
                            ['monitoring_report', 'dashboard_screenshot']),
-            'CM-2': Control('NIST-800-53', 'CM-2', 'Baseline Configuration', 'Configuration Management',
+            'CM-2': Control('nist_800_53', 'CM-2', 'Baseline Configuration', 'Configuration Management',
                            'Establish baseline configurations', ['Configuration review'],
                            ['baseline_config', 'config_comparison']),
-            'CM-6': Control('NIST-800-53', 'CM-6', 'Configuration Settings', 'Configuration Management',
+            'CM-6': Control('nist_800_53', 'CM-6', 'Configuration Settings', 'Configuration Management',
                            'Establish configuration settings', ['Settings review'],
                            ['config_settings', 'hardening_report']),
-            'CM-7': Control('NIST-800-53', 'CM-7', 'Least Functionality', 'Configuration Management',
+            'CM-7': Control('nist_800_53', 'CM-7', 'Least Functionality', 'Configuration Management',
                            'Restrict system functions', ['Service review'],
                            ['service_list', 'port_scan']),
-            'IA-2': Control('NIST-800-53', 'IA-2', 'Identification and Authentication', 'Identification',
+            'IA-2': Control('nist_800_53', 'IA-2', 'Identification and Authentication', 'Identification',
                            'Uniquely identify users', ['Authentication testing'],
                            ['auth_config', 'mfa_status']),
-            'IA-5': Control('NIST-800-53', 'IA-5', 'Authenticator Management', 'Identification',
+            'IA-5': Control('nist_800_53', 'IA-5', 'Authenticator Management', 'Identification',
                            'Manage authenticators', ['Password policy review'],
                            ['password_policy', 'credential_audit']),
-            'RA-3': Control('NIST-800-53', 'RA-3', 'Risk Assessment', 'Risk Assessment',
+            'RA-3': Control('nist_800_53', 'RA-3', 'Risk Assessment', 'Risk Assessment',
                            'Conduct risk assessments', ['Risk assessment review'],
                            ['risk_assessment', 'threat_analysis']),
-            'RA-5': Control('NIST-800-53', 'RA-5', 'Vulnerability Monitoring and Scanning', 'Risk Assessment',
+            'RA-5': Control('nist_800_53', 'RA-5', 'Vulnerability Monitoring and Scanning', 'Risk Assessment',
                            'Monitor and scan for vulnerabilities', ['Vulnerability scan review'],
                            ['vuln_scan_report', 'remediation_tracking']),
-            'SC-7': Control('NIST-800-53', 'SC-7', 'Boundary Protection', 'System and Communications',
+            'SC-7': Control('nist_800_53', 'SC-7', 'Boundary Protection', 'System and Communications',
                            'Monitor communications at boundaries', ['Firewall review'],
                            ['firewall_rules', 'network_diagram']),
-            'SC-8': Control('NIST-800-53', 'SC-8', 'Transmission Confidentiality', 'System and Communications',
+            'SC-8': Control('nist_800_53', 'SC-8', 'Transmission Confidentiality', 'System and Communications',
                            'Protect transmitted information', ['Encryption testing'],
                            ['ssl_scan', 'encryption_config']),
-            'SC-12': Control('NIST-800-53', 'SC-12', 'Cryptographic Key Management', 'System and Communications',
+            'SC-12': Control('nist_800_53', 'SC-12', 'Cryptographic Key Management', 'System and Communications',
                             'Establish cryptographic keys', ['Key management review'],
                             ['key_inventory', 'key_rotation_log']),
-            'SC-13': Control('NIST-800-53', 'SC-13', 'Cryptographic Protection', 'System and Communications',
+            'SC-13': Control('nist_800_53', 'SC-13', 'Cryptographic Protection', 'System and Communications',
                             'Implement cryptography', ['Crypto implementation review'],
                             ['crypto_config', 'cipher_audit']),
-            'SI-2': Control('NIST-800-53', 'SI-2', 'Flaw Remediation', 'System and Information Integrity',
+            'SI-2': Control('nist_800_53', 'SI-2', 'Flaw Remediation', 'System and Information Integrity',
                            'Identify and correct flaws', ['Patch management review'],
                            ['patch_status', 'remediation_report']),
-            'SI-3': Control('NIST-800-53', 'SI-3', 'Malicious Code Protection', 'System and Information Integrity',
+            'SI-3': Control('nist_800_53', 'SI-3', 'Malicious Code Protection', 'System and Information Integrity',
                            'Implement malicious code protection', ['AV/EDR review'],
                            ['av_status', 'malware_scan']),
-            'SI-4': Control('NIST-800-53', 'SI-4', 'System Monitoring', 'System and Information Integrity',
+            'SI-4': Control('nist_800_53', 'SI-4', 'System Monitoring', 'System and Information Integrity',
                            'Monitor system events', ['Monitoring configuration'],
                            ['siem_config', 'alert_rules']),
         }
 
         # HIPAA Security Rule Controls
-        self.controls['HIPAA'] = {
-            '164.308(a)(1)': Control('HIPAA', '164.308(a)(1)', 'Security Management Process', 'Administrative',
+        self.controls['hipaa'] = {
+            '164.308(a)(1)': Control('hipaa', '164.308(a)(1)', 'Security Management Process', 'Administrative',
                                     'Implement policies to prevent security violations',
                                     ['Policy review', 'Risk analysis review'],
                                     ['security_policy', 'risk_analysis']),
-            '164.308(a)(3)': Control('HIPAA', '164.308(a)(3)', 'Workforce Security', 'Administrative',
+            '164.308(a)(3)': Control('hipaa', '164.308(a)(3)', 'Workforce Security', 'Administrative',
                                     'Implement procedures for workforce access',
                                     ['Access control procedures review'],
                                     ['access_procedures', 'workforce_access_list']),
-            '164.308(a)(4)': Control('HIPAA', '164.308(a)(4)', 'Information Access Management', 'Administrative',
+            '164.308(a)(4)': Control('hipaa', '164.308(a)(4)', 'Information Access Management', 'Administrative',
                                     'Implement access authorization policies',
                                     ['Authorization review'],
                                     ['access_policy', 'authorization_matrix']),
-            '164.308(a)(5)': Control('HIPAA', '164.308(a)(5)', 'Security Awareness Training', 'Administrative',
+            '164.308(a)(5)': Control('hipaa', '164.308(a)(5)', 'Security Awareness Training', 'Administrative',
                                     'Security awareness and training program',
                                     ['Training records review'],
                                     ['training_records', 'awareness_materials']),
-            '164.308(a)(6)': Control('HIPAA', '164.308(a)(6)', 'Security Incident Procedures', 'Administrative',
+            '164.308(a)(6)': Control('hipaa', '164.308(a)(6)', 'Security Incident Procedures', 'Administrative',
                                     'Implement security incident procedures',
                                     ['Incident response review'],
                                     ['incident_procedures', 'incident_log']),
-            '164.308(a)(7)': Control('HIPAA', '164.308(a)(7)', 'Contingency Plan', 'Administrative',
+            '164.308(a)(7)': Control('hipaa', '164.308(a)(7)', 'Contingency Plan', 'Administrative',
                                     'Establish contingency operations plan',
                                     ['Contingency plan review'],
                                     ['contingency_plan', 'backup_test_results']),
-            '164.308(a)(8)': Control('HIPAA', '164.308(a)(8)', 'Evaluation', 'Administrative',
+            '164.308(a)(8)': Control('hipaa', '164.308(a)(8)', 'Evaluation', 'Administrative',
                                     'Perform periodic evaluations',
                                     ['Evaluation review'],
                                     ['evaluation_report', 'assessment_results']),
-            '164.310(a)(1)': Control('HIPAA', '164.310(a)(1)', 'Facility Access Controls', 'Physical',
+            '164.310(a)(1)': Control('hipaa', '164.310(a)(1)', 'Facility Access Controls', 'Physical',
                                     'Limit physical access to ePHI systems',
                                     ['Physical access review'],
                                     ['access_logs', 'facility_controls']),
-            '164.310(b)': Control('HIPAA', '164.310(b)', 'Workstation Use', 'Physical',
+            '164.310(b)': Control('hipaa', '164.310(b)', 'Workstation Use', 'Physical',
                                  'Implement workstation use policies',
                                  ['Workstation policy review'],
                                  ['workstation_policy', 'endpoint_config']),
-            '164.310(d)(1)': Control('HIPAA', '164.310(d)(1)', 'Device and Media Controls', 'Physical',
+            '164.310(d)(1)': Control('hipaa', '164.310(d)(1)', 'Device and Media Controls', 'Physical',
                                     'Implement device and media controls',
                                     ['Media control review'],
                                     ['media_policy', 'disposal_log']),
-            '164.312(a)(1)': Control('HIPAA', '164.312(a)(1)', 'Access Control', 'Technical',
+            '164.312(a)(1)': Control('hipaa', '164.312(a)(1)', 'Access Control', 'Technical',
                                     'Implement technical access controls',
                                     ['Access control testing'],
                                     ['access_control_config', 'user_access_report']),
-            '164.312(b)': Control('HIPAA', '164.312(b)', 'Audit Controls', 'Technical',
+            '164.312(b)': Control('hipaa', '164.312(b)', 'Audit Controls', 'Technical',
                                  'Implement audit controls',
                                  ['Audit log review'],
                                  ['audit_config', 'audit_logs']),
-            '164.312(c)(1)': Control('HIPAA', '164.312(c)(1)', 'Integrity Controls', 'Technical',
+            '164.312(c)(1)': Control('hipaa', '164.312(c)(1)', 'Integrity Controls', 'Technical',
                                     'Implement integrity mechanisms',
                                     ['Integrity control review'],
                                     ['integrity_config', 'change_log']),
-            '164.312(d)': Control('HIPAA', '164.312(d)', 'Person or Entity Authentication', 'Technical',
+            '164.312(d)': Control('hipaa', '164.312(d)', 'Person or Entity Authentication', 'Technical',
                                  'Verify identity of persons/entities',
                                  ['Authentication testing'],
                                  ['auth_config', 'identity_verification']),
-            '164.312(e)(1)': Control('HIPAA', '164.312(e)(1)', 'Transmission Security', 'Technical',
+            '164.312(e)(1)': Control('hipaa', '164.312(e)(1)', 'Transmission Security', 'Technical',
                                     'Implement transmission security',
                                     ['Encryption testing'],
                                     ['encryption_config', 'ssl_scan_results']),
         }
 
         # PCI-DSS v4.0 Requirements
-        self.controls['PCI-DSS-v4'] = {
-            '1.1': Control('PCI-DSS-v4', '1.1', 'Network Security Controls', 'Requirement 1',
+        self.controls['pci_dss_4'] = {
+            '1.1': Control('pci_dss_4', '1.1', 'Network Security Controls', 'Requirement 1',
                           'Install and maintain network security controls',
                           ['Firewall configuration review'],
                           ['firewall_config', 'network_diagram']),
-            '1.2': Control('PCI-DSS-v4', '1.2', 'Network Security Control Configuration', 'Requirement 1',
+            '1.2': Control('pci_dss_4', '1.2', 'Network Security Control Configuration', 'Requirement 1',
                           'Configure network security controls',
                           ['Ruleset review'],
                           ['firewall_rules', 'acl_config']),
-            '2.1': Control('PCI-DSS-v4', '2.1', 'Secure Configurations', 'Requirement 2',
+            '2.1': Control('pci_dss_4', '2.1', 'Secure Configurations', 'Requirement 2',
                           'Apply secure configurations',
                           ['Configuration review'],
                           ['hardening_report', 'baseline_comparison']),
-            '2.2': Control('PCI-DSS-v4', '2.2', 'System Components Security', 'Requirement 2',
+            '2.2': Control('pci_dss_4', '2.2', 'System Components Security', 'Requirement 2',
                           'Securely configure system components',
                           ['System configuration review'],
                           ['system_config', 'security_settings']),
-            '3.1': Control('PCI-DSS-v4', '3.1', 'Account Data Storage', 'Requirement 3',
+            '3.1': Control('pci_dss_4', '3.1', 'Account Data Storage', 'Requirement 3',
                           'Account data storage is kept to minimum',
                           ['Data retention review'],
                           ['data_inventory', 'retention_policy']),
-            '3.5': Control('PCI-DSS-v4', '3.5', 'Primary Account Number Protection', 'Requirement 3',
+            '3.5': Control('pci_dss_4', '3.5', 'Primary Account Number Protection', 'Requirement 3',
                           'PAN is secured wherever stored',
                           ['Encryption review'],
                           ['encryption_config', 'key_management']),
-            '4.1': Control('PCI-DSS-v4', '4.1', 'Strong Cryptography in Transit', 'Requirement 4',
+            '4.1': Control('pci_dss_4', '4.1', 'Strong Cryptography in Transit', 'Requirement 4',
                           'Protect cardholder data with strong cryptography during transmission',
                           ['SSL/TLS testing'],
                           ['ssl_scan', 'certificate_inventory']),
-            '5.1': Control('PCI-DSS-v4', '5.1', 'Anti-Malware', 'Requirement 5',
+            '5.1': Control('pci_dss_4', '5.1', 'Anti-Malware', 'Requirement 5',
                           'Protect systems from malware',
                           ['AV deployment review'],
                           ['av_status', 'malware_scan_results']),
-            '5.2': Control('PCI-DSS-v4', '5.2', 'Anti-Malware Mechanisms', 'Requirement 5',
+            '5.2': Control('pci_dss_4', '5.2', 'Anti-Malware Mechanisms', 'Requirement 5',
                           'Anti-malware mechanisms and processes are active',
                           ['AV configuration review'],
                           ['av_config', 'update_status']),
-            '6.1': Control('PCI-DSS-v4', '6.1', 'Security Vulnerabilities Identified', 'Requirement 6',
+            '6.1': Control('pci_dss_4', '6.1', 'Security Vulnerabilities Identified', 'Requirement 6',
                           'Identify and address security vulnerabilities',
                           ['Vulnerability management review'],
                           ['vuln_scan_report', 'patch_status']),
-            '6.2': Control('PCI-DSS-v4', '6.2', 'Custom Software Security', 'Requirement 6',
+            '6.2': Control('pci_dss_4', '6.2', 'Custom Software Security', 'Requirement 6',
                           'Bespoke and custom software developed securely',
                           ['Secure development review'],
                           ['code_review', 'sast_results']),
-            '6.3': Control('PCI-DSS-v4', '6.3', 'Security Vulnerabilities in Software', 'Requirement 6',
+            '6.3': Control('pci_dss_4', '6.3', 'Security Vulnerabilities in Software', 'Requirement 6',
                           'Security vulnerabilities are identified and addressed',
                           ['Vulnerability scanning'],
                           ['vuln_report', 'remediation_tracking']),
-            '7.1': Control('PCI-DSS-v4', '7.1', 'Access Limited to Need to Know', 'Requirement 7',
+            '7.1': Control('pci_dss_4', '7.1', 'Access Limited to Need to Know', 'Requirement 7',
                           'Access to system components limited to those with need',
                           ['Access review'],
                           ['access_matrix', 'role_definitions']),
-            '7.2': Control('PCI-DSS-v4', '7.2', 'Access Control Systems', 'Requirement 7',
+            '7.2': Control('pci_dss_4', '7.2', 'Access Control Systems', 'Requirement 7',
                           'Access control systems configured to restrict access',
                           ['Access control review'],
                           ['access_control_config', 'permission_audit']),
-            '8.1': Control('PCI-DSS-v4', '8.1', 'User Identification', 'Requirement 8',
+            '8.1': Control('pci_dss_4', '8.1', 'User Identification', 'Requirement 8',
                           'User identification and related accounts managed',
                           ['Account management review'],
                           ['user_list', 'account_audit']),
-            '8.3': Control('PCI-DSS-v4', '8.3', 'Strong Authentication', 'Requirement 8',
+            '8.3': Control('pci_dss_4', '8.3', 'Strong Authentication', 'Requirement 8',
                           'Strong authentication for users and administrators',
                           ['Authentication testing'],
                           ['auth_config', 'mfa_status']),
-            '10.1': Control('PCI-DSS-v4', '10.1', 'Audit Logs', 'Requirement 10',
+            '10.1': Control('pci_dss_4', '10.1', 'Audit Logs', 'Requirement 10',
                            'Audit logs capture all access',
                            ['Log configuration review'],
                            ['log_config', 'audit_sample']),
-            '10.2': Control('PCI-DSS-v4', '10.2', 'Audit Log Content', 'Requirement 10',
+            '10.2': Control('pci_dss_4', '10.2', 'Audit Log Content', 'Requirement 10',
                            'Audit logs record required information',
                            ['Log content review'],
                            ['log_sample', 'log_analysis']),
-            '10.3': Control('PCI-DSS-v4', '10.3', 'Audit Log Protection', 'Requirement 10',
+            '10.3': Control('pci_dss_4', '10.3', 'Audit Log Protection', 'Requirement 10',
                            'Audit logs are protected from modification',
                            ['Log protection review'],
                            ['log_integrity', 'access_controls']),
-            '11.3': Control('PCI-DSS-v4', '11.3', 'Vulnerabilities Identified', 'Requirement 11',
+            '11.3': Control('pci_dss_4', '11.3', 'Vulnerabilities Identified', 'Requirement 11',
                            'Vulnerabilities are identified and addressed',
                            ['Vulnerability scanning'],
                            ['vuln_scan_report', 'pentest_report']),
-            '11.4': Control('PCI-DSS-v4', '11.4', 'Penetration Testing', 'Requirement 11',
+            '11.4': Control('pci_dss_4', '11.4', 'Penetration Testing', 'Requirement 11',
                            'Penetration testing performed regularly',
                            ['Pentest review'],
                            ['pentest_report', 'remediation_status']),
-            '12.1': Control('PCI-DSS-v4', '12.1', 'Security Policy', 'Requirement 12',
+            '12.1': Control('pci_dss_4', '12.1', 'Security Policy', 'Requirement 12',
                            'Security policy is established and maintained',
                            ['Policy review'],
                            ['security_policy', 'policy_acknowledgements']),
         }
 
         # SOC 2 Trust Services Criteria
-        self.controls['SOC2-Type2'] = {
-            'CC1.1': Control('SOC2-Type2', 'CC1.1', 'Control Environment', 'Common Criteria',
+        self.controls['soc2'] = {
+            'CC1.1': Control('soc2', 'CC1.1', 'Control Environment', 'Common Criteria',
                             'COSO principle: integrity and ethical values',
                             ['Code of conduct review'],
                             ['code_of_conduct', 'ethics_policy']),
-            'CC2.1': Control('SOC2-Type2', 'CC2.1', 'Communication and Information', 'Common Criteria',
+            'CC2.1': Control('soc2', 'CC2.1', 'Communication and Information', 'Common Criteria',
                             'COSO principle: generate quality information',
                             ['Information quality review'],
                             ['data_quality_report', 'communication_policy']),
-            'CC3.1': Control('SOC2-Type2', 'CC3.1', 'Risk Assessment', 'Common Criteria',
+            'CC3.1': Control('soc2', 'CC3.1', 'Risk Assessment', 'Common Criteria',
                             'COSO principle: specify suitable objectives',
                             ['Risk assessment review'],
                             ['risk_assessment', 'objective_documentation']),
-            'CC3.2': Control('SOC2-Type2', 'CC3.2', 'Risk Identification', 'Common Criteria',
+            'CC3.2': Control('soc2', 'CC3.2', 'Risk Identification', 'Common Criteria',
                             'Identify and analyze risks',
                             ['Risk identification review'],
                             ['risk_register', 'threat_analysis']),
-            'CC4.1': Control('SOC2-Type2', 'CC4.1', 'Monitoring Activities', 'Common Criteria',
+            'CC4.1': Control('soc2', 'CC4.1', 'Monitoring Activities', 'Common Criteria',
                             'COSO principle: ongoing and separate evaluations',
                             ['Monitoring review'],
                             ['monitoring_report', 'evaluation_schedule']),
-            'CC5.1': Control('SOC2-Type2', 'CC5.1', 'Control Activities', 'Common Criteria',
+            'CC5.1': Control('soc2', 'CC5.1', 'Control Activities', 'Common Criteria',
                             'Select and develop control activities',
                             ['Control activity review'],
                             ['control_matrix', 'control_documentation']),
-            'CC6.1': Control('SOC2-Type2', 'CC6.1', 'Logical Access Security', 'Logical Access',
+            'CC6.1': Control('soc2', 'CC6.1', 'Logical Access Security', 'Logical Access',
                             'Implement logical access security software',
                             ['Access control review'],
                             ['access_control_config', 'user_provisioning']),
-            'CC6.2': Control('SOC2-Type2', 'CC6.2', 'Registration and Authorization', 'Logical Access',
+            'CC6.2': Control('soc2', 'CC6.2', 'Registration and Authorization', 'Logical Access',
                             'Prior to granting access, users are registered',
                             ['User registration review'],
                             ['registration_process', 'authorization_workflow']),
-            'CC6.3': Control('SOC2-Type2', 'CC6.3', 'Access Removal', 'Logical Access',
+            'CC6.3': Control('soc2', 'CC6.3', 'Access Removal', 'Logical Access',
                             'Remove access when no longer needed',
                             ['Access termination review'],
                             ['termination_process', 'access_review_log']),
-            'CC6.6': Control('SOC2-Type2', 'CC6.6', 'System Boundaries', 'Logical Access',
+            'CC6.6': Control('soc2', 'CC6.6', 'System Boundaries', 'Logical Access',
                             'Restrict access from system boundaries',
                             ['Boundary protection review'],
                             ['firewall_config', 'network_diagram']),
-            'CC6.7': Control('SOC2-Type2', 'CC6.7', 'Data Transmission', 'Logical Access',
+            'CC6.7': Control('soc2', 'CC6.7', 'Data Transmission', 'Logical Access',
                             'Restrict data transmission, movement and removal',
                             ['Data transmission review'],
                             ['encryption_config', 'dlp_config']),
-            'CC6.8': Control('SOC2-Type2', 'CC6.8', 'Malicious Software', 'Logical Access',
+            'CC6.8': Control('soc2', 'CC6.8', 'Malicious Software', 'Logical Access',
                             'Prevent or detect malicious software',
                             ['Malware protection review'],
                             ['av_config', 'edr_status']),
-            'CC7.1': Control('SOC2-Type2', 'CC7.1', 'Vulnerability Detection', 'System Operations',
+            'CC7.1': Control('soc2', 'CC7.1', 'Vulnerability Detection', 'System Operations',
                             'Detect vulnerabilities in a timely manner',
                             ['Vulnerability scanning review'],
                             ['vuln_scan_report', 'scan_schedule']),
-            'CC7.2': Control('SOC2-Type2', 'CC7.2', 'Security Event Monitoring', 'System Operations',
+            'CC7.2': Control('soc2', 'CC7.2', 'Security Event Monitoring', 'System Operations',
                             'Monitor system components for anomalies',
                             ['Monitoring review'],
                             ['siem_config', 'alert_review']),
-            'CC7.3': Control('SOC2-Type2', 'CC7.3', 'Security Event Evaluation', 'System Operations',
+            'CC7.3': Control('soc2', 'CC7.3', 'Security Event Evaluation', 'System Operations',
                             'Evaluate security events to determine impact',
                             ['Event evaluation review'],
                             ['incident_reports', 'event_analysis']),
-            'CC7.4': Control('SOC2-Type2', 'CC7.4', 'Security Incident Response', 'System Operations',
+            'CC7.4': Control('soc2', 'CC7.4', 'Security Incident Response', 'System Operations',
                             'Respond to identified security incidents',
                             ['Incident response review'],
                             ['incident_response_plan', 'incident_log']),
-            'CC8.1': Control('SOC2-Type2', 'CC8.1', 'Change Management', 'Change Management',
+            'CC8.1': Control('soc2', 'CC8.1', 'Change Management', 'Change Management',
                             'Authorize, design, develop, configure, document changes',
                             ['Change management review'],
                             ['change_policy', 'change_log']),
-            'CC9.1': Control('SOC2-Type2', 'CC9.1', 'Risk Mitigation', 'Risk Mitigation',
+            'CC9.1': Control('soc2', 'CC9.1', 'Risk Mitigation', 'Risk Mitigation',
                             'Identify and assess risks through vendor management',
                             ['Vendor management review'],
                             ['vendor_risk_assessment', 'vendor_inventory']),
@@ -423,56 +423,56 @@ class ComplianceMapper:
         }
 
         # ISO 27001:2022 Controls
-        self.controls['ISO27001-2022'] = {
-            '5.1': Control('ISO27001-2022', '5.1', 'Policies for Information Security', 'Organizational',
+        self.controls['iso_27001_2022'] = {
+            '5.1': Control('iso_27001_2022', '5.1', 'Policies for Information Security', 'Organizational',
                           'Information security policy defined and approved',
                           ['Policy review'],
                           ['security_policy', 'policy_approval']),
-            '5.15': Control('ISO27001-2022', '5.15', 'Access Control', 'Organizational',
+            '5.15': Control('iso_27001_2022', '5.15', 'Access Control', 'Organizational',
                            'Access control rules established and implemented',
                            ['Access control review'],
                            ['access_policy', 'access_matrix']),
-            '5.17': Control('ISO27001-2022', '5.17', 'Authentication Information', 'Organizational',
+            '5.17': Control('iso_27001_2022', '5.17', 'Authentication Information', 'Organizational',
                            'Management of authentication information',
                            ['Authentication review'],
                            ['auth_policy', 'credential_management']),
-            '8.1': Control('ISO27001-2022', '8.1', 'User Endpoint Devices', 'Technological',
+            '8.1': Control('iso_27001_2022', '8.1', 'User Endpoint Devices', 'Technological',
                           'Information stored on, processed by or accessible via user endpoint devices',
                           ['Endpoint review'],
                           ['endpoint_policy', 'device_inventory']),
-            '8.5': Control('ISO27001-2022', '8.5', 'Secure Authentication', 'Technological',
+            '8.5': Control('iso_27001_2022', '8.5', 'Secure Authentication', 'Technological',
                           'Secure authentication technologies and procedures',
                           ['Authentication testing'],
                           ['auth_config', 'mfa_status']),
-            '8.7': Control('ISO27001-2022', '8.7', 'Protection Against Malware', 'Technological',
+            '8.7': Control('iso_27001_2022', '8.7', 'Protection Against Malware', 'Technological',
                           'Protection against malware implemented',
                           ['Malware protection review'],
                           ['av_config', 'malware_scan']),
-            '8.8': Control('ISO27001-2022', '8.8', 'Management of Technical Vulnerabilities', 'Technological',
+            '8.8': Control('iso_27001_2022', '8.8', 'Management of Technical Vulnerabilities', 'Technological',
                           'Timely identification and remediation of vulnerabilities',
                           ['Vulnerability management review'],
                           ['vuln_scan', 'patch_status']),
-            '8.9': Control('ISO27001-2022', '8.9', 'Configuration Management', 'Technological',
+            '8.9': Control('iso_27001_2022', '8.9', 'Configuration Management', 'Technological',
                           'Configurations established, documented, implemented, monitored',
                           ['Configuration review'],
                           ['config_baseline', 'config_audit']),
-            '8.15': Control('ISO27001-2022', '8.15', 'Logging', 'Technological',
+            '8.15': Control('iso_27001_2022', '8.15', 'Logging', 'Technological',
                            'Logs recording activities, exceptions, faults, events produced and protected',
                            ['Logging review'],
                            ['log_config', 'log_samples']),
-            '8.16': Control('ISO27001-2022', '8.16', 'Monitoring Activities', 'Technological',
+            '8.16': Control('iso_27001_2022', '8.16', 'Monitoring Activities', 'Technological',
                            'Networks, systems, applications monitored for anomalies',
                            ['Monitoring review'],
                            ['siem_config', 'monitoring_report']),
-            '8.20': Control('ISO27001-2022', '8.20', 'Networks Security', 'Technological',
+            '8.20': Control('iso_27001_2022', '8.20', 'Networks Security', 'Technological',
                            'Networks secured, managed, controlled',
                            ['Network security review'],
                            ['network_config', 'firewall_rules']),
-            '8.21': Control('ISO27001-2022', '8.21', 'Security of Network Services', 'Technological',
+            '8.21': Control('iso_27001_2022', '8.21', 'Security of Network Services', 'Technological',
                            'Security mechanisms, service levels, management requirements identified',
                            ['Network services review'],
                            ['service_config', 'sla_documentation']),
-            '8.24': Control('ISO27001-2022', '8.24', 'Use of Cryptography', 'Technological',
+            '8.24': Control('iso_27001_2022', '8.24', 'Use of Cryptography', 'Technological',
                            'Effective use of cryptography',
                            ['Cryptography review'],
                            ['crypto_config', 'key_management']),
@@ -737,154 +737,154 @@ class ComplianceMapper:
                 'open_port',
                 'Open network port detected',
                 {
-                    'NIST-800-53': ['CM-7', 'SC-7'],
-                    'HIPAA': ['164.312(e)(1)'],
-                    'PCI-DSS-v4': ['1.1', '1.2'],
-                    'SOC2-Type2': ['CC6.6'],
+                    'nist_800_53': ['CM-7', 'SC-7'],
+                    'hipaa': ['164.312(e)(1)'],
+                    'pci_dss_4': ['1.1', '1.2'],
+                    'soc2': ['CC6.6'],
                     'SOC1-Type2': ['ITGC-01'],
-                    'ISO27001-2022': ['8.20', '8.21']
+                    'iso_27001_2022': ['8.20', '8.21']
                 }
             ),
             'ssl_vulnerability': ControlMapping(
                 'ssl_vulnerability',
                 'SSL/TLS vulnerability or misconfiguration',
                 {
-                    'NIST-800-53': ['SC-8', 'SC-13'],
-                    'HIPAA': ['164.312(e)(1)'],
-                    'PCI-DSS-v4': ['4.1'],
-                    'SOC2-Type2': ['CC6.7'],
-                    'ISO27001-2022': ['8.24']
+                    'nist_800_53': ['SC-8', 'SC-13'],
+                    'hipaa': ['164.312(e)(1)'],
+                    'pci_dss_4': ['4.1'],
+                    'soc2': ['CC6.7'],
+                    'iso_27001_2022': ['8.24']
                 }
             ),
             'weak_cipher': ControlMapping(
                 'weak_cipher',
                 'Weak cryptographic cipher in use',
                 {
-                    'NIST-800-53': ['SC-12', 'SC-13'],
-                    'HIPAA': ['164.312(e)(1)'],
-                    'PCI-DSS-v4': ['4.1', '3.5'],
-                    'SOC2-Type2': ['CC6.7'],
-                    'ISO27001-2022': ['8.24']
+                    'nist_800_53': ['SC-12', 'SC-13'],
+                    'hipaa': ['164.312(e)(1)'],
+                    'pci_dss_4': ['4.1', '3.5'],
+                    'soc2': ['CC6.7'],
+                    'iso_27001_2022': ['8.24']
                 }
             ),
             'expired_certificate': ControlMapping(
                 'expired_certificate',
                 'Expired or soon-to-expire SSL certificate',
                 {
-                    'NIST-800-53': ['SC-12'],
-                    'PCI-DSS-v4': ['4.1'],
-                    'SOC2-Type2': ['CC6.7'],
-                    'ISO27001-2022': ['8.24']
+                    'nist_800_53': ['SC-12'],
+                    'pci_dss_4': ['4.1'],
+                    'soc2': ['CC6.7'],
+                    'iso_27001_2022': ['8.24']
                 }
             ),
             'cve_vulnerability': ControlMapping(
                 'cve_vulnerability',
                 'Known CVE vulnerability detected',
                 {
-                    'NIST-800-53': ['RA-5', 'SI-2'],
-                    'HIPAA': ['164.308(a)(1)', '164.308(a)(8)'],
-                    'PCI-DSS-v4': ['6.1', '6.3', '11.3'],
-                    'SOC2-Type2': ['CC7.1'],
+                    'nist_800_53': ['RA-5', 'SI-2'],
+                    'hipaa': ['164.308(a)(1)', '164.308(a)(8)'],
+                    'pci_dss_4': ['6.1', '6.3', '11.3'],
+                    'soc2': ['CC7.1'],
                     'SOC1-Type2': ['ITGC-09'],
-                    'ISO27001-2022': ['8.8']
+                    'iso_27001_2022': ['8.8']
                 }
             ),
             'missing_patch': ControlMapping(
                 'missing_patch',
                 'Missing security patch or update',
                 {
-                    'NIST-800-53': ['SI-2'],
-                    'HIPAA': ['164.308(a)(1)'],
-                    'PCI-DSS-v4': ['6.1', '6.3'],
-                    'SOC2-Type2': ['CC7.1'],
-                    'ISO27001-2022': ['8.8']
+                    'nist_800_53': ['SI-2'],
+                    'hipaa': ['164.308(a)(1)'],
+                    'pci_dss_4': ['6.1', '6.3'],
+                    'soc2': ['CC7.1'],
+                    'iso_27001_2022': ['8.8']
                 }
             ),
             'web_vulnerability': ControlMapping(
                 'web_vulnerability',
                 'Web application vulnerability detected',
                 {
-                    'NIST-800-53': ['RA-5', 'SI-2'],
-                    'PCI-DSS-v4': ['6.2', '6.3', '11.3'],
-                    'SOC2-Type2': ['CC7.1'],
-                    'ISO27001-2022': ['8.8']
+                    'nist_800_53': ['RA-5', 'SI-2'],
+                    'pci_dss_4': ['6.2', '6.3', '11.3'],
+                    'soc2': ['CC7.1'],
+                    'iso_27001_2022': ['8.8']
                 }
             ),
             'authentication_weakness': ControlMapping(
                 'authentication_weakness',
                 'Weak authentication configuration',
                 {
-                    'NIST-800-53': ['IA-2', 'IA-5'],
-                    'HIPAA': ['164.312(d)'],
-                    'PCI-DSS-v4': ['8.3'],
-                    'SOC2-Type2': ['CC6.1'],
+                    'nist_800_53': ['IA-2', 'IA-5'],
+                    'hipaa': ['164.312(d)'],
+                    'pci_dss_4': ['8.3'],
+                    'soc2': ['CC6.1'],
                     'SOC1-Type2': ['ITGC-03'],
-                    'ISO27001-2022': ['8.5']
+                    'iso_27001_2022': ['8.5']
                 }
             ),
             'default_credentials': ControlMapping(
                 'default_credentials',
                 'Default or weak credentials in use',
                 {
-                    'NIST-800-53': ['IA-5'],
-                    'HIPAA': ['164.312(d)'],
-                    'PCI-DSS-v4': ['2.1', '8.3'],
-                    'SOC2-Type2': ['CC6.1'],
+                    'nist_800_53': ['IA-5'],
+                    'hipaa': ['164.312(d)'],
+                    'pci_dss_4': ['2.1', '8.3'],
+                    'soc2': ['CC6.1'],
                     'SOC1-Type2': ['ITGC-03'],
-                    'ISO27001-2022': ['5.17', '8.5']
+                    'iso_27001_2022': ['5.17', '8.5']
                 }
             ),
             'insecure_configuration': ControlMapping(
                 'insecure_configuration',
                 'Insecure system or service configuration',
                 {
-                    'NIST-800-53': ['CM-2', 'CM-6'],
-                    'HIPAA': ['164.312(a)(1)'],
-                    'PCI-DSS-v4': ['2.1', '2.2'],
-                    'SOC2-Type2': ['CC6.1'],
-                    'ISO27001-2022': ['8.9']
+                    'nist_800_53': ['CM-2', 'CM-6'],
+                    'hipaa': ['164.312(a)(1)'],
+                    'pci_dss_4': ['2.1', '2.2'],
+                    'soc2': ['CC6.1'],
+                    'iso_27001_2022': ['8.9']
                 }
             ),
             'missing_logging': ControlMapping(
                 'missing_logging',
                 'Insufficient logging or monitoring',
                 {
-                    'NIST-800-53': ['AU-2', 'AU-6', 'SI-4'],
-                    'HIPAA': ['164.312(b)'],
-                    'PCI-DSS-v4': ['10.1', '10.2'],
-                    'SOC2-Type2': ['CC7.2'],
-                    'ISO27001-2022': ['8.15', '8.16']
+                    'nist_800_53': ['AU-2', 'AU-6', 'SI-4'],
+                    'hipaa': ['164.312(b)'],
+                    'pci_dss_4': ['10.1', '10.2'],
+                    'soc2': ['CC7.2'],
+                    'iso_27001_2022': ['8.15', '8.16']
                 }
             ),
             'information_disclosure': ControlMapping(
                 'information_disclosure',
                 'Sensitive information disclosure',
                 {
-                    'NIST-800-53': ['AC-3', 'SC-8'],
-                    'HIPAA': ['164.312(e)(1)', '164.312(c)(1)'],
-                    'PCI-DSS-v4': ['3.1', '3.5'],
-                    'SOC2-Type2': ['CC6.7'],
-                    'ISO27001-2022': ['8.24']
+                    'nist_800_53': ['AC-3', 'SC-8'],
+                    'hipaa': ['164.312(e)(1)', '164.312(c)(1)'],
+                    'pci_dss_4': ['3.1', '3.5'],
+                    'soc2': ['CC6.7'],
+                    'iso_27001_2022': ['8.24']
                 }
             ),
             'network_service': ControlMapping(
                 'network_service',
                 'Network service discovery',
                 {
-                    'NIST-800-53': ['CM-7', 'SC-7'],
-                    'PCI-DSS-v4': ['1.1', '1.2'],
-                    'SOC2-Type2': ['CC6.6'],
-                    'ISO27001-2022': ['8.20', '8.21']
+                    'nist_800_53': ['CM-7', 'SC-7'],
+                    'pci_dss_4': ['1.1', '1.2'],
+                    'soc2': ['CC6.6'],
+                    'iso_27001_2022': ['8.20', '8.21']
                 }
             ),
             'host_discovery': ControlMapping(
                 'host_discovery',
                 'Host/asset discovery',
                 {
-                    'NIST-800-53': ['CM-8'],
-                    'PCI-DSS-v4': ['1.1'],
-                    'SOC2-Type2': ['CC6.1'],
-                    'ISO27001-2022': ['8.1']
+                    'nist_800_53': ['CM-8'],
+                    'pci_dss_4': ['1.1'],
+                    'soc2': ['CC6.1'],
+                    'iso_27001_2022': ['8.1']
                 }
             ),
             # Windows scanner finding types
@@ -892,94 +892,94 @@ class ComplianceMapper:
                 'endpoint_protection',
                 'Endpoint protection/antivirus configuration',
                 {
-                    'NIST-800-53': ['SI-3', 'SI-4'],
-                    'HIPAA': ['164.308(a)(1)'],
-                    'PCI-DSS-v4': ['5.1', '5.2'],
-                    'SOC2-Type2': ['CC6.8'],
-                    'ISO27001-2022': ['8.7']
+                    'nist_800_53': ['SI-3', 'SI-4'],
+                    'hipaa': ['164.308(a)(1)'],
+                    'pci_dss_4': ['5.1', '5.2'],
+                    'soc2': ['CC6.8'],
+                    'iso_27001_2022': ['8.7']
                 }
             ),
             'disk_encryption': ControlMapping(
                 'disk_encryption',
                 'Disk/volume encryption status',
                 {
-                    'NIST-800-53': ['SC-28'],
-                    'HIPAA': ['164.312(a)(1)'],
-                    'PCI-DSS-v4': ['3.5'],
-                    'SOC2-Type2': ['CC6.7'],
-                    'ISO27001-2022': ['8.24']
+                    'nist_800_53': ['SC-28'],
+                    'hipaa': ['164.312(a)(1)'],
+                    'pci_dss_4': ['3.5'],
+                    'soc2': ['CC6.7'],
+                    'iso_27001_2022': ['8.24']
                 }
             ),
             'firewall_config': ControlMapping(
                 'firewall_config',
                 'Host firewall configuration',
                 {
-                    'NIST-800-53': ['SC-7'],
-                    'PCI-DSS-v4': ['1.1', '1.2'],
-                    'SOC2-Type2': ['CC6.6'],
-                    'ISO27001-2022': ['8.20']
+                    'nist_800_53': ['SC-7'],
+                    'pci_dss_4': ['1.1', '1.2'],
+                    'soc2': ['CC6.6'],
+                    'iso_27001_2022': ['8.20']
                 }
             ),
             'audit_policy': ControlMapping(
                 'audit_policy',
                 'System audit/logging policy',
                 {
-                    'NIST-800-53': ['AU-2', 'AU-6'],
-                    'HIPAA': ['164.312(b)'],
-                    'PCI-DSS-v4': ['10.1', '10.2'],
-                    'SOC2-Type2': ['CC7.2'],
-                    'ISO27001-2022': ['8.15']
+                    'nist_800_53': ['AU-2', 'AU-6'],
+                    'hipaa': ['164.312(b)'],
+                    'pci_dss_4': ['10.1', '10.2'],
+                    'soc2': ['CC7.2'],
+                    'iso_27001_2022': ['8.15']
                 }
             ),
             'password_policy': ControlMapping(
                 'password_policy',
                 'Password/credential policy',
                 {
-                    'NIST-800-53': ['IA-5'],
-                    'HIPAA': ['164.312(d)'],
-                    'PCI-DSS-v4': ['8.3'],
-                    'SOC2-Type2': ['CC6.1'],
-                    'ISO27001-2022': ['5.17', '8.5']
+                    'nist_800_53': ['IA-5'],
+                    'hipaa': ['164.312(d)'],
+                    'pci_dss_4': ['8.3'],
+                    'soc2': ['CC6.1'],
+                    'iso_27001_2022': ['5.17', '8.5']
                 }
             ),
             'account_hygiene': ControlMapping(
                 'account_hygiene',
                 'User account management and hygiene',
                 {
-                    'NIST-800-53': ['AC-2', 'AC-6'],
-                    'PCI-DSS-v4': ['8.1', '7.1'],
-                    'SOC2-Type2': ['CC6.1'],
-                    'ISO27001-2022': ['5.15']
+                    'nist_800_53': ['AC-2', 'AC-6'],
+                    'pci_dss_4': ['8.1', '7.1'],
+                    'soc2': ['CC6.1'],
+                    'iso_27001_2022': ['5.15']
                 }
             ),
             'scheduled_task_anomaly': ControlMapping(
                 'scheduled_task_anomaly',
                 'Suspicious scheduled task or service',
                 {
-                    'NIST-800-53': ['CM-7', 'SI-4'],
-                    'SOC2-Type2': ['CC7.1'],
-                    'ISO27001-2022': ['8.16']
+                    'nist_800_53': ['CM-7', 'SI-4'],
+                    'soc2': ['CC7.1'],
+                    'iso_27001_2022': ['8.16']
                 }
             ),
             'privilege_escalation': ControlMapping(
                 'privilege_escalation',
                 'Privilege escalation risk',
                 {
-                    'NIST-800-53': ['AC-6'],
-                    'PCI-DSS-v4': ['7.1'],
-                    'SOC2-Type2': ['CC6.3'],
-                    'ISO27001-2022': ['5.15', '8.2']
+                    'nist_800_53': ['AC-6'],
+                    'pci_dss_4': ['7.1'],
+                    'soc2': ['CC6.3'],
+                    'iso_27001_2022': ['5.15', '8.2']
                 }
             ),
             'unauthorized_ai': ControlMapping(
                 'unauthorized_ai',
                 'Unauthorized AI installation or usage',
                 {
-                    'NIST-800-53': ['CM-7', 'CM-10', 'CM-11', 'SA-9', 'SI-4', 'AC-20'],
-                    'PCI-DSS-v4': ['6.3', '12.8'],
-                    'HIPAA': ['164.308(a)(1)', '164.312(a)(1)', '164.312(e)(1)'],
-                    'SOC2-Type2': ['CC6.7', 'CC6.8', 'CC7.1'],
-                    'ISO27001-2022': ['5.23', '8.9', '8.12', '8.20']
+                    'nist_800_53': ['CM-7', 'CM-10', 'CM-11', 'SA-9', 'SI-4', 'AC-20'],
+                    'pci_dss_4': ['6.3', '12.8'],
+                    'hipaa': ['164.308(a)(1)', '164.312(a)(1)', '164.312(e)(1)'],
+                    'soc2': ['CC6.7', 'CC6.8', 'CC7.1'],
+                    'iso_27001_2022': ['5.23', '8.9', '8.12', '8.20']
                 }
             ),
         }
