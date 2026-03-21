@@ -454,6 +454,9 @@ class DonjonAPI:
     # =====================================================================
 
     def _register_routes(self):
+        # -- Favicon -------------------------------------------------------
+        self._get('/favicon.ico', self._favicon)
+
         # -- Health / Stats ------------------------------------------------
         self._get('/api/v1/health', self._health)
         self._get('/api/v1/stats', self._stats)
@@ -1150,6 +1153,17 @@ class DonjonAPI:
             return json_response(result)
         except Exception as exc:
             return error_response(str(exc), 500)
+
+    def _favicon(self, **kw) -> Tuple[bytes, int, str]:
+        """Return a simple SVG favicon."""
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+            '<rect width="32" height="32" rx="6" fill="#0891b2"/>'
+            '<path d="M8 8h6a8 8 0 010 16H8V8z" stroke="white" stroke-width="2.5" fill="none"/>'
+            '<circle cx="22" cy="16" r="3" fill="white"/>'
+            '</svg>'
+        )
+        return svg.encode('utf-8'), 200, 'image/svg+xml'
 
     def _legal_eula(self, **kw) -> Tuple[bytes, int, str]:
         try:

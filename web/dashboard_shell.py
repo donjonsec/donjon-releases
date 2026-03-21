@@ -374,6 +374,11 @@ def generate_shell() -> str:
     # Load sub-module HTML generators
     _tab_html = {}
     try:
+        from web.dashboard_overview_html import generate_overview_html
+        _tab_html["overview"] = generate_overview_html()
+    except Exception:
+        pass
+    try:
         from web.dashboard_scan_center import generate_scan_center
         _tab_html["scan-center"] = generate_scan_center()
     except Exception:
