@@ -23,7 +23,7 @@ class Config:
 
     # Default configuration with 365-day retention
     DEFAULTS = {
-        'version': '7.3.0',
+        'version': '7.3.1',
         'platform': {
             'name': 'Donjon',
             'mode': 'portable',
@@ -61,16 +61,16 @@ class Config:
         },
         'compliance': {
             'frameworks': [
-                'NIST-800-53',
-                'HIPAA',
+                'nist_800_53',
+                'hipaa',
                 'SOC1-Type2',
-                'SOC2-Type2',
-                'PCI-DSS-v4',
-                'ISO27001-2022',
-                'CMMC',
-                'FedRAMP',
-                'GDPR',
-                'SOX'
+                'soc2',
+                'pci_dss_4',
+                'iso_27001_2022',
+                'cmmc',
+                'fedramp',
+                'gdpr',
+                'sox'
             ],
             'auto_map_findings': True,
             'generate_attestations': True,

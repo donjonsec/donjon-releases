@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Donjon Platform v7.0 - Main Launcher
+Donjon Platform - Main Launcher
 Systems Thinking Security Assessment Platform
 
-v7.0: FAIR risk quantification, AI analysis, container/cloud/ASM scanning,
+FAIR risk quantification, AI analysis, container/cloud/ASM scanning,
       SBOM generation, executive dashboard, CI/CD integration, SARIF export.
 """
 
@@ -106,7 +106,7 @@ except ImportError:
 class DonjonLauncher:
     """Main launcher for Donjon Platform."""
 
-    VERSION = "7.0"
+    VERSION = config.get('version', '7.3.1')
 
     def __init__(self):
         self.behavior = HumanBehavior('normal')
@@ -346,8 +346,70 @@ class DonjonLauncher:
 
         return tui.menu("Settings", options, C.YELLOW)
 
+    # ------------------------------------------------------------------
+    # Shared: display individual findings after a scan
+    # ------------------------------------------------------------------
+    def _display_findings(self, findings, page_size=20):
+        """Show finding details with pagination.
+
+        Parameters
+        ----------
+        findings : list[dict]
+            Each dict must have at least ``severity`` and ``title``.
+        page_size : int
+            Number of findings to show before prompting.
+        """
+        if not findings:
+            tui.info("No findings to display.")
+            return
+
+        sev_color = {
+            'CRITICAL': C.BRIGHT_RED,
+            'HIGH': C.RED,
+            'MEDIUM': C.YELLOW,
+            'LOW': C.BLUE,
+            'INFO': C.DIM,
+        }
+
+        total = len(findings)
+        shown = 0
+        for i, f in enumerate(findings, 1):
+            sev = f.get('severity', 'INFO')
+            color = sev_color.get(sev, '')
+            title = f.get('title', 'Untitled')
+            desc = f.get('description', '')
+            asset = f.get('affected_asset', '')
+            remediation = f.get('remediation', '')
+
+            print(f"  {C.DIM}[{i}/{total}]{C.RESET} {color}[{sev}]{C.RESET} {title}")
+            if asset:
+                print(f"       Asset: {asset}")
+            if desc:
+                # Truncate very long descriptions
+                desc_display = (desc[:200] + '...') if len(desc) > 200 else desc
+                print(f"       {C.DIM}{desc_display}{C.RESET}")
+            if remediation:
+                rem_display = (remediation[:200] + '...') if len(remediation) > 200 else remediation
+                print(f"       {C.GREEN}Fix: {rem_display}{C.RESET}")
+            print()
+
+            shown += 1
+            if shown >= page_size and i < total:
+                resp = safe_input(f"{C.DIM}  -- {total - i} more. Press Enter for next page, 'q' to skip -- {C.RESET}")
+                if resp.strip().lower() == 'q':
+                    break
+                shown = 0
+
     def run_quick_scan(self):
-        """Run a quick security scan."""
+        """Run a quick security scan.
+
+        Checks available tools first.  On Windows, defaults to the local
+        Windows scanner when nmap/network targets are unavailable.
+        Each scanner gets a 60-second timeout in quick mode.
+        """
+        import shutil
+        import threading
+
         self.show_banner()
         tui.section("Quick Security Scan", C.GREEN)
         print()
@@ -355,25 +417,167 @@ class DonjonLauncher:
         tui.info(f"Behavior profile: {self.behavior.profile}")
         print()
 
-        # Warn about unprivileged scanning
-        if os.name != 'nt' and os.getuid() != 0:
-            tui.warning("Running without root privileges. Network scans will be limited.")
-            tui.info("For full results: sudo python3 bin/donjon-launcher quick")
-            print()
+        # ------------------------------------------------------------------
+        # 1. Discover what scanners we can actually run
+        # ------------------------------------------------------------------
+        available_scanners = []
+        unavailable_scanners = []
 
+        # Windows scanner (always works on Windows)
+        if sys.platform == 'win32':
+            try:
+                from windows_scanner import WindowsScanner
+                available_scanners.append(('Windows Security', 'windows'))
+            except ImportError:
+                unavailable_scanners.append(('Windows Security', 'module missing'))
+        # Linux scanner
+        elif sys.platform == 'linux':
+            try:
+                from linux_scanner import LinuxScanner
+                available_scanners.append(('Linux Security', 'linux'))
+            except ImportError:
+                unavailable_scanners.append(('Linux Security', 'module missing'))
+
+        # Network scanning (requires nmap + configured targets)
+        has_nmap = shutil.which('nmap') is not None
+        network_targets = []
         try:
-            from orchestrator import AssessmentOrchestrator
-            orchestrator = AssessmentOrchestrator()
-            results = orchestrator.run_full_assessment(assessment_type='quick')
+            from network import get_scan_targets
+            network_targets = get_scan_targets()
+        except Exception:
+            pass
 
+        if has_nmap and network_targets:
+            available_scanners.append(('Network Scan', 'network'))
+        else:
+            reasons = []
+            if not has_nmap:
+                reasons.append('nmap not installed')
+            if not network_targets:
+                reasons.append('no targets configured')
+            unavailable_scanners.append(('Network Scan', ', '.join(reasons)))
+
+        # Show plan
+        tui.info("Scanners available for quick scan:")
+        for name, _ in available_scanners:
+            print(f"  {C.GREEN}{tui.CHECK}{C.RESET} {name}")
+        for name, reason in unavailable_scanners:
+            print(f"  {C.RED}{tui.CROSS}{C.RESET} {name} ({reason})")
+        print()
+
+        if not available_scanners:
+            tui.error("No scanners can run. Install nmap or configure targets, then retry.")
+            tui.section_end(C.GREEN)
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # ------------------------------------------------------------------
+        # 2. Start session
+        # ------------------------------------------------------------------
+        em = get_evidence_manager() if get_evidence_manager else None
+        session_id = em.start_session(
+            scan_type='quick',
+            target_networks=['localhost'],
+            metadata={
+                'scanner': 'quick',
+                'available': [s[0] for s in available_scanners],
+            }
+        ) if em else 'quick-scan'
+
+        all_findings = []
+        scan_results = {}
+        QUICK_TIMEOUT = 60  # seconds per scanner
+
+        # ------------------------------------------------------------------
+        # 3. Run each available scanner with timeout + progress
+        # ------------------------------------------------------------------
+        for idx, (scanner_name, scanner_type) in enumerate(available_scanners, 1):
+            tui.info(f"[{idx}/{len(available_scanners)}] Running {scanner_name}...")
+
+            scanner_result = None
+            scanner_error = None
+            scanner_findings = []
+
+            def _run_scanner(stype=scanner_type, sid=session_id):
+                nonlocal scanner_result, scanner_error, scanner_findings
+                try:
+                    if stype == 'windows':
+                        from windows_scanner import WindowsScanner as WS
+                        s = WS(sid)
+                        scanner_result = s.scan(scan_type='quick')
+                        scanner_findings = list(s.findings)
+                    elif stype == 'linux':
+                        from linux_scanner import LinuxScanner as LS
+                        s = LS(sid)
+                        scanner_result = s.scan(scan_type='quick')
+                        scanner_findings = list(s.findings)
+                    elif stype == 'network':
+                        from orchestrator import AssessmentOrchestrator
+                        orch = AssessmentOrchestrator()
+                        scanner_result = orch.run_full_assessment(
+                            targets=network_targets,
+                            assessment_type='quick'
+                        )
+                except Exception as exc:
+                    scanner_error = str(exc)
+
+            thread = threading.Thread(target=_run_scanner, daemon=True)
+            thread.start()
+            thread.join(timeout=QUICK_TIMEOUT)
+
+            if thread.is_alive():
+                tui.warning(f"  {scanner_name} timed out after {QUICK_TIMEOUT}s -- skipping")
+                continue
+
+            if scanner_error:
+                tui.error(f"  {scanner_name} failed: {scanner_error}")
+                continue
+
+            if scanner_result:
+                scan_results[scanner_type] = scanner_result
+                all_findings.extend(scanner_findings)
+                summary = scanner_result.get('summary', {})
+                count = summary.get('findings_count', len(scanner_findings))
+                tui.success(f"  {scanner_name} complete -- {count} findings")
+            else:
+                tui.warning(f"  {scanner_name} returned no results")
+
+        # ------------------------------------------------------------------
+        # 4. Summary
+        # ------------------------------------------------------------------
+        print()
+        tui.section("Quick Scan Results", C.GREEN)
+        total_findings = len(all_findings)
+        tui.info(f"Session: {session_id}")
+        tui.info(f"Total findings: {total_findings}")
+
+        if total_findings > 0:
+            sev_counts = {}
+            for f in all_findings:
+                sev = f.get('severity', 'INFO')
+                sev_counts[sev] = sev_counts.get(sev, 0) + 1
+
+            for sev in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
+                count = sev_counts.get(sev, 0)
+                if count > 0:
+                    color = {'CRITICAL': C.BRIGHT_RED, 'HIGH': C.RED, 'MEDIUM': C.YELLOW,
+                             'LOW': C.BLUE, 'INFO': C.DIM}.get(sev, '')
+                    tui.info(f"  {color}{sev}: {count}{C.RESET}")
+
+            # Show individual findings (Issue #5)
             print()
-            tui.success(f"Scan complete! Session: {results.get('session_id', 'N/A')}")
-            tui.info("Results saved to: data/evidence/evidence.db")
-            tui.info("View dashboard: python3 bin/donjon-launcher dashboard")
-            tui.info("Generate report: python3 bin/donjon-launcher risk")
-            tui.info(f"Total findings: {results.get('summary', {}).get('total_findings', 0)}")
-        except Exception as e:
-            tui.error(f"Scan failed: {e}")
+            tui.info("Finding details:")
+            print()
+            self._display_findings(all_findings)
+
+        tui.info("Results saved to: data/evidence/evidence.db")
+        tui.info("View dashboard: python3 bin/donjon-launcher dashboard")
+
+        if em:
+            em.end_session(session_id, {
+                'findings_count': total_findings,
+                'scanners_run': [s[0] for s in available_scanners],
+            })
 
         tui.section_end(C.GREEN)
         safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
@@ -1950,8 +2154,111 @@ Systems Thinking Security Assessment
         tui.section_end(C.YELLOW)
 
     def show_dashboard(self):
-        """Show executive security dashboard."""
+        """Show executive security dashboard with web server + browser launch."""
         self.show_banner()
+        tui.section("Executive Dashboard", C.GREEN)
+        print()
+
+        options = [
+            ('1', f'{C.BRIGHT_GREEN}Web Dashboard{C.RESET}', 'Launch in browser (recommended)'),
+            ('2', 'Terminal Dashboard', 'Show in terminal with optional HTML export'),
+            ('---', '', ''),
+            ('b', 'Back', 'Return to main menu'),
+        ]
+        choice = tui.menu("Dashboard Mode", options, C.GREEN)
+
+        if choice == '1':
+            self._launch_web_dashboard()
+        elif choice == '2':
+            self._show_terminal_dashboard()
+
+        tui.section_end(C.GREEN)
+
+    def _launch_web_dashboard(self):
+        """Find a free port, start the web server, and open the browser."""
+        import socket
+        import threading
+        import time
+        import webbrowser
+        import urllib.request
+
+        # Ensure project root is on sys.path for web imports
+        project_root = Path(__file__).resolve().parent.parent
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        if str(project_root / 'lib') not in sys.path:
+            sys.path.insert(0, str(project_root / 'lib'))
+
+        # Find a free port starting from 8443
+        port = None
+        for candidate in range(8443, 8501):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('127.0.0.1', candidate))
+                    port = candidate
+                    break
+            except OSError:
+                continue
+
+        if port is None:
+            tui.error("Could not find a free port in range 8443-8500")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # EULA check (server requires it)
+        from eula import prompt_eula_acceptance_server
+        if not prompt_eula_acceptance_server():
+            tui.error("EULA not accepted. Accept via TUI first or set DONJON_ACCEPT_EULA=yes")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # Create the stdlib server (works on Windows, no Flask dependency)
+        try:
+            from web.api import create_stdlib_server
+            from web.auth import get_auth
+            auth = get_auth(enabled=False)  # No auth for local dashboard
+            server = create_stdlib_server('127.0.0.1', port, auth)
+        except Exception as e:
+            tui.error(f"Failed to create web server: {e}")
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
+
+        # Start server in a daemon thread
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+
+        # Poll health endpoint until server is ready (max 10 seconds)
+        url = f"http://127.0.0.1:{port}"
+        health_url = f"{url}/api/v1/health"
+        ready = False
+        for _ in range(20):
+            try:
+                req = urllib.request.urlopen(health_url, timeout=1)  # nosec B310 -- localhost only
+                if req.status == 200:
+                    ready = True
+                    break
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+        if not ready:
+            tui.warning("Server may not be fully ready, opening browser anyway...")
+
+        # Open browser
+        tui.success(f"Dashboard running at {url}")
+        webbrowser.open(url)
+
+        print()
+        print(f"  {C.BRIGHT_WHITE}Dashboard is running at {url}{C.RESET}")
+        print(f"  {C.DIM}API available at {url}/api/v1/{C.RESET}")
+        safe_input(f"\n  {C.BRIGHT_YELLOW}Press Enter to stop the dashboard server...{C.RESET}")
+
+        # Shutdown server
+        server.shutdown()
+        tui.info("Dashboard server stopped.")
+
+    def _show_terminal_dashboard(self):
+        """Show the terminal-based dashboard with optional HTML export."""
         try:
             from executive_dashboard import ExecutiveDashboard
             dashboard = ExecutiveDashboard()
@@ -2534,10 +2841,20 @@ Systems Thinking Security Assessment
 
         tui.info("Starting {} Windows security scan...".format(scan_type))
         tui.info("Session: {}".format(session_id))
+        tui.info("Press Ctrl+C to cancel and return to menu.")
         print()
 
-        scanner = WindowsScanner(session_id)
-        results = scanner.scan(scan_type=scan_type)
+        try:
+            scanner = WindowsScanner(session_id)
+            results = scanner.scan(scan_type=scan_type)
+        except KeyboardInterrupt:
+            print()
+            tui.warning("Scan cancelled by user.")
+            if em:
+                em.end_session(session_id, {'cancelled': True}, status='cancelled')
+            tui.section_end(C.CYAN)
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
 
         # Display summary
         print()
@@ -2557,6 +2874,14 @@ Systems Thinking Security Assessment
                 color = {'CRITICAL': C.BRIGHT_RED, 'HIGH': C.RED, 'MEDIUM': C.YELLOW,
                          'LOW': C.BLUE, 'INFO': C.DIM}.get(sev, '')
                 tui.info(f"  {color}{sev}: {count}{C.RESET}")
+
+        # Show individual finding details (Issue #5)
+        findings = getattr(scanner, 'findings', [])
+        if findings:
+            print()
+            tui.info("Finding details:")
+            print()
+            self._display_findings(findings)
 
         tui.section_end(C.CYAN)
         if em:
@@ -2612,10 +2937,20 @@ Systems Thinking Security Assessment
 
         tui.info("Starting {} Linux security scan...".format(scan_type))
         tui.info("Session: {}".format(session_id))
+        tui.info("Press Ctrl+C to cancel and return to menu.")
         print()
 
-        scanner = LinuxScanner(session_id)
-        results = scanner.scan(scan_type=scan_type)
+        try:
+            scanner = LinuxScanner(session_id)
+            results = scanner.scan(scan_type=scan_type)
+        except KeyboardInterrupt:
+            print()
+            tui.warning("Scan cancelled by user.")
+            if em:
+                em.end_session(session_id, {'cancelled': True}, status='cancelled')
+            tui.section_end(C.CYAN)
+            safe_input(f"\n{C.DIM}Press Enter to continue...{C.RESET}")
+            return
 
         # Display summary
         print()
@@ -2635,6 +2970,14 @@ Systems Thinking Security Assessment
                 color = {'CRITICAL': C.BRIGHT_RED, 'HIGH': C.RED, 'MEDIUM': C.YELLOW,
                          'LOW': C.BLUE, 'INFO': C.DIM}.get(sev, '')
                 tui.info(f"  {color}{sev}: {count}{C.RESET}")
+
+        # Show individual finding details (Issue #5)
+        findings = getattr(scanner, 'findings', [])
+        if findings:
+            print()
+            tui.info("Finding details:")
+            print()
+            self._display_findings(findings)
 
         tui.section_end(C.CYAN)
         if em:

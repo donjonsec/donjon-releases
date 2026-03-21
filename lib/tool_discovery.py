@@ -71,6 +71,8 @@ TOOLS: Dict[str, ToolInfo] = {
         check_cmd='nikto -Version',
         version_cmd='nikto -Version 2>&1 | grep -i version | head -1',
         install_apt='nikto',
+        install_cmd='pip install nikto',
+        install_url='https://github.com/sullo/nikto',
     ),
     'nuclei': ToolInfo(
         name='nuclei',
@@ -91,6 +93,7 @@ TOOLS: Dict[str, ToolInfo] = {
         check_cmd='testssl.sh --version',
         version_cmd='testssl.sh --version 2>&1 | head -1',
         install_apt='testssl.sh',
+        install_cmd='git clone --depth 1 https://github.com/drwetter/testssl.sh.git',
         install_url='https://github.com/drwetter/testssl.sh',
     ),
     'wpscan': ToolInfo(
@@ -694,14 +697,6 @@ class ToolDiscovery:
                     if tool.available:
                         tui.success(f"{tool.name} installed successfully")
                         return True
-            elif shutil.which('winget'):
-                tui.info(f"Trying winget install: {tool.name}")
-                result = subprocess.run(f"winget install {tool.name}", shell=True)  # nosec B602 -- tool.name from internal registry
-                if result.returncode == 0:
-                    self.check_tool(name)
-                    if tool.available:
-                        tui.success(f"{tool.name} installed successfully")
-                        return True
 
         # Try apt first (Linux)
         if tool.install_apt:
@@ -730,9 +725,11 @@ class ToolDiscovery:
         # Provide manual instructions
         tui.warning(f"Automatic installation failed for {tool.name}")
         if tool.install_url:
-            tui.info(f"Manual installation: {tool.install_url}")
+            tui.info(f"Download/install manually: {tool.install_url}")
         if tool.install_apt and _sys.platform != 'win32':
             tui.info(f"Try: sudo apt install {tool.install_apt}")
+        if _sys.platform == 'win32' and tool.install_cmd:
+            tui.info(f"Try: {tool.install_cmd}")
 
         return False
 
