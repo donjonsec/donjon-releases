@@ -259,6 +259,19 @@ class BaseScanner(ABC):
             json.dump(output_data, f, indent=2, default=str)
 
         self.scan_logger.info(f"Results saved to {output_path}")
+
+        # Record scan in usage telemetry
+        try:
+            from usage_reporter import get_usage_reporter
+            reporter = get_usage_reporter()
+            reporter.record_scan(
+                scanner_name=self.SCANNER_NAME,
+                finding_count=len(self.findings),
+                findings_by_severity=self._count_by_severity(),
+            )
+        except Exception as exc:
+            self.scan_logger.debug(f"Usage telemetry recording skipped: {exc}")
+
         return output_path
 
     def _count_by_severity(self) -> Dict[str, int]:
