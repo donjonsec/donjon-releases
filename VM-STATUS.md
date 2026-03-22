@@ -1,1 +1,1 @@
-SSH key encoding fixed — CRLF replaced with LF
+Password reset to Donj0n2026! and key rewritten via cmd.exe
