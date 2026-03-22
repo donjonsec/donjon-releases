@@ -1,39 +1,26 @@
-# Task — Fix Agent to Use Dangerously Mode
-
-The `claude -p` invocation needs the `--dangerously-skip-permissions` flag to run autonomously without permission prompts.
+# Task — Disable Screen Lock + Power Timeouts
 
 ```powershell
-# Update the agent script
-$agentPath = "C:\donjon-agent\agent.ps1"
-$content = Get-Content $agentPath -Raw
-$content = $content -replace 'claude -p \$prompt', 'claude -p $prompt --dangerously-skip-permissions'
-$content = $content -replace 'claude -p "\$prompt"', 'claude -p "$prompt" --dangerously-skip-permissions'
-$content | Set-Content $agentPath -Encoding UTF8
+# Disable monitor timeout
+powercfg -change -monitor-timeout-ac 0
+powercfg -change -standby-timeout-ac 0
 
-# Also add it directly if the replace didn't catch it
-if (-not (Select-String -Path $agentPath -Pattern "dangerously-skip-permissions" -Quiet)) {
-    $content = Get-Content $agentPath -Raw
-    $content = $content -replace 'claude -p \$prompt ([^-])', 'claude -p $prompt --dangerously-skip-permissions $1'
-    $content | Set-Content $agentPath -Encoding UTF8
-}
+# Disable lock screen
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" /v NoLockScreen /t REG_DWORD /d 1 /f
 
-# Verify
-if (Select-String -Path $agentPath -Pattern "dangerously-skip-permissions" -Quiet) {
-    Write-Output "FIXED: --dangerously-skip-permissions added to claude invocation"
-} else {
-    Write-Output "WARNING: flag not found in script — manual check needed"
-    Select-String -Path $agentPath -Pattern "claude" | ForEach-Object { Write-Output $_.Line }
-}
+# Disable screen saver
+reg add "HKCU\Control Panel\Desktop" /v ScreenSaveActive /t REG_SZ /d 0 /f
+reg add "HKCU\Control Panel\Desktop" /v ScreenSaverIsSecure /t REG_SZ /d 0 /f
 
-# Restart the scheduled task to pick up changes
-Stop-ScheduledTask -TaskName "DonjonTestAgent" -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
-Start-ScheduledTask -TaskName "DonjonTestAgent"
+# Disable auto-lock on idle
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v InactivityTimeoutSecs /t REG_DWORD /d 0 /f
+
+Write-Output "Screen lock and power timeouts disabled"
 
 # Push confirmation
 cd C:\donjon-platform
-"Agent updated with --dangerously-skip-permissions at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Set-Content VM-STATUS.md
+"Screen lock disabled, power timeouts set to 0 at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Set-Content VM-STATUS.md
 git add VM-STATUS.md
-git commit -m "VM: agent updated with dangerously-skip-permissions flag"
+git commit -m "VM: screen lock and power timeouts disabled"
 git push origin main
 ```
