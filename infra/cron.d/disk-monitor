@@ -1,0 +1,2 @@
+# Hourly root disk usage check — alert if above 80%
+0 * * * * root /usr/local/bin/check-disk.sh

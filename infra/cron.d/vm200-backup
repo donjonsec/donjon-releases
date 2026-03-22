@@ -1,0 +1,2 @@
+# Nightly backup of VM 200 (Windows) at 4 AM
+0 4 * * * root vzdump 200 --storage local --compress zstd --mode snapshot --mailto root --quiet 1 2>&1 | logger -t vm200-backup
