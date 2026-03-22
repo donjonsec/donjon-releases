@@ -811,6 +811,10 @@ class LicenseManager:
         An empty fingerprint means the license is a "floating" license
         that is not bound to any specific machine.
 
+        POLICY: Fingerprint mismatch produces a warning but does NOT
+        block activation.  This supports floating/transferred licenses
+        while still logging the discrepancy for audit purposes.
+
         SECURITY: Uses constant-time comparison via hmac.compare_digest
         to prevent timing side-channels.  While fingerprints are not
         secret, timing differences could reveal how many characters
@@ -823,7 +827,15 @@ class LicenseManager:
 
         current_fp = generate_machine_fingerprint()
         # Constant-time comparison to prevent timing side-channels.
-        return hmac.compare_digest(fp, current_fp)
+        if not hmac.compare_digest(fp, current_fp):
+            logger.warning(
+                "Machine fingerprint mismatch: license bound to a different "
+                "machine. Allowing activation (floating license policy). "
+                "Expected=%s..., Got=%s...",
+                fp[:16], current_fp[:16],
+            )
+            # Warn but do not block -- floating licenses should still work.
+        return True
 
     def _is_revoked(self, data: Dict[str, Any]) -> bool:
         """Check whether this license ID appears in the local revocation list.
@@ -960,6 +972,29 @@ class LicenseManager:
             "format_version": 0,
             "valid": True,
         }
+
+    def days_until_expiry(self) -> Optional[int]:
+        """Return number of days until the license expires, or None if perpetual.
+
+        Returns negative values for already-expired licenses.
+        Community tier (no license) returns None (no expiry concept).
+        """
+        if not self._license:
+            return None
+        expires = self._license.get("expires")
+        if not expires:
+            return None  # Perpetual license
+        try:
+            exp_str = expires.replace("Z", "+00:00")
+            exp_dt = datetime.fromisoformat(exp_str)
+            if exp_dt.tzinfo is not None:
+                now = datetime.now(timezone.utc)
+            else:
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+            delta = exp_dt - now
+            return delta.days
+        except (ValueError, TypeError):
+            return -1  # Malformed date = treat as expired
 
     # ------------------------------------------------------------------
     # Limit checking

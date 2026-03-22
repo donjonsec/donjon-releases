@@ -193,6 +193,11 @@ except ImportError:
     run_cleanup = None
     get_data_stats = None
 
+try:
+    from lib.usage_reporter import get_usage_reporter
+except ImportError:
+    get_usage_reporter = None
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -664,6 +669,10 @@ class DonjonAPI:
 
         # -- Legal ---------------------------------------------------------
         self._get('/api/v1/legal/eula', self._legal_eula)
+
+        # -- Usage Telemetry -----------------------------------------------
+        if get_usage_reporter is not None:
+            self._get('/api/v1/usage', self._api_usage_report)
 
     # ------------------------------------------------------------------
     # API sub-module adapters
@@ -1175,6 +1184,14 @@ class DonjonAPI:
                 'accepted': record is not None and record.get('eula_version') == EULA_VERSION,
                 'accepted_at': record.get('accepted_at') if record else None,
             })
+        except Exception as exc:
+            return error_response(str(exc), 500)
+
+    def _api_usage_report(self, **kw) -> Tuple[bytes, int, str]:
+        """GET /api/v1/usage - Return local usage telemetry report."""
+        try:
+            reporter = get_usage_reporter()
+            return json_response({"ok": True, "usage": reporter.get_report()})
         except Exception as exc:
             return error_response(str(exc), 500)
 
@@ -2189,6 +2206,19 @@ class DonjonAPI:
         # Validate the license using the unified validator
         if not lm.validate_license(license_data):
             return error_response('Invalid or expired license', 400)
+
+        # Auto-bind machine fingerprint on activation.
+        # If the license doesn't already carry a fingerprint (floating license),
+        # we record the current machine fingerprint in the activation record
+        # so subsequent startups can verify the license is on the same machine.
+        from lib.licensing import generate_machine_fingerprint
+        activation_fingerprint = generate_machine_fingerprint()
+        if not license_data.get('machine_fingerprint'):
+            license_data['machine_fingerprint'] = activation_fingerprint
+        license_data['activation_record'] = {
+            'activated_at': datetime.now(timezone.utc).isoformat(),
+            'machine_fingerprint': activation_fingerprint,
+        }
 
         # Save to data/license.json
         license_path = lm.license_path

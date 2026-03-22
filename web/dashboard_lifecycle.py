@@ -218,6 +218,22 @@ def generate_lifecycle() -> str:
     )
     parts.append('</div>')
 
+    # Start Free Trial button (shown when no trial/license active)
+    parts.append(
+        '<div class="lc-card" id="lcStartTrialSection" style="display:none;">'
+        '<div class="lc-section-title">Try Pro Free for 14 Days</div>'
+        '<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">'
+        'Unlock all 17 scanners, 30 compliance frameworks, AI analysis, '
+        'scheduled scans, and PDF/SARIF export. No credit card required.</p>'
+        '<button class="lc-upgrade-btn" id="lcStartTrialBtn" '
+        'onclick="startFreeTrial()">'
+        'Start Free Trial'
+        '</button>'
+        '<div id="lcTrialError" style="color:var(--critical);font-size:0.85rem;'
+        'margin-top:8px;display:none;"></div>'
+        '</div>'
+    )
+
     # Trial countdown section
     parts.append(
         '<div class="lc-card" id="lcTrialSection" style="display:none;">'
@@ -312,8 +328,50 @@ def generate_lifecycle() -> str:
                     '<span class="lc-alert-icon">\u26D4</span>' +
                     '<div class="lc-alert-body">' +
                     '<div class="lc-alert-title">License Expired</div>' +
-                    '<div class="lc-alert-text">Your license has expired. Features have been downgraded to Community tier. Contact sales to renew.</div>' +
+                    '<div class="lc-alert-text">Your license has expired. Features have been downgraded to Community tier. Contact sales@donjonsec.com to renew, or use tools/license-refresh.py to import a new license file offline.</div>' +
                     '</div></div>';
+            }
+
+            // License expiry renewal notifications
+            var licInfo = data.license || {};
+            var expiresStr = licInfo.expires || "";
+            if (expiresStr && status !== "expired") {
+                var expiryDate = new Date(expiresStr.replace("Z", "+00:00"));
+                var nowMs = Date.now();
+                var daysLeft = Math.ceil((expiryDate.getTime() - nowMs) / 86400000);
+                if (daysLeft <= 0) {
+                    alerts.innerHTML +=
+                        '<div class="lc-alert lc-alert-error">' +
+                        '<span class="lc-alert-icon">\u26D4</span>' +
+                        '<div class="lc-alert-body">' +
+                        '<div class="lc-alert-title">License Expired</div>' +
+                        '<div class="lc-alert-text">Your license expired ' + Math.abs(daysLeft) + ' day(s) ago. Features have been downgraded to Community tier. Contact sales@donjonsec.com to renew, or use tools/license-refresh.py for offline renewal.</div>' +
+                        '</div></div>';
+                } else if (daysLeft <= 7) {
+                    alerts.innerHTML +=
+                        '<div class="lc-alert lc-alert-error">' +
+                        '<span class="lc-alert-icon">\u26A0</span>' +
+                        '<div class="lc-alert-body">' +
+                        '<div class="lc-alert-title">License Expires in ' + daysLeft + ' Day' + (daysLeft === 1 ? '' : 's') + '</div>' +
+                        '<div class="lc-alert-text">Your ' + tier + ' license expires on ' + expiryDate.toLocaleDateString() + '. Contact sales@donjonsec.com to renew before access is downgraded to Community tier.</div>' +
+                        '</div></div>';
+                } else if (daysLeft <= 14) {
+                    alerts.innerHTML +=
+                        '<div class="lc-alert lc-alert-warning">' +
+                        '<span class="lc-alert-icon">\u26A0</span>' +
+                        '<div class="lc-alert-body">' +
+                        '<div class="lc-alert-title">License Expires in ' + daysLeft + ' Days</div>' +
+                        '<div class="lc-alert-text">Your ' + tier + ' license expires on ' + expiryDate.toLocaleDateString() + '. Plan your renewal to avoid service interruption.</div>' +
+                        '</div></div>';
+                } else if (daysLeft <= 30) {
+                    alerts.innerHTML +=
+                        '<div class="lc-alert lc-alert-info">' +
+                        '<span class="lc-alert-icon">\u2139</span>' +
+                        '<div class="lc-alert-body">' +
+                        '<div class="lc-alert-title">License Expires in ' + daysLeft + ' Days</div>' +
+                        '<div class="lc-alert-text">Your ' + tier + ' license expires on ' + expiryDate.toLocaleDateString() + '. Renewal reminders will increase as the date approaches.</div>' +
+                        '</div></div>';
+                }
             }
 
             // Scanner count based on tier
@@ -335,6 +393,7 @@ def generate_lifecycle() -> str:
             if (data.active || data.trial_active) {
                 var section = document.getElementById("lcTrialSection");
                 section.style.display = "";
+                document.getElementById("lcStartTrialSection").style.display = "none";
                 var days = data.days_remaining || data.remaining_days || 0;
                 document.getElementById("lcTrialDays").textContent = days + " days";
                 document.getElementById("lcTrialText").textContent = "Trial expires: " + (data.expires || data.expiry || "");
@@ -353,6 +412,8 @@ def generate_lifecycle() -> str:
                         '<div class="lc-alert-text">' + days + ' days remaining on your Pro trial. Upgrade to keep advanced features.</div>' +
                         '</div></div>';
                 }
+            } else if (data.trial_available && tier === "community") {
+                document.getElementById("lcStartTrialSection").style.display = "";
             }
         }).catch(function(){});
     }
@@ -422,7 +483,38 @@ def generate_lifecycle() -> str:
             loadLifecycle();
         }
     });
-})();''')
+})();
+
+function startFreeTrial() {
+    var btn = document.getElementById("lcStartTrialBtn");
+    var errDiv = document.getElementById("lcTrialError");
+    btn.disabled = true;
+    btn.textContent = "Activating...";
+    errDiv.style.display = "none";
+
+    fetch("/api/v1/license/trial", {method: "POST", headers: {"Content-Type": "application/json"}})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.activated) {
+                btn.textContent = "Trial Activated!";
+                document.getElementById("lcStartTrialSection").style.display = "none";
+                // Reload the lifecycle tab to show countdown
+                var evt = new CustomEvent("tabload", {detail: {tab: "lifecycle"}});
+                document.dispatchEvent(evt);
+            } else {
+                btn.disabled = false;
+                btn.textContent = "Start Free Trial";
+                errDiv.textContent = data.error || "Failed to activate trial";
+                errDiv.style.display = "";
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = "Start Free Trial";
+            errDiv.textContent = "Network error: " + e.message;
+            errDiv.style.display = "";
+        });
+}''')
     parts.append('</script>')
 
     return ''.join(parts)
