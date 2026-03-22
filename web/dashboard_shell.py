@@ -423,6 +423,48 @@ def generate_shell() -> str:
         _tab_html["patch-verification"] = generate_patch_html()
     except Exception:
         pass
+    # Enterprise tabs
+    try:
+        from web.dashboard_users_html import generate_users_html
+        _tab_html["users-roles"] = generate_users_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_sso_html import generate_sso_html
+        _tab_html["sso"] = generate_sso_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_tenants_html import generate_tenants_html
+        _tab_html["tenants"] = generate_tenants_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_audit_html import generate_audit_html
+        _tab_html["audit-log"] = generate_audit_html()
+    except Exception:
+        pass
+    # MSSP tabs
+    try:
+        from web.dashboard_mssp_clients_html import generate_mssp_clients_html
+        _tab_html["clients"] = generate_mssp_clients_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_mssp_bulk_html import generate_mssp_bulk_html
+        _tab_html["bulk-scans"] = generate_mssp_bulk_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_mssp_reports_html import generate_mssp_reports_html
+        _tab_html["reports"] = generate_mssp_reports_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_mssp_metering_html import generate_mssp_metering_html
+        _tab_html["metering"] = generate_mssp_metering_html()
+    except Exception:
+        pass
 
     for tab_id in all_tabs:
         active = ' active' if tab_id == 'overview' else ''
