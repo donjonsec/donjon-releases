@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest tests/test_production_ready.py tests/test_api_routes.py tests/test_eula.py tests/test_scanners.py -v --tb=short
+
+      - name: Verify compilation
+        run: |
+          python -c "
+          import py_compile, glob, sys
+          files = glob.glob('lib/*.py') + glob.glob('scanners/*.py') + glob.glob('web/*.py')
+          errors = []
+          for f in files:
+              try:
+                  py_compile.compile(f, doraise=True)
+              except py_compile.PyCompileError as e:
+                  errors.append(str(e))
+          if errors:
+              for e in errors:
+                  print(f'COMPILE ERROR: {e}', file=sys.stderr)
+              sys.exit(1)
+          print(f'Successfully compiled {len(files)} files')
+          "
