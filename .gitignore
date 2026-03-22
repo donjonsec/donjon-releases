@@ -26,6 +26,15 @@ data/remediation.db
 data/risk_register.db
 data/notifications.db
 data/scheduler.db
+data/eula_accepted.json
+data/mssp_metering.db
+data/mssp_provisioning.db
+data/mssp_templates.db
+data/multi_tenant.db
+data/rbac.db
+data/usage_report.json
+data/zero_retention.db
+results/
 
 # Demo output (runtime generated)
 data/demo/

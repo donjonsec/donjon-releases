@@ -78,6 +78,7 @@ class ComplianceMapper:
         self._load_control_definitions()
         self._load_mappings()
         self._load_frameworks_from_yaml()
+        self._build_control_keyword_index()
 
     def _load_control_definitions(self):
         """Load control definitions for all frameworks."""
@@ -990,6 +991,95 @@ class ComplianceMapper:
             ),
         }
 
+    # ----------------------------------------------------------------
+    # Category-to-finding-type mapping.
+    # Scanner findings carry a 'category' field (e.g., "network", "web",
+    # "auth").  This maps each category to the finding_type keys that are
+    # relevant for that category, enabling broader control coverage when
+    # an explicit finding_type is absent.
+    # ----------------------------------------------------------------
+    _CATEGORY_FINDING_MAP: Dict[str, List[str]] = {
+        'network': [
+            'open_port', 'network_service', 'firewall_config', 'ssl_vulnerability',
+            'weak_cipher', 'expired_certificate', 'host_discovery',
+        ],
+        'web': [
+            'web_vulnerability', 'ssl_vulnerability', 'information_disclosure',
+            'insecure_configuration', 'expired_certificate',
+        ],
+        'auth': [
+            'authentication_weakness', 'default_credentials', 'password_policy',
+            'account_hygiene',
+        ],
+        'authentication': [
+            'authentication_weakness', 'default_credentials', 'password_policy',
+            'account_hygiene',
+        ],
+        'encryption': [
+            'ssl_vulnerability', 'weak_cipher', 'expired_certificate',
+            'disk_encryption',
+        ],
+        'crypto': [
+            'ssl_vulnerability', 'weak_cipher', 'expired_certificate',
+            'disk_encryption',
+        ],
+        'configuration': [
+            'insecure_configuration', 'firewall_config', 'audit_policy',
+        ],
+        'endpoint': [
+            'endpoint_protection', 'disk_encryption', 'insecure_configuration',
+            'firewall_config',
+        ],
+        'vulnerability': [
+            'cve_vulnerability', 'web_vulnerability', 'missing_patch',
+        ],
+        'patching': [
+            'missing_patch', 'cve_vulnerability',
+        ],
+        'logging': [
+            'missing_logging', 'audit_policy',
+        ],
+        'access': [
+            'account_hygiene', 'privilege_escalation', 'authentication_weakness',
+        ],
+        'malware': [
+            'endpoint_protection',
+        ],
+        'compliance': [
+            'insecure_configuration', 'audit_policy', 'missing_logging',
+        ],
+        'windows': [
+            'endpoint_protection', 'insecure_configuration',
+        ],
+    }
+
+    # ----------------------------------------------------------------
+    # Scanner-type to additional finding types.  Findings from certain
+    # scanners automatically get extra finding-type associations.
+    # ----------------------------------------------------------------
+    _SCANNER_FINDING_MAP: Dict[str, List[str]] = {
+        'network_scanner': [
+            'open_port', 'network_service', 'host_discovery',
+        ],
+        'web_scanner': [
+            'web_vulnerability', 'ssl_vulnerability',
+        ],
+        'windows_scanner': [
+            'endpoint_protection', 'insecure_configuration',
+        ],
+        'vulnerability_scanner': [
+            'cve_vulnerability', 'missing_patch',
+        ],
+    }
+
+    # ----------------------------------------------------------------
+    # Cross-framework control domain keywords.
+    # Maps security concept keywords to lists of (framework, control_id)
+    # tuples.  These extend the hardcoded ControlMappings to cover YAML-
+    # loaded frameworks (CMMC, CIS, GDPR, FEDRAMP, NIS2, SOX, etc.).
+    # Built once in __init__ via _build_control_keyword_index().
+    # ----------------------------------------------------------------
+
     # Keyword-to-finding-type map for intelligent secondary matching.
     # Each entry: keyword (lowercased) -> list of finding_type keys that apply.
     _KEYWORD_FINDING_MAP: Dict[str, List[str]] = {
@@ -1085,6 +1175,130 @@ class ComplianceMapper:
         'chatgpt': ['unauthorized_ai'],
     }
 
+    # ----------------------------------------------------------------
+    # Security concept keywords for control-description matching.
+    # Maps broad security concepts to search terms used to match against
+    # YAML-loaded control names and descriptions.
+    # ----------------------------------------------------------------
+    _CONCEPT_KEYWORDS: Dict[str, List[str]] = {
+        'ssl_vulnerability': [
+            'cryptograph', 'encrypt', 'ssl', 'tls', 'transmission', 'transit',
+            'certificate', 'cipher', 'crypto',
+        ],
+        'weak_cipher': [
+            'cryptograph', 'cipher', 'encrypt', 'crypto', 'key management',
+        ],
+        'expired_certificate': [
+            'certificate', 'cryptograph', 'key management', 'encrypt',
+        ],
+        'open_port': [
+            'network', 'firewall', 'boundary', 'port', 'perimeter',
+            'segment', 'traffic', 'communic',
+        ],
+        'network_service': [
+            'network', 'service', 'boundary', 'perimeter', 'segment',
+            'traffic', 'communic', 'infrastructure',
+        ],
+        'cve_vulnerability': [
+            'vulnerabilit', 'patch', 'flaw', 'remediat', 'scan',
+            'risk assess', 'threat', 'update',
+        ],
+        'missing_patch': [
+            'patch', 'update', 'remediat', 'flaw', 'vulnerabilit',
+            'maintenance', 'configuration management',
+        ],
+        'web_vulnerability': [
+            'web', 'application', 'vulnerabilit', 'injection', 'cross-site',
+            'input validat', 'software', 'code review',
+        ],
+        'authentication_weakness': [
+            'authenticat', 'identif', 'credential', 'password', 'logon',
+            'login', 'mfa', 'multi-factor', 'access control',
+        ],
+        'default_credentials': [
+            'credential', 'password', 'default', 'authenticat', 'identif',
+        ],
+        'insecure_configuration': [
+            'configur', 'harden', 'baseline', 'secure setting', 'system setting',
+            'security setting',
+        ],
+        'missing_logging': [
+            'log', 'audit', 'monitor', 'event', 'detect', 'alert',
+            'record', 'siem',
+        ],
+        'information_disclosure': [
+            'data protect', 'confidential', 'sensitive', 'privacy',
+            'disclosure', 'data loss', 'classif',
+        ],
+        'endpoint_protection': [
+            'malware', 'anti-virus', 'antivirus', 'malicious', 'endpoint',
+            'threat detect', 'protection',
+        ],
+        'disk_encryption': [
+            'encrypt', 'data at rest', 'storage protect', 'media protect',
+            'cryptograph',
+        ],
+        'firewall_config': [
+            'firewall', 'network security', 'boundary', 'perimeter',
+            'filter', 'segment',
+        ],
+        'audit_policy': [
+            'audit', 'log', 'accountab', 'record', 'event', 'monitor',
+        ],
+        'password_policy': [
+            'password', 'credential', 'authenticat', 'identif',
+        ],
+        'account_hygiene': [
+            'account', 'user', 'access control', 'provision', 'privilege',
+            'role', 'authoriz',
+        ],
+        'privilege_escalation': [
+            'privilege', 'least privilege', 'access control', 'authoriz',
+            'role', 'segregat', 'separat',
+        ],
+        'host_discovery': [
+            'asset', 'inventory', 'discover', 'identif',
+        ],
+        'scheduled_task_anomaly': [
+            'monitor', 'detect', 'anomal', 'schedul', 'integrity',
+        ],
+        'unauthorized_ai': [
+            'software', 'unauthoriz', 'install', 'approved', 'shadow',
+            'third party', 'vendor',
+        ],
+    }
+
+    def _build_control_keyword_index(self):
+        """Build a reverse index from (framework, control_id) to matching concepts.
+
+        For every YAML-loaded control, checks its name/description/family
+        against _CONCEPT_KEYWORDS to pre-compute which finding types each
+        control is relevant for.  This extends the hardcoded ControlMappings
+        to cover all YAML-loaded frameworks.
+
+        Requires at least 2 keyword hits per concept to reduce false positives.
+        """
+        # concept_to_controls: finding_type -> {framework -> set(control_ids)}
+        self._concept_controls: Dict[str, Dict[str, Set[str]]] = {}
+
+        # Frameworks already fully covered by hardcoded mappings — skip them
+        # to avoid duplication of those curated, high-quality mappings.
+        hardcoded_fws = {'nist_800_53', 'hipaa', 'pci_dss_4', 'soc2', 'SOC1-Type2', 'iso_27001_2022'}
+
+        for fw_id, fw_controls in self.controls.items():
+            if fw_id in hardcoded_fws:
+                continue
+            for ctrl_id, ctrl in fw_controls.items():
+                # Build searchable text from control metadata
+                search_text = f"{ctrl.control_name} {ctrl.description} {ctrl.family}".lower()
+                for concept, keywords in self._CONCEPT_KEYWORDS.items():
+                    # Count how many distinct keywords from this concept hit
+                    hits = sum(1 for kw in keywords if kw in search_text)
+                    # Require 2+ keyword hits to reduce false positives
+                    if hits >= 2:
+                        by_fw = self._concept_controls.setdefault(concept, {})
+                        by_fw.setdefault(fw_id, set()).add(ctrl_id)
+
     def infer_finding_types(self, title: str, description: str = '') -> Set[str]:
         """Infer applicable finding_type keys from a finding's title and description.
 
@@ -1098,6 +1312,117 @@ class ComplianceMapper:
             if keyword in text:
                 matched.update(types)
         return matched
+
+    def map_finding(self, finding: dict) -> List[dict]:
+        """Map a finding dict to all relevant compliance controls.
+
+        This is the primary entry point for mapping scanner findings to
+        compliance framework controls.  It combines:
+        1. Explicit finding_type matching (from ``self.mappings``)
+        2. Keyword-based inference from title/description
+        3. Category-based matching (finding category -> finding types)
+        4. Scanner-specific associations (scanner name -> finding types)
+        5. Control-description matching against YAML-loaded frameworks
+
+        Args:
+            finding: Dict with keys such as 'title', 'category', 'severity',
+                     'scanner', 'finding_type', 'description'.
+
+        Returns:
+            List of dicts, each with keys: framework, control_id, control_name,
+            family, match_source (how it was matched).
+        """
+        title = finding.get('title', '')
+        description = finding.get('description', '')
+        category = finding.get('category', '').lower()
+        scanner = finding.get('scanner', '').lower()
+        finding_type = finding.get('finding_type', '')
+        frameworks_filter = finding.get('frameworks', None)
+
+        # --- Phase 1: Collect all relevant finding types ---
+        types_to_check: Set[str] = set()
+
+        # 1a. Explicit finding_type
+        if finding_type and finding_type in self.mappings:
+            types_to_check.add(finding_type)
+
+        # 1b. Keyword inference from title/description
+        if title or description:
+            types_to_check.update(self.infer_finding_types(title, description))
+
+        # 1c. Category-based matching
+        if category:
+            cat_types = self._CATEGORY_FINDING_MAP.get(category, [])
+            types_to_check.update(cat_types)
+
+        # 1d. Scanner-specific associations
+        if scanner:
+            scanner_types = self._SCANNER_FINDING_MAP.get(scanner, [])
+            types_to_check.update(scanner_types)
+
+        # --- Phase 2: Gather controls from hardcoded mappings ---
+        # Track (fw, ctrl_id) to avoid duplicates
+        seen: Set[tuple] = set()
+        results: List[dict] = []
+
+        for ft in types_to_check:
+            mapping = self.mappings.get(ft)
+            if not mapping:
+                continue
+            for fw, ctrl_ids in mapping.controls.items():
+                if frameworks_filter and fw not in frameworks_filter:
+                    continue
+                for cid in ctrl_ids:
+                    key = (fw, cid)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    ctrl = self.get_control(fw, cid)
+                    results.append({
+                        'framework': fw,
+                        'control_id': cid,
+                        'control_name': ctrl.control_name if ctrl else cid,
+                        'family': ctrl.family if ctrl else '',
+                        'match_source': 'mapping',
+                    })
+
+        # --- Phase 3: Gather controls from YAML keyword index ---
+        for ft in types_to_check:
+            concept_map = self._concept_controls.get(ft, {})
+            for fw, ctrl_ids in concept_map.items():
+                if frameworks_filter and fw not in frameworks_filter:
+                    continue
+                for cid in ctrl_ids:
+                    key = (fw, cid)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    ctrl = self.get_control(fw, cid)
+                    results.append({
+                        'framework': fw,
+                        'control_id': cid,
+                        'control_name': ctrl.control_name if ctrl else cid,
+                        'family': ctrl.family if ctrl else '',
+                        'match_source': 'keyword_index',
+                    })
+
+        # --- Phase 4: Universal NIST controls for any scanner finding ---
+        nist_key = 'nist_800_53'
+        if not frameworks_filter or nist_key in frameworks_filter:
+            for cid in self._UNIVERSAL_NIST_CONTROLS:
+                key = (nist_key, cid)
+                if key not in seen:
+                    seen.add(key)
+                    ctrl = self.get_control(nist_key, cid)
+                    results.append({
+                        'framework': nist_key,
+                        'control_id': cid,
+                        'control_name': ctrl.control_name if ctrl else cid,
+                        'family': ctrl.family if ctrl else '',
+                        'match_source': 'universal',
+                    })
+
+        return results
 
     def get_controls_for_finding(self, finding_type: str, frameworks: List[str] = None,
                                   title: str = '', description: str = '') -> Dict[str, List[str]]:
@@ -1119,7 +1444,7 @@ class ComplianceMapper:
         if not types_to_check:
             return {}
 
-        # Merge controls from all matched types
+        # Merge controls from all matched types (hardcoded mappings)
         merged: Dict[str, List[str]] = {}
         for ft in types_to_check:
             mapping = self.mappings.get(ft)
@@ -1130,6 +1455,17 @@ class ComplianceMapper:
                     continue
                 existing = merged.setdefault(fw, [])
                 for c in ctrls:
+                    if c not in existing:
+                        existing.append(c)
+
+        # Merge controls from YAML keyword index (broader framework coverage)
+        for ft in types_to_check:
+            concept_map = self._concept_controls.get(ft, {})
+            for fw, ctrl_ids in concept_map.items():
+                if frameworks and fw not in frameworks:
+                    continue
+                existing = merged.setdefault(fw, [])
+                for c in ctrl_ids:
                     if c not in existing:
                         existing.append(c)
 

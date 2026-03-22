@@ -141,6 +141,9 @@ class EvidenceManager:
             ('findings', 'fp_reason', 'TEXT'),
             ('findings', 'scanner_name', 'TEXT'),
             ('findings', 'seen_count', 'INTEGER DEFAULT 1'),
+            ('findings', 'finding_hash', 'TEXT'),
+            ('findings', 'last_seen', 'TEXT'),
+            ('findings', 'session_ids', 'TEXT'),
         ]
 
         with sqlite3.connect(self.db_path) as conn:
@@ -161,6 +164,10 @@ class EvidenceManager:
                 pass
             try:
                 conn.execute('CREATE INDEX IF NOT EXISTS idx_findings_fp ON findings(false_positive)')
+            except Exception:
+                pass
+            try:
+                conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_findings_hash ON findings(finding_hash)')
             except Exception:
                 pass
 
@@ -196,6 +203,28 @@ class EvidenceManager:
     def _hash_content(self, content: str) -> str:
         """Generate SHA-256 hash of content."""
         return hashlib.sha256(content.encode()).hexdigest()
+
+    @staticmethod
+    def _finding_hash(affected_asset: str, title: str, cve_ids: List[str],
+                      scanner_name: str = '') -> str:
+        """Generate a stable dedup hash from a finding's composite key.
+
+        Components: host, port, title (or first CVE if present), scanner_name.
+        The asset string is split on ``':'`` to separate host and port so that
+        ``192.168.1.1:443`` and ``192.168.1.1:8443`` hash differently.
+        """
+        host = affected_asset
+        port = ''
+        if ':' in affected_asset:
+            parts = affected_asset.rsplit(':', 1)
+            if parts[1].isdigit():
+                host, port = parts[0], parts[1]
+
+        # Use the first CVE as the identity signal when available; fall back to title
+        identity = sorted(cve_ids)[0] if cve_ids else title
+
+        raw = f"{host}|{port}|{identity}|{scanner_name}".lower()
+        return hashlib.sha256(raw.encode()).hexdigest()
 
     def start_session(self, scan_type: str, target_networks: List[str],
                       metadata: Optional[Dict] = None) -> str:
@@ -291,35 +320,54 @@ class EvidenceManager:
                     description: str = '', affected_asset: str = '',
                     cvss_score: float = 0.0, cve_ids: List[str] = None,
                     remediation: str = '', evidence_id: str = None,
-                    metadata: Optional[Dict] = None) -> str:
+                    metadata: Optional[Dict] = None,
+                    scanner_name: str = '') -> str:
         """Add a security finding with cross-session deduplication.
 
-        Before inserting, checks whether an identical finding (same title,
-        affected_asset, and CVE set) already exists in *any* session.  If a
-        duplicate is found the existing row's timestamp is refreshed, its
-        ``seen_count`` is incremented, and the existing ``finding_id`` is
-        returned — no new row is created.
+        A composite hash is built from (host, port, title/CVE, scanner_name).
+        If a finding with the same hash already exists the existing row is
+        updated: ``last_seen`` is refreshed, ``seen_count`` is incremented,
+        the new ``session_id`` is appended to ``session_ids``, and the
+        original ``finding_id`` is returned — no duplicate row is created.
         """
-        cve_json = json.dumps(sorted(cve_ids) if cve_ids else [])
+        cve_list = sorted(cve_ids) if cve_ids else []
+        cve_json = json.dumps(cve_list)
+        now = datetime.now(timezone.utc).isoformat()
+        fhash = self._finding_hash(affected_asset, title, cve_list, scanner_name)
 
         with sqlite3.connect(self.db_path) as conn:
-            # --- dedup check: same title + asset + CVEs = duplicate ---
-            row = conn.execute('''
-                SELECT finding_id FROM findings
-                WHERE title = ? AND affected_asset = ? AND cve_ids = ?
-                ORDER BY timestamp DESC LIMIT 1
-            ''', (title, affected_asset, cve_json)).fetchone()
+            # --- dedup: check by composite hash first, fall back to legacy key ---
+            row = conn.execute(
+                'SELECT finding_id, session_ids FROM findings WHERE finding_hash = ?',
+                (fhash,),
+            ).fetchone()
+
+            # Legacy fallback for rows that pre-date the hash column
+            if row is None:
+                row = conn.execute('''
+                    SELECT finding_id, session_ids FROM findings
+                    WHERE title = ? AND affected_asset = ? AND cve_ids = ?
+                    ORDER BY timestamp DESC LIMIT 1
+                ''', (title, affected_asset, cve_json)).fetchone()
 
             if row:
                 existing_id = row[0]
-                now = datetime.now(timezone.utc).isoformat()
-                # Bump seen_count (defaults to 1 for legacy rows)
+                # Merge session_id into the tracked list
+                try:
+                    sess_list = json.loads(row[1]) if row[1] else []
+                except (json.JSONDecodeError, TypeError):
+                    sess_list = []
+                if session_id not in sess_list:
+                    sess_list.append(session_id)
+
                 conn.execute('''
                     UPDATE findings
-                    SET timestamp = ?,
-                        seen_count = COALESCE(seen_count, 1) + 1
+                    SET last_seen    = ?,
+                        seen_count   = COALESCE(seen_count, 1) + 1,
+                        session_ids  = ?,
+                        finding_hash = COALESCE(finding_hash, ?)
                     WHERE finding_id = ?
-                ''', (now, existing_id))
+                ''', (now, json.dumps(sess_list), fhash, existing_id))
                 return existing_id
 
             # --- new finding ---
@@ -328,13 +376,15 @@ class EvidenceManager:
                 INSERT INTO findings
                 (finding_id, session_id, evidence_id, timestamp, severity, title,
                  description, affected_asset, cvss_score, cve_ids, remediation,
-                 metadata, seen_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                 metadata, seen_count, finding_hash, last_seen, session_ids,
+                 scanner_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
             ''', (
                 finding_id, session_id, evidence_id,
-                datetime.now(timezone.utc).isoformat(), severity, title, description,
+                now, severity, title, description,
                 affected_asset, cvss_score, cve_json,
-                remediation, json.dumps(metadata or {})
+                remediation, json.dumps(metadata or {}),
+                fhash, now, json.dumps([session_id]), scanner_name or None
             ))
 
         return finding_id
@@ -587,6 +637,52 @@ class EvidenceManager:
                 ORDER BY effective_priority DESC, cvss_score DESC, timestamp DESC
             ''', (session_id,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_deduplicated_findings(self, status: str = 'open',
+                                   severity: str = None,
+                                   include_false_positives: bool = False) -> List[Dict]:
+        """Return deduplicated findings for display.
+
+        Each row is already unique thanks to hash-based dedup on insert, so
+        this method simply queries with optional filters and annotates each
+        finding with its cross-session metadata (``seen_count``,
+        ``last_seen``, ``session_ids``).
+        """
+        clauses = []
+        params: list = []
+
+        if status:
+            clauses.append('status = ?')
+            params.append(status)
+        if severity:
+            clauses.append('severity = ?')
+            params.append(severity)
+        if not include_false_positives:
+            clauses.append('COALESCE(false_positive, 0) = 0')
+
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ''
+        sql = f'''
+            SELECT *, COALESCE(seen_count, 1) AS times_seen,
+                   COALESCE(last_seen, timestamp) AS last_observed
+            FROM findings
+            {where}
+            ORDER BY COALESCE(effective_priority, 0) DESC,
+                     cvss_score DESC, timestamp DESC
+        '''  # nosec B608 -- clauses built from hardcoded strings above
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, params).fetchall()
+            results = []
+            for row in rows:
+                d = dict(row)
+                # Parse session_ids JSON for caller convenience
+                try:
+                    d['session_ids_list'] = json.loads(d.get('session_ids') or '[]')
+                except (json.JSONDecodeError, TypeError):
+                    d['session_ids_list'] = []
+                results.append(d)
+            return results
 
     def get_all_sessions(self, limit: int = 50) -> List[Dict]:
         """Get all sessions ordered by start time."""

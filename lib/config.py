@@ -23,7 +23,7 @@ class Config:
 
     # Default configuration with 365-day retention
     DEFAULTS = {
-        'version': '7.3.1',
+        'version': '7.3.0',
         'platform': {
             'name': 'Donjon',
             'mode': 'portable',
@@ -191,6 +191,11 @@ class Config:
                 config[k] = {}
             config = config[k]
         config[keys[-1]] = value
+
+    @property
+    def version(self) -> str:
+        """Get platform version string."""
+        return self.get('version', '0.0.0')
 
     def get_frameworks(self) -> list:
         """Get list of enabled compliance frameworks."""

@@ -97,6 +97,12 @@ try:
 except ImportError:
     get_license_manager = None
 
+try:
+    from lib.config import Config
+    _config = Config()
+except Exception:
+    _config = None
+
 from web.auth import get_auth, APIKeyAuth
 try:
     from web.dashboard_shell import generate_shell as generate_dashboard_html
@@ -1219,7 +1225,7 @@ class DonjonAPI:
         }
         return json_response({
             'status': 'healthy',
-            'version': '7.3.0',
+            'version': _config.version if _config else '7.3.0',
             'uptime_seconds': round(uptime, 2),
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'modules': modules,

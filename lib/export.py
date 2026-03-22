@@ -958,6 +958,72 @@ class ExportManager:
                 # Write as single line
                 f.write(json.dumps(finding_obj, ensure_ascii=False) + '\n')
 
+    def export_html(self, findings: List[Dict], output_path: Path):
+        """
+        Export findings as a self-contained HTML report.
+        Inline CSS for air-gap operation — no external dependencies.
+        """
+        from html import escape
+
+        sev_colors = {
+            'CRITICAL': ('#dc2626', 'rgba(220,38,38,0.1)'),
+            'HIGH': ('#ea580c', 'rgba(234,88,12,0.1)'),
+            'MEDIUM': ('#eab308', 'rgba(234,179,8,0.1)'),
+            'LOW': ('#3b82f6', 'rgba(59,130,246,0.1)'),
+            'INFO': ('#6b7280', 'rgba(107,114,128,0.1)'),
+        }
+
+        rows = []
+        for f in findings:
+            sev = (f.get('severity') or 'INFO').upper()
+            fg, bg = sev_colors.get(sev, sev_colors['INFO'])
+            title = escape(str(f.get('title', f.get('finding', f.get('description', '')))))[:120]
+            host = escape(str(f.get('host', f.get('target', f.get('affected_asset', '')))))
+            scanner = escape(str(f.get('scanner', f.get('scanner_name', f.get('tool', '')))))
+            remediation = escape(str(f.get('remediation', '')))[:200]
+            rows.append(
+                f'<tr>'
+                f'<td><span style="background:{bg};color:{fg};padding:2px 8px;border-radius:10px;'
+                f'font-size:0.75rem;font-weight:600">{sev}</span></td>'
+                f'<td>{title}</td><td>{host}</td><td>{scanner}</td>'
+                f'<td style="font-size:0.85em;color:#666">{remediation}</td></tr>'
+            )
+
+        sev_counts = {}
+        for f in findings:
+            s = (f.get('severity') or 'INFO').upper()
+            sev_counts[s] = sev_counts.get(s, 0) + 1
+
+        summary_cards = ''.join(
+            f'<div style="padding:12px 20px;border-radius:8px;background:{sev_colors.get(s, sev_colors["INFO"])[1]};'
+            f'text-align:center"><div style="font-size:1.8rem;font-weight:700;color:{sev_colors.get(s, sev_colors["INFO"])[0]}">'
+            f'{c}</div><div style="font-size:0.8rem;color:#666">{s}</div></div>'
+            for s, c in sorted(sev_counts.items(), key=lambda x: ['CRITICAL','HIGH','MEDIUM','LOW','INFO'].index(x[0]) if x[0] in ['CRITICAL','HIGH','MEDIUM','LOW','INFO'] else 5)
+        )
+
+        html = f'''<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Donjon Security Report</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:20px;background:#f8f9fa;color:#1a1a2e}}
+.header{{background:#1a1a2e;color:#fff;padding:24px 32px;border-radius:8px;margin-bottom:24px}}
+.header h1{{margin:0;font-size:1.5rem}} .header p{{margin:4px 0 0;opacity:0.7;font-size:0.9rem}}
+.cards{{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}}
+table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)}}
+th{{text-align:left;padding:10px 14px;background:#f1f3f5;font-size:0.8rem;text-transform:uppercase;color:#666;border-bottom:2px solid #dee2e6}}
+td{{padding:10px 14px;border-bottom:1px solid #eee;font-size:0.85rem}}
+tr:hover{{background:#f8f9fa}}
+</style></head><body>
+<div class="header"><h1>Donjon Security Report</h1>
+<p>Generated {__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M")} | {len(findings)} findings</p></div>
+<div class="cards">{summary_cards}</div>
+<table><thead><tr><th>Severity</th><th>Finding</th><th>Target</th><th>Scanner</th><th>Remediation</th></tr></thead>
+<tbody>{"".join(rows)}</tbody></table>
+</body></html>'''
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+
     # Helper methods
 
     def _escape_cef(self, text: str) -> str:

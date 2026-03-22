@@ -234,7 +234,7 @@ def check_marketing_claims(report: AuditReport) -> None:
     for filepath, stub_marker, label, severity in stub_checks:
         full_path = PROJECT_ROOT / filepath
         if full_path.exists():
-            content = full_path.read_text()
+            content = full_path.read_text(encoding='utf-8', errors='replace')
             if stub_marker in content and len(content) < 500:
                 report.add_gap(Gap(
                     category="Stub",
@@ -603,7 +603,7 @@ def _count_frameworks() -> int:
 
 def _check_ai_providers() -> int:
     try:
-        content = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text()
+        content = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text(encoding='utf-8', errors='replace')
         providers = ["ollama", "stepfun", "anthropic", "gemini", "openai", "template"]
         return sum(1 for p in providers if p.lower() in content.lower())
     except Exception:
@@ -625,7 +625,7 @@ def _has_function(module: str, func: str) -> bool:
 
 def _has_import(module: str, name: str) -> bool:
     try:
-        content = (PROJECT_ROOT / module.replace(".", "/") + ".py").read_text()
+        content = (PROJECT_ROOT / module.replace(".", "/") + ".py").read_text(encoding='utf-8', errors='replace')
         return name in content
     except Exception:
         return False
@@ -639,7 +639,7 @@ def _module_exists(module: str) -> bool:
 
 def _file_has_content(path: str, content: str) -> bool:
     try:
-        return content in (PROJECT_ROOT / path).read_text()
+        return content in (PROJECT_ROOT / path).read_text(encoding='utf-8', errors='replace')
     except Exception:
         return False
 
@@ -689,7 +689,7 @@ def check_data_integrity(report: AuditReport) -> None:
     # Check .gitignore covers secrets
     gitignore = PROJECT_ROOT / ".gitignore"
     if gitignore.exists():
-        content = gitignore.read_text()
+        content = gitignore.read_text(encoding='utf-8', errors='replace')
         for pattern in ["*.key", "*.pem", "keys/", ".env"]:
             if pattern in content:
                 report.add_working(f"Gitignore: {pattern}")
@@ -744,7 +744,7 @@ def check_export_formats(report: AuditReport) -> None:
     """Verify each export format has real implementation logic."""
     try:
         from lib.export import ExportManager
-        em_src = (PROJECT_ROOT / "lib" / "export.py").read_text()
+        em_src = (PROJECT_ROOT / "lib" / "export.py").read_text(encoding='utf-8', errors='replace')
 
         formats = {
             "cef": "CEF:0",
@@ -814,7 +814,7 @@ def check_export_formats(report: AuditReport) -> None:
 def check_notification_channels(report: AuditReport) -> None:
     """Verify notification delivery implementations."""
     try:
-        delivery_src = (PROJECT_ROOT / "lib" / "notification_delivery.py").read_text()
+        delivery_src = (PROJECT_ROOT / "lib" / "notification_delivery.py").read_text(encoding='utf-8', errors='replace')
         channels = {
             "email": ["smtp", "SMTP"],
             "slack": ["slack", "webhook"],
@@ -891,7 +891,7 @@ def check_cli_tools(report: AuditReport) -> None:
     for path, (marker, label) in scripts.items():
         full = PROJECT_ROOT / path
         if full.exists():
-            content = full.read_text()
+            content = full.read_text(encoding='utf-8', errors='replace')
             if "TODO" in content and len(content) < 500:
                 report.add_gap(Gap("CLI", label, "fake", "critical",
                     f"{path} is a stub with TODO"))
@@ -929,7 +929,7 @@ def check_deployment(report: AuditReport) -> None:
     """Check deployment artifacts and configuration."""
     # Docker
     if (PROJECT_ROOT / "docker-compose.yml").exists():
-        content = (PROJECT_ROOT / "docker-compose.yml").read_text()
+        content = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding='utf-8', errors='replace')
         services = content.lower().count("image:") + content.lower().count("build:")
         report.add_working(f"Docker: docker-compose.yml ({services} services)")
     else:
@@ -945,7 +945,7 @@ def check_deployment(report: AuditReport) -> None:
     # Requirements
     req_path = PROJECT_ROOT / "requirements.txt"
     if req_path.exists():
-        deps = [l.strip() for l in req_path.read_text().splitlines()
+        deps = [l.strip() for l in req_path.read_text(encoding='utf-8', errors='replace').splitlines()
                 if l.strip() and not l.startswith("#")]
         report.add_working(f"Deploy: requirements.txt ({len(deps)} deps)")
     else:
@@ -1186,7 +1186,7 @@ def check_risk_engine(report: AuditReport) -> None:
             report.add_working("Risk: Monte Carlo method exists")
         else:
             # Check source for monte carlo
-            src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text()
+            src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text(encoding='utf-8', errors='replace')
             if "monte_carlo" in src.lower() or "simulation" in src.lower():
                 report.add_working("Risk: Monte Carlo in source")
             else:
@@ -1194,7 +1194,7 @@ def check_risk_engine(report: AuditReport) -> None:
                     "No Monte Carlo simulation found"))
 
         # Check FAIR taxonomy
-        src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "risk_quantification.py").read_text(encoding='utf-8', errors='replace')
         fair_terms = ["loss_event_frequency", "loss_magnitude", "threat_event_frequency",
                       "vulnerability", "contact_frequency", "probability_of_action",
                       "primary_loss", "secondary_loss", "ale", "annual_loss"]
@@ -1234,7 +1234,7 @@ def check_risk_engine(report: AuditReport) -> None:
 def check_ai_engine(report: AuditReport) -> None:
     """Verify AI engine has 6-provider fallback chain."""
     try:
-        src = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text(encoding='utf-8', errors='replace')
         providers = {
             "ollama": ["ollama", "localhost:11434"],
             "stepfun": ["stepfun", "step"],
@@ -1282,7 +1282,7 @@ def check_ai_engine(report: AuditReport) -> None:
 def check_credential_security(report: AuditReport) -> None:
     """Verify credential manager encrypts at rest with Fernet."""
     try:
-        src = (PROJECT_ROOT / "lib" / "credential_manager.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "credential_manager.py").read_text(encoding='utf-8', errors='replace')
 
         # Fernet encryption
         if "Fernet" in src or "fernet" in src:
@@ -1324,7 +1324,7 @@ def check_backup_restore(report: AuditReport) -> None:
     """Verify backup and restore capabilities."""
     try:
         import lib.backup
-        src = (PROJECT_ROOT / "lib" / "backup.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "backup.py").read_text(encoding='utf-8', errors='replace')
 
         # Backup function
         backup_markers = ["backup", "create_backup", "export_backup"]
@@ -1366,7 +1366,7 @@ def check_data_retention(report: AuditReport) -> None:
     """Verify data retention policies and zero-retention mode."""
     try:
         import lib.data_retention
-        src = (PROJECT_ROOT / "lib" / "data_retention.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "data_retention.py").read_text(encoding='utf-8', errors='replace')
 
         # Has a run() function (confirmed from exports)
         if hasattr(lib.data_retention, 'run'):
@@ -1391,7 +1391,7 @@ def check_data_retention(report: AuditReport) -> None:
     # Zero retention mode
     try:
         import lib.zero_retention
-        src = (PROJECT_ROOT / "lib" / "zero_retention.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "zero_retention.py").read_text(encoding='utf-8', errors='replace')
         if "zero" in src.lower() and ("retention" in src.lower() or "delete" in src.lower()):
             report.add_working("Zero retention: mode exists")
         else:
@@ -1410,7 +1410,7 @@ def check_scan_profiles(report: AuditReport) -> None:
     """Verify scan profile management."""
     try:
         import lib.scan_profiles
-        src = (PROJECT_ROOT / "lib" / "scan_profiles.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "scan_profiles.py").read_text(encoding='utf-8', errors='replace')
 
         ops = {
             "create": ["create", "add", "new"],
@@ -1438,7 +1438,7 @@ def check_import_results(report: AuditReport) -> None:
     """Verify import results can parse multiple formats."""
     try:
         import lib.import_results
-        src = (PROJECT_ROOT / "lib" / "import_results.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "import_results.py").read_text(encoding='utf-8', errors='replace')
 
         formats = {
             "nessus": ["nessus", ".nessus"],
@@ -1473,7 +1473,7 @@ def check_tier_enforcement(report: AuditReport) -> None:
         report.add_working("Tier enforcement: require_feature importable")
 
         # Check tier ordering
-        src = (PROJECT_ROOT / "lib" / "license_guard.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "license_guard.py").read_text(encoding='utf-8', errors='replace')
         tiers = ["community", "pro", "enterprise", "managed"]
         found_tiers = sum(1 for t in tiers if t in src.lower())
         if found_tiers >= 4:
@@ -1489,7 +1489,7 @@ def check_tier_enforcement(report: AuditReport) -> None:
     # Check trial license
     try:
         import lib.trial_license
-        src = (PROJECT_ROOT / "lib" / "trial_license.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "trial_license.py").read_text(encoding='utf-8', errors='replace')
         if "14" in src or "trial" in src.lower():
             report.add_working("Licensing: trial system")
         else:
@@ -1507,7 +1507,7 @@ def check_tier_enforcement(report: AuditReport) -> None:
 def check_crypto_signatures(report: AuditReport) -> None:
     """Verify dual ML-DSA-65 + Ed25519 signature verification."""
     try:
-        src = (PROJECT_ROOT / "lib" / "licensing.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "licensing.py").read_text(encoding='utf-8', errors='replace')
 
         # ML-DSA-65 (post-quantum)
         if "ml_dsa" in src.lower() or "ml-dsa" in src.lower() or "dilithium" in src.lower():
@@ -1544,7 +1544,7 @@ def check_crypto_signatures(report: AuditReport) -> None:
 def check_dedup_logic(report: AuditReport) -> None:
     """Verify deduplication produces correct results."""
     try:
-        src = (PROJECT_ROOT / "lib" / "finding_dedup.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "finding_dedup.py").read_text(encoding='utf-8', errors='replace')
 
         # Must have dedup logic
         dedup_markers = ["deduplic", "duplicate", "unique", "hash", "fingerprint"]
@@ -1574,7 +1574,7 @@ def check_dedup_logic(report: AuditReport) -> None:
 def check_sso_depth(report: AuditReport) -> None:
     """Verify SSO has SAML implementation via handle() dispatch."""
     try:
-        src = (PROJECT_ROOT / "lib" / "sso.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "sso.py").read_text(encoding='utf-8', errors='replace')
 
         # SAML support
         if "saml" in src.lower():
@@ -1600,7 +1600,7 @@ def check_sso_depth(report: AuditReport) -> None:
         # Also check API SSO module
         sso_api = PROJECT_ROOT / "web" / "api_sso.py"
         if sso_api.exists():
-            api_src = sso_api.read_text()
+            api_src = sso_api.read_text(encoding='utf-8', errors='replace')
             actions = ["login", "callback", "logout", "metadata"]
             found = sum(1 for a in actions if a.lower() in api_src.lower())
             if found >= 3:
@@ -1625,7 +1625,7 @@ def check_rbac_depth(report: AuditReport) -> None:
     """Verify RBAC has proper role/permission model."""
     try:
         import lib.rbac
-        src = (PROJECT_ROOT / "lib" / "rbac.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "rbac.py").read_text(encoding='utf-8', errors='replace')
 
         # Key functions: assign_role, check_permission, create_role, list_roles
         if hasattr(lib.rbac, 'check_permission'):
@@ -1672,7 +1672,7 @@ def check_rbac_depth(report: AuditReport) -> None:
 def check_audit_trail(report: AuditReport) -> None:
     """Verify audit trail captures actions with timestamps."""
     try:
-        src = (PROJECT_ROOT / "lib" / "audit_trail.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "audit_trail.py").read_text(encoding='utf-8', errors='replace')
 
         # Log action
         if "log" in src.lower() or "record" in src.lower() or "write" in src.lower():
@@ -1705,7 +1705,7 @@ def check_audit_trail(report: AuditReport) -> None:
     except Exception as e:
         # Fall back to lib/audit.py
         try:
-            src = (PROJECT_ROOT / "lib" / "audit.py").read_text()
+            src = (PROJECT_ROOT / "lib" / "audit.py").read_text(encoding='utf-8', errors='replace')
             if "log" in src.lower() and "timestamp" in src.lower():
                 report.add_working("Audit trail: via lib/audit.py")
             else:
@@ -1723,7 +1723,7 @@ def check_audit_trail(report: AuditReport) -> None:
 def check_multi_tenant(report: AuditReport) -> None:
     """Verify multi-tenant data isolation."""
     try:
-        src = (PROJECT_ROOT / "lib" / "multi_tenant.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "multi_tenant.py").read_text(encoding='utf-8', errors='replace')
 
         # Tenant creation
         if "create" in src.lower() and "tenant" in src.lower():
@@ -1758,7 +1758,7 @@ def check_multi_tenant(report: AuditReport) -> None:
 def check_exception_manager(report: AuditReport) -> None:
     """Verify risk exception management."""
     try:
-        src = (PROJECT_ROOT / "lib" / "exceptions.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "exceptions.py").read_text(encoding='utf-8', errors='replace')
 
         # Create exception
         if "create" in src.lower() or "add" in src.lower() or "request" in src.lower():
@@ -1794,7 +1794,7 @@ def check_scan_diff(report: AuditReport) -> None:
     """Verify scan diff/comparison capability."""
     try:
         import lib.scan_diff
-        src = (PROJECT_ROOT / "lib" / "scan_diff.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "scan_diff.py").read_text(encoding='utf-8', errors='replace')
 
         # Diff/compare method
         if "diff" in src.lower() or "compare" in src.lower():
@@ -1825,7 +1825,7 @@ def check_integrations_depth(report: AuditReport) -> None:
     """Verify Jira and ServiceNow integrations have real implementation."""
     try:
         import lib.integrations
-        src = (PROJECT_ROOT / "lib" / "integrations.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "integrations.py").read_text(encoding='utf-8', errors='replace')
 
         # create_tickets dispatch function
         if hasattr(lib.integrations, 'create_tickets'):
@@ -2073,7 +2073,7 @@ def check_dr_essentials(report: AuditReport) -> None:
     # DB migration script
     migrate = PROJECT_ROOT / "bin" / "migrate-db.py"
     if migrate.exists():
-        src = migrate.read_text()
+        src = migrate.read_text(encoding='utf-8', errors='replace')
         if "migrate" in src.lower() and len(src) > 1000:
             report.add_working("DR: DB migration script")
         else:
@@ -2086,7 +2086,7 @@ def check_dr_essentials(report: AuditReport) -> None:
     # Config export/import
     config_path = PROJECT_ROOT / "lib" / "config.py"
     if config_path.exists():
-        src = config_path.read_text()
+        src = config_path.read_text(encoding='utf-8', errors='replace')
         if "export" in src.lower() or "save" in src.lower() or "dump" in src.lower():
             report.add_working("DR: config export capability")
         else:
@@ -2113,7 +2113,7 @@ def check_cicd_readiness(report: AuditReport) -> None:
     # donjon-scan.py CLI
     scan_cli = PROJECT_ROOT / "bin" / "donjon-scan.py"
     if scan_cli.exists():
-        src = scan_cli.read_text()
+        src = scan_cli.read_text(encoding='utf-8', errors='replace')
 
         # argparse for CLI args
         if "argparse" in src:
@@ -2149,7 +2149,7 @@ def check_cicd_readiness(report: AuditReport) -> None:
     # CI/CD integration module
     cicd_mod = PROJECT_ROOT / "lib" / "cicd_integration.py"
     if cicd_mod.exists():
-        src = cicd_mod.read_text()
+        src = cicd_mod.read_text(encoding='utf-8', errors='replace')
         integrations = ["github", "gitlab", "jenkins", "azure"]
         found = sum(1 for i in integrations if i.lower() in src.lower())
         if found >= 2:
@@ -2162,7 +2162,7 @@ def check_cicd_readiness(report: AuditReport) -> None:
 
     # SARIF output for GitHub code scanning
     export_path = PROJECT_ROOT / "lib" / "export.py"
-    if export_path.exists() and "sarif" in export_path.read_text().lower():
+    if export_path.exists() and "sarif" in export_path.read_text(encoding='utf-8', errors='replace').lower():
         report.add_working("CI/CD: SARIF output for GitHub code scanning")
     else:
         report.add_gap(Gap("CI/CD", "SARIF", "missing", "high",
@@ -2246,7 +2246,7 @@ def check_first_time_user(report: AuditReport) -> None:
     # EULA prompt
     eula = PROJECT_ROOT / "lib" / "eula.py"
     if eula.exists():
-        src = eula.read_text()
+        src = eula.read_text(encoding='utf-8', errors='replace')
         if "prompt" in src.lower() or "accept" in src.lower():
             report.add_working("Onboarding: EULA acceptance flow")
         else:
@@ -2281,7 +2281,7 @@ def check_first_time_user(report: AuditReport) -> None:
     for cp in config_paths:
         full = PROJECT_ROOT / cp
         if full.exists():
-            content = full.read_text()
+            content = full.read_text(encoding='utf-8', errors='replace')
             if "version" in content and "scanning" in content:
                 report.add_working(f"Onboarding: default config ({cp})")
             else:
@@ -2345,7 +2345,7 @@ def check_ciso_reporting(report: AuditReport) -> None:
     # Risk quantification ($ values for board)
     rq_path = PROJECT_ROOT / "lib" / "risk_quantification.py"
     if rq_path.exists():
-        src = rq_path.read_text()
+        src = rq_path.read_text(encoding='utf-8', errors='replace')
         if "dollar" in src.lower() or "$" in src or "ale" in src.lower() or "annual_loss" in src.lower():
             report.add_working("CISO: dollar-quantified risk")
         else:
@@ -2385,7 +2385,7 @@ def check_incident_response(report: AuditReport) -> None:
     # AI-powered triage
     ai_path = PROJECT_ROOT / "lib" / "ai_engine.py"
     if ai_path.exists():
-        src = ai_path.read_text()
+        src = ai_path.read_text(encoding='utf-8', errors='replace')
         if "triage" in src.lower() or "prioriti" in src.lower():
             report.add_working("IR: AI-powered triage")
         else:
@@ -2432,7 +2432,7 @@ def check_cross_framework(report: AuditReport) -> None:
         # Compliance report per framework
         report_path = PROJECT_ROOT / "lib" / "compliance.py"
         if report_path.exists():
-            src = report_path.read_text()
+            src = report_path.read_text(encoding='utf-8', errors='replace')
             if "report" in src.lower() or "generate" in src.lower():
                 report.add_working("Cross-framework: compliance reporting")
             else:
@@ -2529,7 +2529,7 @@ def check_log_management(report: AuditReport) -> None:
     """Sysadmin needs: structured logging, log rotation, log levels."""
     logger_path = PROJECT_ROOT / "lib" / "logger.py"
     if logger_path.exists():
-        src = logger_path.read_text()
+        src = logger_path.read_text(encoding='utf-8', errors='replace')
 
         # Log levels
         levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -2658,7 +2658,7 @@ def check_intel_sources(report: AuditReport) -> None:
     for path in ["lib/intel_feeds.py", "lib/vuln_database.py", "lib/threat_intel.py"]:
         full = PROJECT_ROOT / path
         if full.exists():
-            intel_src += full.read_text()
+            intel_src += full.read_text(encoding='utf-8', errors='replace')
 
     for source, markers in sources.items():
         found = any(m.lower() in intel_src.lower() for m in markers)
@@ -2681,7 +2681,7 @@ def check_airgap_mode(report: AuditReport) -> None:
                   "lib/config.py"]:
         full = PROJECT_ROOT / path
         if full.exists():
-            content = full.read_text()
+            content = full.read_text(encoding='utf-8', errors='replace')
             if "DONJON_OFFLINE" in content or "offline" in content.lower():
                 found_offline = True
                 break
@@ -2725,7 +2725,7 @@ def check_airgap_mode(report: AuditReport) -> None:
             "No air-gap deployment guide"))
 
     # Template AI provider (works offline)
-    ai_src = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text()
+    ai_src = (PROJECT_ROOT / "lib" / "ai_engine.py").read_text(encoding='utf-8', errors='replace')
     if "template" in ai_src.lower():
         report.add_working("Air-gap: template AI provider (no LLM needed)")
     else:
@@ -2747,7 +2747,7 @@ def check_source_compilation(report: AuditReport) -> None:
         if ".claude" in str(py_file):
             continue
         # Skip vendored third-party tools (Python 2 code)
-        rel = str(py_file.relative_to(PROJECT_ROOT))
+        rel = str(py_file.relative_to(PROJECT_ROOT)).replace('\\', '/')
         if "tools/nmap" in rel or "tools/openvas" in rel or "vendor" in rel:
             continue
         total += 1
@@ -3018,7 +3018,7 @@ def check_platform_detection(report: AuditReport) -> None:
     """Verify platform detection for cross-OS support."""
     platform_path = PROJECT_ROOT / "lib" / "platform_detect.py"
     if platform_path.exists():
-        src = platform_path.read_text()
+        src = platform_path.read_text(encoding='utf-8', errors='replace')
         platforms = ["windows", "linux", "macos", "darwin"]
         found = sum(1 for p in platforms if p.lower() in src.lower())
         if found >= 2:
@@ -3044,7 +3044,7 @@ def check_sbom_generation(report: AuditReport) -> None:
     """Verify SBOM generator produces valid output."""
     try:
         import lib.sbom_generator
-        src = (PROJECT_ROOT / "lib" / "sbom_generator.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "sbom_generator.py").read_text(encoding='utf-8', errors='replace')
 
         # CycloneDX or SPDX format
         formats = ["cyclonedx", "spdx", "bom"]
@@ -3075,7 +3075,7 @@ def check_tui_launcher(report: AuditReport) -> None:
     """Verify TUI launcher has real menu system."""
     tui_path = PROJECT_ROOT / "lib" / "tui.py"
     if tui_path.exists():
-        src = tui_path.read_text()
+        src = tui_path.read_text(encoding='utf-8', errors='replace')
         size = tui_path.stat().st_size
 
         # Menu system
@@ -3183,7 +3183,7 @@ def check_docker_quality(report: AuditReport) -> None:
             "No Dockerfile"))
         return
 
-    content = dockerfile.read_text()
+    content = dockerfile.read_text(encoding='utf-8', errors='replace')
 
     # Multi-stage build or slim base
     if "FROM" in content:
@@ -3209,7 +3209,7 @@ def check_docker_quality(report: AuditReport) -> None:
     # docker-compose quality
     compose = PROJECT_ROOT / "docker-compose.yml"
     if compose.exists():
-        compose_content = compose.read_text()
+        compose_content = compose.read_text(encoding='utf-8', errors='replace')
         if "restart:" in compose_content:
             report.add_working("Docker Compose: restart policy")
         else:
@@ -3224,7 +3224,7 @@ def check_threat_intel(report: AuditReport) -> None:
     """Verify threat intelligence module has real feed parsing."""
     try:
         import lib.threat_intel
-        src = (PROJECT_ROOT / "lib" / "threat_intel.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "threat_intel.py").read_text(encoding='utf-8', errors='replace')
 
         # Feed sources
         feeds = ["stix", "taxii", "mitre", "att&ck", "ioc", "indicator"]
@@ -3255,7 +3255,7 @@ def check_human_behavior(report: AuditReport) -> None:
     """Verify human behavior analysis module (anti-bot/evasion)."""
     hb_path = PROJECT_ROOT / "lib" / "human_behavior.py"
     if hb_path.exists():
-        src = hb_path.read_text()
+        src = hb_path.read_text(encoding='utf-8', errors='replace')
         size = hb_path.stat().st_size
         if size > 5000:
             report.add_working(f"Human Behavior: analysis module ({size//1024}KB)")
@@ -3280,7 +3280,7 @@ def check_agent_system(report: AuditReport) -> None:
     """Verify agent-based distributed scanning."""
     agent_path = PROJECT_ROOT / "lib" / "agent_deployer.py"
     if agent_path.exists():
-        src = agent_path.read_text()
+        src = agent_path.read_text(encoding='utf-8', errors='replace')
         size = agent_path.stat().st_size
 
         # Agent registration
@@ -3315,7 +3315,7 @@ def check_asset_inventory(report: AuditReport) -> None:
     """Verify asset inventory has CRUD + categorization."""
     try:
         import lib.asset_manager
-        src = (PROJECT_ROOT / "lib" / "asset_manager.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "asset_manager.py").read_text(encoding='utf-8', errors='replace')
 
         ops = ["create", "update", "delete", "list", "get", "search"]
         found = sum(1 for op in ops if op.lower() in src.lower())
@@ -3345,7 +3345,7 @@ def check_qod_scoring(report: AuditReport) -> None:
     """Verify Quality of Detection scoring module."""
     qod_path = PROJECT_ROOT / "lib" / "qod.py"
     if qod_path.exists():
-        src = qod_path.read_text()
+        src = qod_path.read_text(encoding='utf-8', errors='replace')
         size = qod_path.stat().st_size
 
         if "quality" in src.lower() or "score" in src.lower() or "confidence" in src.lower():
@@ -3365,7 +3365,7 @@ def check_cis_benchmarks(report: AuditReport) -> None:
     """Verify CIS benchmark support for hardening checks."""
     cis_path = PROJECT_ROOT / "lib" / "cis_benchmarks.py"
     if cis_path.exists():
-        src = cis_path.read_text()
+        src = cis_path.read_text(encoding='utf-8', errors='replace')
         size = cis_path.stat().st_size
 
         if size > 10000:
@@ -3393,7 +3393,7 @@ def check_api_versioning(report: AuditReport) -> None:
     """Verify API uses versioning and has deprecation strategy."""
     api_path = PROJECT_ROOT / "web" / "api.py"
     if api_path.exists():
-        src = api_path.read_text()
+        src = api_path.read_text(encoding='utf-8', errors='replace')
 
         # v1 API prefix
         if "/api/v1/" in src:
@@ -3496,7 +3496,7 @@ def check_risklens_parity(report: AuditReport) -> None:
             "Claim to replace RiskLens but no risk_quantification.py"))
         return
 
-    src = rq_path.read_text()
+    src = rq_path.read_text(encoding='utf-8', errors='replace')
     size = rq_path.stat().st_size
 
     # Module size (RiskLens replacement needs substantial code)
@@ -3645,7 +3645,7 @@ def check_license_feature_gates(report: AuditReport) -> None:
     for path in gated_paths:
         full = PROJECT_ROOT / path
         if full.exists():
-            content = full.read_text()
+            content = full.read_text(encoding='utf-8', errors='replace')
             if "require_feature" in content or "license_guard" in content or "tier" in content.lower():
                 report.add_working(f"Feature gate: {path}")
             else:
@@ -3674,7 +3674,7 @@ def check_scanner_targets(report: AuditReport) -> None:
     for path, markers in target_checks.items():
         full = PROJECT_ROOT / path
         if full.exists():
-            src = full.read_text()
+            src = full.read_text(encoding='utf-8', errors='replace')
             found = sum(1 for m in markers if m.lower() in src.lower())
             if found >= 2:
                 report.add_working(f"Scanner targets: {Path(path).stem} ({found} markers)")
@@ -3694,7 +3694,7 @@ def check_epss_kev_correlation(report: AuditReport) -> None:
     """Verify EPSS and CISA KEV correlation in vuln database."""
     vuln_path = PROJECT_ROOT / "lib" / "vuln_database.py"
     if vuln_path.exists():
-        src = vuln_path.read_text()
+        src = vuln_path.read_text(encoding='utf-8', errors='replace')
 
         # EPSS support
         if "epss" in src.lower():
@@ -3730,7 +3730,7 @@ def check_nvd_database(report: AuditReport) -> None:
     """Verify NVD database has substantial CVE data."""
     vuln_path = PROJECT_ROOT / "lib" / "vuln_database.py"
     if vuln_path.exists():
-        src = vuln_path.read_text()
+        src = vuln_path.read_text(encoding='utf-8', errors='replace')
         if "nvd" in src.lower() or "nist" in src.lower():
             report.add_working("NVD: database integration")
         else:
@@ -3740,7 +3740,7 @@ def check_nvd_database(report: AuditReport) -> None:
         # Check for update capability
         update_path = PROJECT_ROOT / "bin" / "update-intel.py"
         if update_path.exists():
-            update_src = update_path.read_text()
+            update_src = update_path.read_text(encoding='utf-8', errors='replace')
             if "nvd" in update_src.lower() or "cve" in update_src.lower():
                 report.add_working("NVD: update script")
             else:
@@ -3761,7 +3761,7 @@ def check_remediation_workflow(report: AuditReport) -> None:
     """Verify complete remediation lifecycle."""
     rem_path = PROJECT_ROOT / "lib" / "remediation.py"
     if rem_path.exists():
-        src = rem_path.read_text()
+        src = rem_path.read_text(encoding='utf-8', errors='replace')
         size = rem_path.stat().st_size
 
         # Lifecycle stages
@@ -3808,7 +3808,7 @@ def check_notification_e2e(report: AuditReport) -> None:
     # Delivery mechanisms
     delivery_path = PROJECT_ROOT / "lib" / "notification_delivery.py"
     if delivery_path.exists():
-        src = delivery_path.read_text()
+        src = delivery_path.read_text(encoding='utf-8', errors='replace')
         mechanisms = {
             "Email": ["smtp", "email"],
             "Slack": ["slack"],
@@ -3834,7 +3834,7 @@ def check_interactive_report(report: AuditReport) -> None:
     """Verify interactive report has real visualizations."""
     ir_path = PROJECT_ROOT / "lib" / "interactive_report.py"
     if ir_path.exists():
-        src = ir_path.read_text()
+        src = ir_path.read_text(encoding='utf-8', errors='replace')
         size = ir_path.stat().st_size
 
         if size > 10000:
@@ -3894,7 +3894,7 @@ def check_scheduling_depth(report: AuditReport) -> None:
     """Verify scheduler has cron-like capabilities."""
     sched_path = PROJECT_ROOT / "lib" / "scheduler.py"
     if sched_path.exists():
-        src = sched_path.read_text()
+        src = sched_path.read_text(encoding='utf-8', errors='replace')
         size = sched_path.stat().st_size
 
         if size > 15000:
@@ -3934,7 +3934,7 @@ def check_cidr_validation(report: AuditReport) -> None:
     checked = False
     for path in [scan_cli, network_mod]:
         if path.exists():
-            src = path.read_text()
+            src = path.read_text(encoding='utf-8', errors='replace')
             if "rfc" in src.lower() or "private" in src.lower() or "169.254" in src or "metadata" in src.lower():
                 report.add_working("Security: CIDR/IP validation")
                 checked = True
@@ -3948,7 +3948,7 @@ def check_cidr_validation(report: AuditReport) -> None:
         # Check in scanner base
         base = PROJECT_ROOT / "scanners" / "base.py"
         if base.exists():
-            src = base.read_text()
+            src = base.read_text(encoding='utf-8', errors='replace')
             if "valid" in src.lower() or "target" in src.lower():
                 report.add_working("Security: scanner target validation")
             else:
@@ -4052,7 +4052,7 @@ def check_version_tracking(report: AuditReport) -> None:
     # Version in config
     config_path = PROJECT_ROOT / "config" / "active" / "config.yaml"
     if config_path.exists():
-        content = config_path.read_text()
+        content = config_path.read_text(encoding='utf-8', errors='replace')
         if "version:" in content:
             report.add_working("Version: version in config")
         else:
@@ -4074,7 +4074,7 @@ def check_auth_depth(report: AuditReport) -> None:
     """Verify authentication module has API key + session support."""
     auth_path = PROJECT_ROOT / "web" / "auth.py"
     if auth_path.exists():
-        src = auth_path.read_text()
+        src = auth_path.read_text(encoding='utf-8', errors='replace')
         size = auth_path.stat().st_size
 
         # API key auth
@@ -4109,7 +4109,7 @@ def check_storage_management(report: AuditReport) -> None:
     # Storage stats API was already checked, verify module depth
     api_path = PROJECT_ROOT / "web" / "api.py"
     if api_path.exists():
-        src = api_path.read_text()
+        src = api_path.read_text(encoding='utf-8', errors='replace')
         if "storage" in src.lower() and "cleanup" in src.lower():
             report.add_working("Storage: stats + cleanup API")
         elif "storage" in src.lower():
@@ -4126,7 +4126,7 @@ def check_maintenance_ops(report: AuditReport) -> None:
     """Verify maintenance operations (purge scans, audit, notifications)."""
     api_path = PROJECT_ROOT / "web" / "api.py"
     if api_path.exists():
-        src = api_path.read_text()
+        src = api_path.read_text(encoding='utf-8', errors='replace')
         ops = {
             "purge-scans": "Scan purge",
             "purge-audit": "Audit purge",
@@ -4180,7 +4180,7 @@ def check_openvas_integration(report: AuditReport) -> None:
     """Verify OpenVAS/GVM scanner integration."""
     openvas_path = PROJECT_ROOT / "scanners" / "openvas_scanner.py"
     if openvas_path.exists():
-        src = openvas_path.read_text()
+        src = openvas_path.read_text(encoding='utf-8', errors='replace')
         size = openvas_path.stat().st_size
 
         if size > 5000:
@@ -4234,7 +4234,7 @@ def check_eula_enforcement(report: AuditReport) -> None:
     """Verify EULA is enforced at server start."""
     server_path = PROJECT_ROOT / "bin" / "start-server.py"
     if server_path.exists():
-        src = server_path.read_text()
+        src = server_path.read_text(encoding='utf-8', errors='replace')
         if "eula" in src.lower() or "DONJON_ACCEPT_EULA" in src:
             report.add_working("EULA: enforced at server start")
         else:
@@ -4247,7 +4247,7 @@ def check_eula_enforcement(report: AuditReport) -> None:
     # EULA module
     eula_path = PROJECT_ROOT / "lib" / "eula.py"
     if eula_path.exists():
-        src = eula_path.read_text()
+        src = eula_path.read_text(encoding='utf-8', errors='replace')
         if "accept" in src.lower() and "prompt" in src.lower():
             report.add_working("EULA: acceptance prompt module")
         else:
@@ -4265,7 +4265,7 @@ def check_discovery_depth(report: AuditReport) -> None:
     """Verify network discovery capabilities."""
     disc_path = PROJECT_ROOT / "lib" / "discovery.py"
     if disc_path.exists():
-        src = disc_path.read_text()
+        src = disc_path.read_text(encoding='utf-8', errors='replace')
         size = disc_path.stat().st_size
 
         if size > 20000:
@@ -4294,7 +4294,7 @@ def check_worker_system(report: AuditReport) -> None:
     """Verify background worker for async scan execution."""
     worker_path = PROJECT_ROOT / "bin" / "run-worker.py"
     if worker_path.exists():
-        src = worker_path.read_text()
+        src = worker_path.read_text(encoding='utf-8', errors='replace')
         if "worker" in src.lower() and ("queue" in src.lower() or "job" in src.lower()):
             report.add_working("Worker: async execution system")
         else:
@@ -4333,7 +4333,7 @@ def check_marketing_reality(report: AuditReport) -> None:
             "No README.md"))
         return
 
-    content = readme.read_text()
+    content = readme.read_text(encoding='utf-8', errors='replace')
 
     # "17 security scanners"
     scanner_count = len([f for f in (PROJECT_ROOT / "scanners").glob("*_scanner.py")
@@ -4384,7 +4384,7 @@ def check_marketing_reality(report: AuditReport) -> None:
 
     # "Post-quantum secure licensing"
     try:
-        src = (PROJECT_ROOT / "lib" / "licensing.py").read_text()
+        src = (PROJECT_ROOT / "lib" / "licensing.py").read_text(encoding='utf-8', errors='replace')
         if "ml_dsa" in src.lower() or "ml-dsa" in src.lower():
             report.add_working("Marketing: post-quantum licensing verified")
         else:

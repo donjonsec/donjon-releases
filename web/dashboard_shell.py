@@ -8,6 +8,12 @@ All CSS/JS inline for air-gap operation.
 
 def generate_shell() -> str:
     """Return the complete dashboard shell HTML as a string."""
+    try:
+        from lib.config import Config
+        _version = Config().version
+    except Exception:
+        _version = '7.3.0'
+
     parts = []
 
     # --- DOCTYPE and head ---
@@ -339,7 +345,7 @@ def generate_shell() -> str:
     parts.append(
         '<div class="sidebar-footer">'
         '<span style="font-size:0.75rem;color:#6B7280;">'
-        'Donjon Platform v7.3.0'
+        'Donjon Platform v' + _version +
         '</span>'
         '</div>'
     )

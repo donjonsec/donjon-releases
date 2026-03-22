@@ -1,14 +1,14 @@
 {
-  "recorded_at": "2026-03-22T03:21:38Z",
+  "recorded_at": "2026-03-22T12:13:28Z",
   "platform": "win32",
   "python": "3.13.5",
   "benchmarks": {
     "config_load": {
-      "seconds": 0.043,
+      "seconds": 0.048,
       "threshold": 1.0
     },
     "compliance_load": {
-      "seconds": 0.992,
+      "seconds": 0.896,
       "threshold": 2.0
     },
     "framework_query": {
@@ -17,21 +17,21 @@
       "count": 31
     },
     "evidence_init": {
-      "seconds": 0.022,
+      "seconds": 0.014,
       "threshold": 1.0
     },
     "sarif_export_100": {
-      "seconds": 0.004,
+      "seconds": 0.003,
       "threshold": 5.0,
       "bytes": 32504
     },
     "windows_scan_quick": {
-      "seconds": 15.463,
+      "seconds": 27.997,
       "threshold": 30.0,
       "checks": 5
     },
     "server_startup": {
-      "seconds": 0.596,
+      "seconds": 0.578,
       "threshold": 10.0
     }
   }
