@@ -12,14 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up virtualenv
+        run: |
+          python3 -m venv .venv
+          echo "$PWD/.venv/bin" >> $GITHUB_PATH
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          . .venv/bin/activate
+          pip install -r requirements.txt
 
       - name: Run tests
-        run: python -m pytest tests/test_production_ready.py tests/test_api_routes.py tests/test_eula.py tests/test_scanners.py -v --tb=short
+        run: |
+          . .venv/bin/activate
+          python -m pytest tests/test_production_ready.py tests/test_api_routes.py tests/test_eula.py tests/test_scanners.py -v --tb=short
 
       - name: Verify compilation
         run: |
+          . .venv/bin/activate
           python -c "
           import py_compile, glob, sys
           files = glob.glob('lib/*.py') + glob.glob('scanners/*.py') + glob.glob('web/*.py')
