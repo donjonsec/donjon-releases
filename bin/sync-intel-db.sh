@@ -17,9 +17,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# GitHub repo — set DONJON_REPO env var to override
+# Repository — supports both GitHub and Forgejo
+# Set DONJON_REPO env var to override (e.g., "donjonsec/donjon-platform")
+# Set DONJON_RELEASE_URL for Forgejo (e.g., "http://192.168.1.116:3000")
 REPO="${DONJON_REPO:-DonjonSec/donjon-platform}"
 RELEASE_TAG="intel-latest"
+FORGEJO_URL="${DONJON_RELEASE_URL:-}"
 
 # Colors (auto-disable if not a TTY)
 if [ -t 1 ]; then
@@ -43,6 +46,27 @@ download_file() {
     local filename="$1" dest="$2"
     echo -e "  Downloading ${BOLD}${filename}${RESET}..."
 
+    # Try Forgejo first if configured
+    if [[ -n "$FORGEJO_URL" ]] && command -v curl &>/dev/null; then
+        local forgejo_release_url="${FORGEJO_URL}/api/v1/repos/${REPO}/releases/tags/${RELEASE_TAG}"
+        local asset_url
+        asset_url=$(curl -sf "$forgejo_release_url" 2>/dev/null | \
+            python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for asset in data.get('assets', []):
+    if asset['name'] == '${filename}':
+        print(asset['browser_download_url'])
+        break
+" 2>/dev/null || echo "")
+        if [[ -n "$asset_url" ]]; then
+            if curl -fsSL "$asset_url" -o "$dest" 2>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+
+    # Fall back to GitHub (gh CLI)
     if command -v gh &>/dev/null; then
         local tmpdir
         tmpdir=$(mktemp -d)
@@ -54,12 +78,14 @@ download_file() {
         rm -rf "$tmpdir"
     fi
 
+    # Fall back to GitHub (curl)
     if command -v curl &>/dev/null; then
         if curl -fsSL "https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${filename}" -o "$dest" 2>/dev/null; then
             return 0
         fi
     fi
 
+    # Fall back to GitHub (wget)
     if command -v wget &>/dev/null; then
         if wget -q "https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${filename}" -O "$dest" 2>/dev/null; then
             return 0

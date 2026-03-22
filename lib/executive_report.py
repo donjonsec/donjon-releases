@@ -1076,6 +1076,338 @@ class ExecutiveReportGenerator:
 
         return self._html_wrap("Risk Register Report", "\n".join(sections))
 
+    # ==================================================================
+    # Compliance Package Generator
+    # ==================================================================
+
+    def generate_compliance_package(self, framework_id: str,
+                                     output_dir: str = None) -> Dict:
+        """Generate a full attestation-backed compliance package.
+
+        Produces:
+        - compliance_summary.json  -- machine-readable posture
+        - compliance_report.html   -- self-contained HTML (air-gap friendly)
+        - evidence_index.json      -- links to all evidence files
+
+        Parameters
+        ----------
+        framework_id : str
+            Framework to generate the package for (e.g. 'nist_800_53').
+        output_dir : str, optional
+            Directory to write outputs. Defaults to data/reports/<framework_id>/.
+
+        Returns
+        -------
+        Dict with keys: output_dir, files (list of paths), posture (summary).
+        """
+        from .evidence import get_evidence_manager
+        from .compliance import get_compliance_mapper, ATTESTATION_TYPES
+
+        em = get_evidence_manager()
+        cm = get_compliance_mapper()
+
+        # Compute posture
+        posture = em.get_compliance_posture(framework_id, cm)
+
+        # Resolve output dir
+        if output_dir is None:
+            out = self.reports_dir / framework_id
+        else:
+            out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+
+        # ---- 1. compliance_summary.json ----
+        summary_path = out / 'compliance_summary.json'
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            json.dump(posture, f, indent=2, default=str)
+
+        # ---- 2. evidence_index.json ----
+        evidence_index = {
+            'framework': framework_id,
+            'generated_at': posture['generated_at'],
+            'controls': [],
+        }
+        for ctrl in posture['controls']:
+            entry = {
+                'control_id': ctrl['control_id'],
+                'control_name': ctrl['control_name'],
+                'status': ctrl['status'],
+                'scan_evidence': [],
+                'attestation_evidence': [],
+            }
+            if ctrl.get('scan_evidence'):
+                se = ctrl['scan_evidence']
+                entry['scan_evidence'].append({
+                    'evidence_count': se.get('count', 0),
+                    'tools': se.get('tools', ''),
+                    'last_evidence': se.get('last_evidence', ''),
+                })
+            if ctrl.get('attestation'):
+                att = ctrl['attestation']
+                entry['attestation_evidence'].append({
+                    'type': att.get('attestation_type', ''),
+                    'attester': att.get('attester', ''),
+                    'status': att.get('status', ''),
+                    'file_path': att.get('file_path', ''),
+                    'period': f"{att.get('period_start', '')} to {att.get('period_end', '')}",
+                })
+            evidence_index['controls'].append(entry)
+
+        evidence_path = out / 'evidence_index.json'
+        with open(evidence_path, 'w', encoding='utf-8') as f:
+            json.dump(evidence_index, f, indent=2, default=str)
+
+        # ---- 3. compliance_report.html ----
+        html = self._build_compliance_package_html(framework_id, posture, cm)
+        report_path = out / 'compliance_report.html'
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(html)
+
+        return {
+            'output_dir': str(out),
+            'files': [str(summary_path), str(evidence_path), str(report_path)],
+            'posture': {
+                'framework': framework_id,
+                'total_controls': posture['total_controls'],
+                'compliance_percentage': posture['compliance_percentage'],
+                'counts': posture['counts'],
+            },
+        }
+
+    def _build_compliance_package_html(self, framework_id: str,
+                                        posture: Dict,
+                                        compliance_mapper) -> str:
+        """Build the self-contained HTML compliance report."""
+        sections: list = []
+        counts = posture['counts']
+        total = posture['total_controls']
+        pct = posture['compliance_percentage']
+
+        # Get framework display name
+        all_fw = compliance_mapper.get_all_frameworks()
+        fw_name = framework_id
+        for fw in all_fw:
+            if fw['id'] == framework_id:
+                fw_name = fw.get('name', framework_id)
+                break
+
+        # --- Executive summary cards ---
+        score_color = COLORS["pass"] if pct >= 80 else (
+            COLORS["medium"] if pct >= 50 else COLORS["critical"]
+        )
+        cards = f'''<div class="card-grid">
+            <div class="card">
+                <div class="label">Compliance Score</div>
+                <div class="value" style="color:{score_color}">{pct}%</div>
+            </div>
+            <div class="card">
+                <div class="label">Total Controls</div>
+                <div class="value">{total}</div>
+            </div>
+            <div class="card">
+                <div class="label">Compliant</div>
+                <div class="value" style="color:{COLORS["pass"]}">{counts["COMPLIANT"]}</div>
+            </div>
+            <div class="card">
+                <div class="label">Partial</div>
+                <div class="value" style="color:{COLORS["medium"]}">{counts["PARTIAL"]}</div>
+            </div>
+            <div class="card">
+                <div class="label">Non-Compliant</div>
+                <div class="value" style="color:{COLORS["critical"]}">{counts["NON_COMPLIANT"]}</div>
+            </div>
+            <div class="card">
+                <div class="label">Not Applicable</div>
+                <div class="value" style="color:{COLORS["na"]}">{counts["NOT_APPLICABLE"]}</div>
+            </div>
+        </div>'''
+
+        # Donut chart
+        donut_data = []
+        donut_colors = []
+        for label, key, color in [
+            ("Compliant", "COMPLIANT", COLORS["pass"]),
+            ("Partial", "PARTIAL", COLORS["medium"]),
+            ("Non-Compliant", "NON_COMPLIANT", COLORS["critical"]),
+            ("N/A", "NOT_APPLICABLE", COLORS["na"]),
+        ]:
+            if counts[key] > 0:
+                donut_data.append((label, counts[key]))
+                donut_colors.append(color)
+
+        donut = _svg_donut_chart(donut_data, "Control Status", size=240,
+                                  colors=donut_colors)
+
+        sections.append(
+            f'<div class="section">'
+            f'<h2 class="section-title">Executive Summary</h2>'
+            f'{cards}'
+            f'<div class="chart-container">{donut}</div>'
+            f'</div>'
+        )
+
+        # --- Compliance by family ---
+        by_family = posture.get('by_family', {})
+        if by_family:
+            fam_bar_data = []
+            for fam_name, fam_counts in sorted(by_family.items()):
+                fam_total = sum(fam_counts.values())
+                fam_compliant = fam_counts.get('COMPLIANT', 0)
+                fam_pct = round(fam_compliant / max(fam_total, 1) * 100)
+                fam_bar_data.append((fam_name[:30] if fam_name else 'Other', fam_pct))
+
+            if fam_bar_data:
+                fam_bar = _svg_bar_chart(fam_bar_data,
+                                          "Compliance % by Control Family",
+                                          width=650)
+                sections.append(
+                    f'<div class="section">'
+                    f'<h2 class="section-title">Compliance by Family</h2>'
+                    f'<div class="chart-container">{fam_bar}</div>'
+                    f'</div>'
+                )
+
+        # --- Per-control detail table ---
+        # Group by status for readability
+        def _status_badge(status):
+            color_map = {
+                'COMPLIANT': COLORS["pass"],
+                'PARTIAL': COLORS["medium"],
+                'NON_COMPLIANT': COLORS["critical"],
+                'NOT_APPLICABLE': COLORS["na"],
+            }
+            color = color_map.get(status, COLORS["info"])
+            label = status.replace('_', ' ')
+            return (f'<span class="sev-badge" style="background:{color}">'
+                    f'{label}</span>')
+
+        control_rows = ""
+        for ctrl in posture['controls']:
+            cid = ctrl['control_id']
+            cname = _escape(ctrl['control_name'])
+            family = _escape(ctrl['family'])
+            status = ctrl['status']
+
+            # Evidence column
+            evidence_parts = []
+            if ctrl.get('scan_evidence'):
+                se = ctrl['scan_evidence']
+                tools = se.get('tools', 'scanner')
+                evidence_parts.append(
+                    f"Scan: {se['count']} artifact(s) via {_escape(tools)}"
+                )
+            if ctrl.get('attestation'):
+                att = ctrl['attestation']
+                att_type = att.get('attestation_type', 'attestation')
+                attester = att.get('attester', '')
+                fp = att.get('file_path', '')
+                fname = Path(fp).name if fp else ''
+                parts = [f"Attestation: {_escape(att_type)}"]
+                if attester:
+                    parts.append(f"by {_escape(attester)}")
+                if fname:
+                    parts.append(f"({_escape(fname)})")
+                evidence_parts.append(' '.join(parts))
+
+            if not evidence_parts:
+                evidence_text = '<span style="color:' + COLORS["text_muted"] + '">None</span>'
+            else:
+                evidence_text = '<br>'.join(evidence_parts)
+
+            # Recommendations
+            recs = ctrl.get('recommendations', [])
+            rec_text = ''
+            if recs:
+                rec_text = '<br>'.join(f'&#8226; {_escape(r)}' for r in recs)
+
+            control_rows += (
+                f'<tr>'
+                f'<td>{_escape(family)}</td>'
+                f'<td><b>{_escape(cid)}</b></td>'
+                f'<td>{cname}</td>'
+                f'<td>{_status_badge(status)}</td>'
+                f'<td style="font-size:12px">{evidence_text}</td>'
+                f'<td style="font-size:12px">{rec_text}</td>'
+                f'</tr>'
+            )
+
+        sections.append(
+            f'<div class="section">'
+            f'<h2 class="section-title">Control Details</h2>'
+            f'<table>'
+            f'<tr><th>Family</th><th>Control</th><th>Name</th>'
+            f'<th>Status</th><th>Evidence</th><th>Recommendations</th></tr>'
+            f'{control_rows}'
+            f'</table></div>'
+        )
+
+        # --- Non-compliant controls (actionable gap list) ---
+        gaps = [c for c in posture['controls']
+                if c['status'] in ('NON_COMPLIANT', 'PARTIAL')]
+        if gaps:
+            gap_rows = ""
+            for i, g in enumerate(gaps, 1):
+                recs = g.get('recommendations', [])
+                rec_text = '; '.join(recs) if recs else 'Review control requirements'
+                gap_rows += (
+                    f'<tr><td>{i}</td>'
+                    f'<td><b>{_escape(g["control_id"])}</b></td>'
+                    f'<td>{_escape(g["control_name"])}</td>'
+                    f'<td>{_status_badge(g["status"])}</td>'
+                    f'<td style="font-size:12px">{_escape(rec_text)}</td></tr>'
+                )
+            sections.append(
+                f'<div class="section">'
+                f'<h2 class="section-title">Gap Analysis &amp; '
+                f'Remediation Priorities</h2>'
+                f'<table><tr><th>#</th><th>Control</th><th>Name</th>'
+                f'<th>Status</th><th>Action Required</th></tr>'
+                f'{gap_rows}</table></div>'
+            )
+
+        # --- Recommendations ---
+        rec_items = []
+        if counts['NON_COMPLIANT'] > 0:
+            rec_items.append(
+                f"<b>{counts['NON_COMPLIANT']}</b> controls are non-compliant. "
+                f"Upload required attestation documents or run additional scans."
+            )
+        if counts['PARTIAL'] > 0:
+            rec_items.append(
+                f"<b>{counts['PARTIAL']}</b> controls have partial evidence. "
+                f"Provide missing scan evidence or attestations to achieve full compliance."
+            )
+        if pct >= 80:
+            rec_items.append(
+                f"Framework is at <b>{pct}%</b> compliance. "
+                f"Focus on closing remaining gaps for audit readiness."
+            )
+        elif pct >= 50:
+            rec_items.append(
+                f"Framework is at <b>{pct}%</b> compliance. "
+                f"Prioritize non-compliant controls, starting with governance policies."
+            )
+        else:
+            rec_items.append(
+                f"Framework is at <b>{pct}%</b> compliance. "
+                f"Significant gaps exist. Begin with policy documents and risk assessments."
+            )
+
+        if rec_items:
+            rec_html = '<ol class="recommendations">'
+            for item in rec_items:
+                rec_html += f"<li>{item}</li>"
+            rec_html += "</ol>"
+            sections.append(
+                f'<div class="section">'
+                f'<h2 class="section-title">Recommendations</h2>'
+                f'{rec_html}</div>'
+            )
+
+        return self._html_wrap(
+            f"Compliance Package - {fw_name}", "\n".join(sections)
+        )
+
     # ---- save report -----------------------------------------------------
 
     def save_report(self, html_content: str, filename: str) -> Path:

@@ -130,6 +130,21 @@ class EvidenceManager:
 
     def _migrate_schema(self):
         """Migrate database schema - add new columns for v6.0 features."""
+        # Attestation table enhancements for compliance pipeline
+        attestation_columns = [
+            ('attestations', 'attestation_type', 'TEXT'),
+            ('attestations', 'file_path', 'TEXT'),
+            ('attestations', 'file_hash', 'TEXT'),
+            ('attestations', 'reviewed_by', 'TEXT'),
+            ('attestations', 'reviewed_at', 'TEXT'),
+        ]
+        with sqlite3.connect(self.db_path) as conn:
+            for table, column, col_type in attestation_columns:
+                try:
+                    conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {col_type}')
+                except Exception:
+                    pass
+
         migration_columns = [
             ('findings', 'kev_status', 'TEXT'),
             ('findings', 'epss_score', 'REAL'),
@@ -391,24 +406,246 @@ class EvidenceManager:
 
     def create_attestation(self, framework: str, control_id: str,
                            period_start: datetime, period_end: datetime,
-                           status: str, evidence_ids: List[str],
-                           attester: str = '', notes: str = '') -> str:
-        """Create a control attestation."""
+                           status: str, evidence_ids: List[str] = None,
+                           attester: str = '', notes: str = '',
+                           attestation_type: str = '',
+                           file_path: str = '') -> str:
+        """Create a control attestation.
+
+        Parameters
+        ----------
+        framework : str
+            Framework ID (e.g. 'nist_800_53', 'gdpr').
+        control_id : str
+            Control ID within the framework.
+        period_start, period_end : datetime
+            Attestation validity window.
+        status : str
+            One of: compliant, non_compliant, partial, not_applicable.
+        evidence_ids : list[str], optional
+            Evidence artifacts supporting the attestation.
+        attester : str
+            Person or role attesting.
+        notes : str
+            Free-text notes.
+        attestation_type : str
+            Type from ATTESTATION_TYPES taxonomy (e.g. 'policy_document').
+        file_path : str
+            Path to supporting document (PDF, etc.).
+        """
         attestation_id = self._generate_id('ATT')
+
+        file_hash = None
+        if file_path:
+            from pathlib import Path as _P
+            fp = _P(file_path)
+            if fp.exists():
+                with open(fp, 'rb') as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 INSERT INTO attestations
                 (attestation_id, framework, control_id, period_start, period_end,
-                 status, evidence_ids, attester, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 status, evidence_ids, attester, notes, attestation_type,
+                 file_path, file_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 attestation_id, framework, control_id,
                 period_start.isoformat(), period_end.isoformat(),
-                status, json.dumps(evidence_ids), attester, notes
+                status, json.dumps(evidence_ids or []), attester, notes,
+                attestation_type, file_path or None, file_hash
             ))
 
         return attestation_id
+
+    def get_attestations_for_framework(self, framework: str) -> List[Dict]:
+        """Get all attestations for a framework."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT * FROM attestations
+                WHERE framework = ?
+                ORDER BY control_id, created_at DESC
+            ''', (framework,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_attestation_for_control(self, framework: str,
+                                     control_id: str) -> Optional[Dict]:
+        """Get the most recent attestation for a specific control."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute('''
+                SELECT * FROM attestations
+                WHERE framework = ? AND control_id = ?
+                ORDER BY created_at DESC LIMIT 1
+            ''', (framework, control_id)).fetchone()
+            return dict(row) if row else None
+
+    def get_compliance_posture(self, framework_id: str,
+                                compliance_mapper=None) -> Dict:
+        """Compute full compliance posture for a framework.
+
+        Returns every control with its status:
+        - COMPLIANT: has scan evidence + required attestation (or attestation alone
+          for governance-only controls)
+        - PARTIAL: has scan evidence OR attestation, but not both when both expected
+        - NON_COMPLIANT: missing required evidence
+        - NOT_APPLICABLE: explicitly marked N/A via attestation
+
+        Parameters
+        ----------
+        framework_id : str
+            Framework ID (e.g. 'nist_800_53').
+        compliance_mapper : ComplianceMapper, optional
+            If provided, uses its control definitions for the full control list.
+            If None, only returns controls that have DB entries.
+        """
+        from .compliance import get_compliance_mapper, ATTESTATION_TYPES
+        if compliance_mapper is None:
+            compliance_mapper = get_compliance_mapper()
+
+        all_controls = compliance_mapper.get_all_controls(framework_id)
+
+        # Build set of attestation types that map to each control
+        att_type_to_controls = {}
+        for att_type, info in ATTESTATION_TYPES.items():
+            for fw, ctrl_ids in info.get('controls', {}).items():
+                if fw == framework_id:
+                    for cid in ctrl_ids:
+                        att_type_to_controls.setdefault(cid, set()).add(att_type)
+
+        # Get scan evidence from DB
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            scan_evidence = {}
+            rows = conn.execute('''
+                SELECT cm.control_id, COUNT(*) as cnt,
+                       GROUP_CONCAT(DISTINCT e.source_tool) as tools,
+                       MAX(e.timestamp) as last_evidence
+                FROM control_mappings cm
+                JOIN evidence e ON cm.evidence_id = e.evidence_id
+                WHERE cm.framework = ?
+                GROUP BY cm.control_id
+            ''', (framework_id,)).fetchall()
+            for row in rows:
+                scan_evidence[row['control_id']] = {
+                    'count': row['cnt'],
+                    'tools': row['tools'] or '',
+                    'last_evidence': row['last_evidence'] or '',
+                }
+
+            # Get attestations
+            attestations = {}
+            att_rows = conn.execute('''
+                SELECT control_id, status, attestation_type, attester,
+                       notes, file_path, period_start, period_end, created_at
+                FROM attestations
+                WHERE framework = ?
+                ORDER BY control_id, created_at DESC
+            ''', (framework_id,)).fetchall()
+            for row in att_rows:
+                cid = row['control_id']
+                if cid not in attestations:  # most recent only
+                    attestations[cid] = dict(row)
+
+        # Determine if framework is governance-only (no scanner coverage expected)
+        governance_frameworks = {
+            'gdpr', 'ccpa', 'dora', 'eu_ai_act', 'colorado_privacy',
+            'connecticut_cdpa', 'ny_shield', 'texas_dpsa', 'virginia_cdpa',
+        }
+        is_governance = framework_id in governance_frameworks
+
+        # Build posture
+        controls_posture = []
+        counts = {'COMPLIANT': 0, 'PARTIAL': 0, 'NON_COMPLIANT': 0,
+                  'NOT_APPLICABLE': 0}
+        families = {}
+
+        for ctrl_id, ctrl in all_controls.items():
+            has_scan = ctrl_id in scan_evidence
+            has_attestation = ctrl_id in attestations
+            att_data = attestations.get(ctrl_id)
+
+            # Check for explicit N/A
+            if att_data and att_data.get('status') == 'not_applicable':
+                status = 'NOT_APPLICABLE'
+            elif is_governance:
+                # Governance frameworks: attestation alone suffices
+                if has_attestation and att_data.get('status') in ('compliant', 'COMPLIANT'):
+                    status = 'COMPLIANT'
+                elif has_attestation:
+                    status = 'PARTIAL'
+                else:
+                    status = 'NON_COMPLIANT'
+            else:
+                # Technical frameworks: both scan + attestation is ideal
+                needs_attestation = ctrl_id in att_type_to_controls
+                if has_scan and has_attestation:
+                    status = 'COMPLIANT'
+                elif has_scan and not needs_attestation:
+                    # Scan evidence alone is enough for technical controls
+                    status = 'COMPLIANT'
+                elif has_scan or has_attestation:
+                    status = 'PARTIAL'
+                else:
+                    status = 'NON_COMPLIANT'
+
+            counts[status] += 1
+            family = ctrl.family if hasattr(ctrl, 'family') else ''
+            fam_counts = families.setdefault(family, {
+                'COMPLIANT': 0, 'PARTIAL': 0, 'NON_COMPLIANT': 0,
+                'NOT_APPLICABLE': 0
+            })
+            fam_counts[status] += 1
+
+            control_entry = {
+                'control_id': ctrl_id,
+                'control_name': ctrl.control_name if hasattr(ctrl, 'control_name') else str(ctrl),
+                'family': family,
+                'status': status,
+                'scan_evidence': scan_evidence.get(ctrl_id),
+                'attestation': att_data,
+                'recommendations': [],
+            }
+
+            if status == 'NON_COMPLIANT':
+                if ctrl_id in att_type_to_controls:
+                    needed = att_type_to_controls[ctrl_id]
+                    control_entry['recommendations'].append(
+                        f"Upload attestation ({', '.join(needed)}) to satisfy this control."
+                    )
+                else:
+                    control_entry['recommendations'].append(
+                        "Run scans that produce evidence for this control, "
+                        "or provide an attestation."
+                    )
+            elif status == 'PARTIAL':
+                if not has_scan:
+                    control_entry['recommendations'].append(
+                        "Run scans to provide technical evidence."
+                    )
+                if not has_attestation and ctrl_id in att_type_to_controls:
+                    needed = att_type_to_controls[ctrl_id]
+                    control_entry['recommendations'].append(
+                        f"Upload attestation ({', '.join(needed)}) for full compliance."
+                    )
+
+            controls_posture.append(control_entry)
+
+        total = len(all_controls)
+        compliant_pct = round(counts['COMPLIANT'] / max(total, 1) * 100, 1)
+
+        return {
+            'framework_id': framework_id,
+            'total_controls': total,
+            'compliance_percentage': compliant_pct,
+            'counts': counts,
+            'by_family': families,
+            'controls': controls_posture,
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+        }
 
     def get_evidence_for_control(self, framework: str, control_id: str) -> List[Dict]:
         """Get all evidence mapped to a specific control."""

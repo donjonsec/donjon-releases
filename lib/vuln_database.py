@@ -579,6 +579,11 @@ class VulnDatabase:
 
     def _nvd_api_request(self, params: Dict[str, str], timeout: int = 30) -> Optional[Dict]:
         """Make a request to the NVD API 2.0 with retry on transient failures."""
+        # Bail immediately in offline/air-gap mode
+        if os.environ.get('DONJON_OFFLINE') == '1':
+            logger.debug("NVD: Skipping API request (DONJON_OFFLINE=1)")
+            return None
+
         import urllib.request
         import urllib.error
         import urllib.parse

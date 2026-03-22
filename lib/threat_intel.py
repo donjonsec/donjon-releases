@@ -155,6 +155,11 @@ class ThreatIntelManager:
 
     def update_kev_catalog(self) -> bool:
         """Download and cache the CISA KEV catalog with retry on transient failures."""
+        # Bail immediately in offline/air-gap mode
+        if os.environ.get('DONJON_OFFLINE') == '1':
+            logger.debug("KEV: Skipping download (DONJON_OFFLINE=1)")
+            return False
+
         import urllib.request
         import urllib.error
         import ssl
@@ -209,6 +214,10 @@ class ThreatIntelManager:
 
         # Check cache first
         uncached = [cve for cve in cve_ids if cve not in self._epss_cache]
+
+        if uncached and os.environ.get('DONJON_OFFLINE') == '1':
+            logger.debug("EPSS: Skipping API query (DONJON_OFFLINE=1), returning cached only")
+            uncached = []  # Skip network, return only cached results
 
         if uncached:
             import urllib.request

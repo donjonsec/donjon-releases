@@ -12,6 +12,367 @@ from typing import Dict, List, Optional, Set
 from enum import Enum
 
 
+# ---------------------------------------------------------------------------
+# Attestation Types Taxonomy
+# Maps attestation document types to the compliance controls they satisfy.
+# Each entry: attestation_type -> {description, controls: {framework -> [control_ids]}}
+# ---------------------------------------------------------------------------
+
+ATTESTATION_TYPES: Dict[str, dict] = {
+    'policy_document': {
+        'description': 'Formal policy document (access control, security, acceptable use, etc.)',
+        'controls': {
+            'nist_800_53': ['AC-1', 'AT-1', 'AU-1', 'CA-1', 'CM-1', 'CP-1',
+                            'IA-1', 'IR-1', 'MA-1', 'MP-1', 'PE-1', 'PL-1',
+                            'PM-1', 'PS-1', 'RA-1', 'SA-1', 'SC-1', 'SI-1'],
+            'hipaa': ['164.308(a)(1)', '164.310(b)'],
+            'pci_dss_4': ['12.1'],
+            'soc2': ['CC1.1', 'CC5.1'],
+            'iso_27001_2022': ['5.1'],
+            # GDPR YAML uses Art.XX IDs
+            'gdpr': ['Art.24', 'Art.25', 'Art.32'],
+            'ccpa': ['1798.100', '1798.105', '1798.110'],
+            # DORA YAML uses art_X IDs
+            'dora': ['art_1', 'art_5', 'art_6'],
+            # SOX YAML uses SOX-XX-NN IDs
+            'sox': ['SOX-AC-01', 'SOX-AC-02', 'SOX-CM-01', 'SOX-CM-02'],
+            'fedramp': ['AC-1', 'AT-1', 'CA-1', 'CM-1', 'CP-1', 'IA-1',
+                        'IR-1', 'MA-1', 'MP-1', 'PE-1', 'PL-1', 'PS-1',
+                        'RA-1', 'SA-1', 'SC-1', 'SI-1'],
+            # NIS2 YAML uses art_XX_X IDs
+            'nis2': ['art_20_1', 'art_20_2', 'art_21_2_a'],
+            # SEC Cyber uses 10-K.106.X IDs
+            'sec_cyber': ['10-K.106.b.1', '10-K.106.b.2', '10-K.106.c.1'],
+            # UK FCA Resilience
+            'uk_fca_resilience': ['board_responsibility', 'self_assessment'],
+        },
+    },
+    'risk_assessment': {
+        'description': 'Risk assessment report or risk register',
+        'controls': {
+            'nist_800_53': ['RA-1', 'RA-3'],
+            'hipaa': ['164.308(a)(1)'],
+            'pci_dss_4': ['12.1'],
+            'soc2': ['CC3.1', 'CC3.2'],
+            'iso_27001_2022': ['5.1'],
+            'gdpr': ['Art.35'],
+            'dora': ['art_1', 'art_5'],
+            'nis2': ['art_21_2_a', 'art_21_2_b'],
+            'eu_ai_act': ['art_10_2', 'art_10_3'],
+            'sec_cyber': ['10-K.106.b.3', '10-K.106.b.4'],
+            'sox': ['SOX-RA-01', 'SOX-RA-02'],
+            'uk_fca_resilience': ['self_assessment', 'impact_tolerance_setting'],
+        },
+    },
+    'incident_response_plan': {
+        'description': 'Incident response plan, playbooks, or tabletop exercise results',
+        'controls': {
+            'nist_800_53': ['IR-1', 'IR-4', 'IR-6', 'IR-8'],
+            'hipaa': ['164.308(a)(6)'],
+            'pci_dss_4': ['12.1'],
+            'soc2': ['CC7.3', 'CC7.4'],
+            'iso_27001_2022': ['5.1'],
+            'gdpr': ['Art.33', 'Art.34'],
+            'dora': ['art_10', 'art_11', 'art_12'],
+            'nis2': ['art_23_1', 'art_23_3', 'art_23_4_a', 'art_23_4_b',
+                     'art_23_4_c', 'art_23_4_d', 'art_23_4_e', 'art_23_4_f'],
+            'sec_cyber': ['8-K.1.05.a', '8-K.1.05.b'],
+            'uk_fca_resilience': ['response_recovery', 'scenario_testing'],
+        },
+    },
+    'training_records': {
+        'description': 'Security awareness training records and completion certificates',
+        'controls': {
+            'nist_800_53': ['AT-2', 'AT-3', 'AT-4'],
+            'hipaa': ['164.308(a)(5)'],
+            'pci_dss_4': ['12.1'],
+            'soc2': ['CC1.1'],
+            'gdpr': ['Art.39'],
+            'dora': ['art_13', 'art_14'],
+            'nis2': ['art_20_2'],
+        },
+    },
+    'access_review': {
+        'description': 'Periodic access review results, role recertification',
+        'controls': {
+            'nist_800_53': ['AC-2', 'AC-6'],
+            'hipaa': ['164.308(a)(3)', '164.308(a)(4)'],
+            'pci_dss_4': ['7.1', '7.2', '8.1'],
+            'soc2': ['CC6.1', 'CC6.2', 'CC6.3'],
+            'iso_27001_2022': ['5.15'],
+            'SOC1-Type2': ['ITGC-01', 'ITGC-02'],
+            'sox': ['SOX-AC-03', 'SOX-AC-04', 'SOX-AC-05'],
+        },
+    },
+    'data_classification': {
+        'description': 'Data classification scheme, data inventory, processing records',
+        'controls': {
+            'nist_800_53': ['RA-2'],
+            'gdpr': ['Art.30', 'Art.35'],
+            'ccpa': ['1798.100', '1798.100.b', '1798.105', '1798.110',
+                     '1798.115', '1798.120', '1798.125', '1798.130'],
+            # Privacy frameworks: use actual YAML control IDs
+            'colorado_privacy': ['right_access', 'right_delete', 'right_opt_out'],
+            'connecticut_cdpa': ['right_access', 'right_delete', 'right_opt_out'],
+            'ny_shield': ['admin_1', 'admin_2', 'admin_3'],
+            'texas_dpsa': ['right_access', 'right_confirm', 'right_delete'],
+            'virginia_cdpa': ['right_access', 'right_know', 'right_delete'],
+            'eu_ai_act': ['art_10_2', 'art_10_3', 'art_10_5'],
+        },
+    },
+    'vendor_assessment': {
+        'description': 'Third-party/vendor risk assessment, SOC reports from vendors',
+        'controls': {
+            'nist_800_53': ['SA-4', 'SA-9', 'SR-6'],
+            'soc2': ['CC9.1'],
+            'pci_dss_4': ['12.1'],
+            'gdpr': ['Art.28'],
+            'dora': ['art_17', 'art_18', 'art_19'],
+        },
+    },
+    'board_minutes': {
+        'description': 'Board/committee meeting minutes showing security governance',
+        'controls': {
+            'nist_800_53': ['PM-1', 'PM-2'],
+            'soc2': ['CC1.1', 'CC4.1'],
+            'sox': ['SOX-AC-01', 'SOX-CM-01'],
+            'sec_cyber': ['10-K.106.c.1', '10-K.106.c.2',
+                          '10-K.106.c.2.i', '10-K.106.c.2.ii'],
+            'uk_fca_resilience': ['board_responsibility', 'communication'],
+        },
+    },
+    'backup_test_results': {
+        'description': 'Backup and disaster recovery test results',
+        'controls': {
+            'nist_800_53': ['CP-2', 'CP-9', 'CP-10'],
+            'hipaa': ['164.308(a)(7)'],
+            'soc2': ['CC9.1'],
+            'SOC1-Type2': ['ITGC-08'],
+            'iso_27001_2022': ['8.1'],
+            'dora': ['art_11', 'art_12'],
+            'nis2': ['art_21_2_c'],
+            'uk_fca_resilience': ['response_recovery', 'scenario_testing'],
+        },
+    },
+    'business_continuity_plan': {
+        'description': 'Business continuity / disaster recovery plan',
+        'controls': {
+            'nist_800_53': ['CP-1', 'CP-2'],
+            'hipaa': ['164.308(a)(7)'],
+            'soc2': ['CC9.1'],
+            'dora': ['art_11'],
+            'nis2': ['art_21_2_c'],
+            'uk_fca_resilience': ['response_recovery', 'ibs_identification'],
+        },
+    },
+    'privacy_impact_assessment': {
+        'description': 'Privacy impact assessment (PIA / DPIA)',
+        'controls': {
+            'gdpr': ['Art.35', 'Art.36'],
+            'ccpa': ['1798.100'],
+            'colorado_privacy': ['right_access', 'right_opt_out'],
+            'eu_ai_act': ['art_10_2', 'art_13_1', 'art_14_1'],
+        },
+    },
+    'data_processing_agreement': {
+        'description': 'Data processing agreements with processors/sub-processors',
+        'controls': {
+            'gdpr': ['Art.28', 'Art.26'],
+            'ccpa': ['1798.140'],
+            'colorado_privacy': ['right_opt_out'],
+            'connecticut_cdpa': ['right_opt_out'],
+            'virginia_cdpa': ['right_opt_out_sale', 'right_opt_out_targeted'],
+        },
+    },
+    'consent_records': {
+        'description': 'Records of consent collection and management',
+        'controls': {
+            'gdpr': ['Art.6', 'Art.7', 'Art.9'],
+            'ccpa': ['1798.120', '1798.121', '1798.135'],
+            'colorado_privacy': ['right_opt_out'],
+        },
+    },
+    'penetration_test_report': {
+        'description': 'Penetration test report from qualified assessor',
+        'controls': {
+            'nist_800_53': ['CA-8', 'RA-5'],
+            'pci_dss_4': ['11.4'],
+            'soc2': ['CC7.1'],
+            'fedramp': ['CA-8', 'RA-5'],
+            'dora': ['art_11', 'art_12'],
+            'nis2': ['art_21_2_e'],
+        },
+    },
+    'change_management_records': {
+        'description': 'Change advisory board records, change tickets, approval logs',
+        'controls': {
+            'nist_800_53': ['CM-3', 'CM-4'],
+            'soc2': ['CC8.1'],
+            'SOC1-Type2': ['ITGC-04', 'ITGC-05', 'ITGC-06'],
+            'pci_dss_4': ['6.2'],
+            'iso_27001_2022': ['8.9'],
+            'sox': ['SOX-CM-03', 'SOX-CM-04'],
+        },
+    },
+    'ai_governance': {
+        'description': 'AI model governance documentation, bias assessments, model cards',
+        'controls': {
+            'eu_ai_act': ['art_10_2', 'art_10_3', 'art_10_5', 'art_11_1',
+                          'art_12_1', 'art_13_1', 'art_14_1', 'art_14_2'],
+            'nist_800_53': ['CM-7'],
+        },
+    },
+    'data_subject_rights_process': {
+        'description': 'Documented process for handling data subject rights requests',
+        'controls': {
+            'gdpr': ['Art.12', 'Art.13', 'Art.14', 'Art.15', 'Art.16',
+                     'Art.17', 'Art.18', 'Art.19', 'Art.20', 'Art.21', 'Art.22'],
+            'ccpa': ['1798.100', '1798.100.b', '1798.105', '1798.106',
+                     '1798.110', '1798.115', '1798.120', '1798.121',
+                     '1798.125', '1798.130', '1798.135', '1798.140',
+                     '1798.145', '1798.150', '1798.155', '1798.185',
+                     '1798.190', '1798.192', '1798.196', '1798.198'],
+            'colorado_privacy': ['right_access', 'right_correct', 'right_delete',
+                                 'right_opt_out', 'right_portability'],
+            'connecticut_cdpa': ['right_access', 'right_appeal', 'right_correct',
+                                 'right_delete', 'right_opt_out', 'right_portability'],
+            'texas_dpsa': ['right_access', 'right_confirm', 'right_correct',
+                           'right_delete', 'right_opt_out_profiling',
+                           'right_opt_out_sale', 'right_opt_out_targeted',
+                           'right_portability'],
+            'virginia_cdpa': ['right_access', 'right_correct', 'right_delete',
+                              'right_know', 'right_opt_out_profiling',
+                              'right_opt_out_sale', 'right_opt_out_targeted',
+                              'right_portability'],
+        },
+    },
+    'security_architecture_review': {
+        'description': 'Network diagrams, security architecture documentation, threat models',
+        'controls': {
+            'nist_800_53': ['PL-2', 'SA-8'],
+            'nis2': ['art_21_2_a', 'art_21_2_b', 'art_21_2_d',
+                     'art_21_2_e', 'art_21_2_f', 'art_21_2_g',
+                     'art_21_2_h', 'art_21_2_i', 'art_21_2_j'],
+            'dora': ['art_5', 'art_6', 'art_7', 'art_8', 'art_9'],
+            'uk_fca_resilience': ['mapping', 'ibs_identification',
+                                  'impact_tolerance_setting'],
+            'ny_shield': ['admin_4', 'admin_5', 'admin_6',
+                          'phys_1', 'phys_2', 'phys_3',
+                          'tech_1', 'tech_2', 'tech_3', 'tech_4', 'tech_5'],
+            'sox': ['SOX-AC-06', 'SOX-AC-07', 'SOX-AC-08',
+                    'SOX-CM-03', 'SOX-CM-04', 'SOX-CM-05'],
+            'sec_cyber': ['10-K.106.b.1', '10-K.106.b.2',
+                          '10-K.106.b.3', '10-K.106.b.4'],
+            'eu_ai_act': ['art_11_1', 'art_12_1'],
+        },
+    },
+    'supply_chain_security': {
+        'description': 'Supply chain risk management, software bill of materials (SBOM)',
+        'controls': {
+            'nis2': ['art_21_2_d', 'art_21_2_i'],
+            'dora': ['art_17', 'art_18', 'art_19'],
+            'nist_800_53': ['SR-6', 'SA-4'],
+            'eu_ai_act': ['art_14_1', 'art_14_2'],
+        },
+    },
+    'data_protection_principles': {
+        'description': 'Documentation of data protection principles (lawfulness, fairness, minimization, accuracy, storage limitation, integrity)',
+        'controls': {
+            'gdpr': ['Art.5.1.a', 'Art.5.1.b', 'Art.5.1.c', 'Art.5.1.d',
+                     'Art.5.1.e', 'Art.5.1.f', 'Art.5.2'],
+        },
+    },
+    'dpo_appointment': {
+        'description': 'Data Protection Officer appointment, qualifications, and reporting lines',
+        'controls': {
+            'gdpr': ['Art.37', 'Art.38', 'Art.39'],
+        },
+    },
+    'international_transfer_safeguards': {
+        'description': 'Documentation of cross-border data transfer mechanisms (SCCs, BCRs, adequacy)',
+        'controls': {
+            'gdpr': ['Art.27', 'Art.29', 'Art.31', 'Art.44', 'Art.46', 'Art.49'],
+            'dora': ['art_24', 'art_25', 'art_26'],
+        },
+    },
+    'breach_notification_process': {
+        'description': 'Documented breach notification procedures and records',
+        'controls': {
+            'ccpa': ['1798.82', '1798.81.5'],
+            'dora': ['art_28', 'art_29', 'art_30'],
+            'nis2': ['art_24_1', 'art_25_1', 'art_26_1', 'art_27_1',
+                     'art_28_1', 'art_29_1'],
+            'sec_cyber': ['8-K.1.05.c', '8-K.1.05.d'],
+        },
+    },
+    'ai_compliance_documentation': {
+        'description': 'AI system documentation: conformity assessments, risk classifications, quality management, post-market monitoring',
+        'controls': {
+            'eu_ai_act': ['art_15_1', 'art_15_3', 'art_15_5',
+                          'art_16_a', 'art_16_c', 'art_16_i',
+                          'art_17_1', 'art_17_1_b', 'art_17_1_c',
+                          'art_17_1_e', 'art_17_1_f', 'art_17_1_g',
+                          'art_17_1_h', 'art_29_1', 'art_29_3',
+                          'art_40_1', 'art_41_1', 'art_41_3',
+                          'art_42_1', 'art_42_2', 'art_43_1',
+                          'art_43_2', 'art_43_3', 'art_43_4',
+                          'art_47_1', 'art_48_1', 'art_49_1',
+                          'art_49_3', 'art_50_1', 'art_50_2',
+                          'art_50_4', 'art_52_1', 'art_52_2',
+                          'art_52_3', 'art_52_4', 'art_52_5'],
+        },
+    },
+    'financial_controls_documentation': {
+        'description': 'Internal financial control documentation, audit trails, segregation of duties',
+        'controls': {
+            'sox': ['SOX-AL-01', 'SOX-AL-02', 'SOX-AL-03', 'SOX-AL-04',
+                    'SOX-CM-05', 'SOX-CM-06',
+                    'SOX-DI-01', 'SOX-DI-02', 'SOX-DI-03', 'SOX-DI-04',
+                    'SOX-DI-05', 'SOX-DI-06', 'SOX-DI-07', 'SOX-DI-08',
+                    'SOX-DR-01', 'SOX-DR-02',
+                    'SOX-IB-01', 'SOX-IB-02',
+                    'SOX-LC-01', 'SOX-LC-02', 'SOX-LC-03',
+                    'SOX-RA-03'],
+        },
+    },
+    'operational_resilience': {
+        'description': 'Operational resilience documentation, critical function mapping, ICT continuity',
+        'controls': {
+            'dora': ['art_2', 'art_45'],
+            'nis2': ['art_21_2_k', 'art_21_2_l', 'art_32_2', 'art_33_2'],
+            'uk_fca_resilience': ['vulnerability_identification'],
+            'ny_shield': ['phys_4'],
+        },
+    },
+    'privacy_program_documentation': {
+        'description': 'Comprehensive privacy program documentation, CPRA regulations compliance',
+        'controls': {
+            'ccpa': ['1798.140.ag', '1798.140.d', '1798.140.j',
+                     '1798.185.a.15', '1798.185.a.16'],
+        },
+    },
+    'ai_sandbox_and_deployer_obligations': {
+        'description': 'AI regulatory sandbox documentation, deployer obligations, prohibited AI practices',
+        'controls': {
+            'eu_ai_act': ['art_4_1', 'art_5_1', 'art_9_1', 'art_9_2', 'art_9_4',
+                          'art_17_1_i', 'art_18_1', 'art_19_1',
+                          'art_26_1', 'art_26_5', 'art_26_6', 'art_26_8',
+                          'art_53_1_a', 'art_53_1_b', 'art_53_1_c', 'art_53_1_d',
+                          'art_55_1_a', 'art_55_1_b', 'art_55_1_c', 'art_55_1_d'],
+        },
+    },
+    'sox_operational_controls': {
+        'description': 'SOX operational controls: service management, operations, monitoring',
+        'controls': {
+            'sox': ['SOX-OP-01', 'SOX-OP-02', 'SOX-OP-03', 'SOX-OP-04',
+                    'SOX-OP-05', 'SOX-OP-06',
+                    'SOX-SM-01', 'SOX-SM-02', 'SOX-SM-03', 'SOX-SM-04',
+                    'SOX-SM-05', 'SOX-SM-06', 'SOX-SM-07', 'SOX-SM-08'],
+        },
+    },
+}
+
+
 class Framework(Enum):
     """Supported compliance frameworks."""
     NIST_800_53 = "nist_800_53"
@@ -1515,6 +1876,42 @@ class ComplianceMapper:
                         control.control_name,
                         control.family
                     )
+
+    def get_attestation_types_for_control(self, framework: str,
+                                           control_id: str) -> List[str]:
+        """Return which attestation types satisfy a given control.
+
+        Searches the ATTESTATION_TYPES taxonomy for entries that map
+        to this (framework, control_id) pair.
+        """
+        result = []
+        for att_type, info in ATTESTATION_TYPES.items():
+            fw_controls = info.get('controls', {}).get(framework, [])
+            if control_id in fw_controls:
+                result.append(att_type)
+        return result
+
+    def get_controls_for_attestation_type(self, attestation_type: str,
+                                            framework: str = None) -> Dict[str, List[str]]:
+        """Return all controls satisfied by an attestation type.
+
+        Parameters
+        ----------
+        attestation_type : str
+            Key from ATTESTATION_TYPES.
+        framework : str, optional
+            If given, restrict to this framework only.
+
+        Returns
+        -------
+        Dict mapping framework_id -> list of control_ids.
+        """
+        info = ATTESTATION_TYPES.get(attestation_type, {})
+        controls = info.get('controls', {})
+        if framework:
+            subset = controls.get(framework, [])
+            return {framework: subset} if subset else {}
+        return dict(controls)
 
     def generate_compliance_summary(self, evidence_manager, framework: str) -> Dict:
         """Generate compliance summary for a framework."""
