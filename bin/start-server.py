@@ -156,6 +156,80 @@ def main():
     except Exception:
         pass
 
+    # License expiry check at startup
+    try:
+        from lib.licensing import LicenseManager
+        lm = LicenseManager.get_instance()
+        days_left = lm.days_until_expiry()
+        if days_left is not None:
+            if days_left < 0:
+                import logging
+                logging.getLogger('donjon').error(
+                    "LICENSE EXPIRED %d day(s) ago. "
+                    "Graceful degradation to community tier is active. "
+                    "Contact sales@donjonsec.com or use tools/license-refresh.py to renew.",
+                    abs(days_left),
+                )
+                print(
+                    f"\n  WARNING: License expired {abs(days_left)} day(s) ago.\n"
+                    f"  Running in community tier (graceful degradation).\n"
+                    f"  Renew at sales@donjonsec.com or use tools/license-refresh.py\n",
+                    file=sys.stderr,
+                )
+            elif days_left <= 30:
+                import logging
+                logging.getLogger('donjon').warning(
+                    "License expires in %d day(s). "
+                    "Contact sales@donjonsec.com or use tools/license-refresh.py to renew.",
+                    days_left,
+                )
+                print(
+                    f"\n  NOTICE: License expires in {days_left} day(s).\n"
+                    f"  Renew at sales@donjonsec.com or use tools/license-refresh.py\n",
+                    file=sys.stderr,
+                )
+    except Exception as e:
+        print(f"Warning: Could not check license expiry: {e}", file=sys.stderr)
+
+    # Sideloaded license check (USB / air-gap refresh)
+    try:
+        from lib.licensing import LicenseManager
+        from lib.paths import paths as _paths
+        sideload_path = _paths.home / "license.json"
+        if sideload_path.exists():
+            import json as _json
+            import shutil
+            _lm = LicenseManager.get_instance()
+            _data = _json.loads(sideload_path.read_text("utf-8"))
+            if _lm.validate_license(_data):
+                dest = _paths.data / "license.json"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(sideload_path), str(dest))
+                sideload_path.unlink()
+                _lm.reload()
+                print(
+                    f"\n  LICENSE IMPORTED: Sideloaded license from {sideload_path}\n"
+                    f"  Tier: {_lm.get_tier()}  Organization: {_lm.get_license_info().get('organization', '')}\n"
+                )
+                import logging
+                logging.getLogger('donjon').info(
+                    "Sideloaded license imported from %s (tier=%s)",
+                    sideload_path, _lm.get_tier(),
+                )
+            else:
+                print(
+                    f"\n  WARNING: Sideloaded license at {sideload_path} failed validation.\n"
+                    f"  The file was NOT imported. Check the signatures and expiry date.\n",
+                    file=sys.stderr,
+                )
+                import logging
+                logging.getLogger('donjon').warning(
+                    "Sideloaded license at %s failed validation -- not imported",
+                    sideload_path,
+                )
+    except Exception as e:
+        print(f"Warning: Could not check sideloaded license: {e}", file=sys.stderr)
+
     # Banner
     print()
     print("  ====================================")
