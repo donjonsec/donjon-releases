@@ -1,41 +1,45 @@
-# Task for Claude on Windows VM (192.168.1.200)
+# Task for Claude on Windows VM — DEBUG SSH
 
-## Fix SSH — Do This Now
-
-Replace the entire sshd_config with this minimal working config:
+Run these commands and write the output to C:\donjon-platform\VM-STATUS.md, then git add, commit, and push to origin main.
 
 ```powershell
-Set-Content "C:\ProgramData\ssh\sshd_config" @"
-Port 22
-PasswordAuthentication yes
-PermitRootLogin yes
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-Subsystem sftp sftp-server.exe
-"@
+$out = @()
+$out += "# VM Status Report"
+$out += ""
+$out += "## sshd_config contents"
+$out += '```'
+$out += (Get-Content C:\ProgramData\ssh\sshd_config)
+$out += '```'
+$out += ""
+$out += "## sshd service status"
+$out += (Get-Service sshd | Format-List Status, StartType | Out-String)
+$out += ""
+$out += "## Port 22 listening"
+$out += (netstat -an | Select-String ":22 " | Out-String)
+$out += ""
+$out += "## authorized_keys files"
+$out += "### ProgramData"
+$out += (Get-Content C:\ProgramData\ssh\administrators_authorized_keys -ErrorAction SilentlyContinue) ?? "FILE NOT FOUND"
+$out += "### User .ssh"
+$out += (Get-Content C:\Users\Administrator\.ssh\authorized_keys -ErrorAction SilentlyContinue) ?? "FILE NOT FOUND"
+$out += ""
+$out += "## AD Status"
+$out += (Get-ADDomain | Select-Object DNSRoot, NetBIOSName | Format-List | Out-String)
+$out += ""
+$out += "## AD Users"
+$out += (Get-ADUser -Filter * | Select-Object Name, SamAccountName | Format-Table | Out-String)
+$out += ""
+$out += "## Python"
+$out += (python --version 2>&1)
+$out += ""
+$out += "## IP"
+$out += (ipconfig | Select-String "IPv4" | Out-String)
 
-# Remove the administrators_authorized_keys file that overrides user keys
-Remove-Item "C:\ProgramData\ssh\administrators_authorized_keys" -Force -ErrorAction SilentlyContinue
-
-# Place the SSH key for the main workstation
-mkdir C:\Users\Administrator\.ssh -Force -ErrorAction SilentlyContinue
-Set-Content "C:\Users\Administrator\.ssh\authorized_keys" "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY"
-
-Restart-Service sshd
+$out | Set-Content C:\donjon-platform\VM-STATUS.md
+cd C:\donjon-platform
+git add VM-STATUS.md
+git commit -m "VM status report — SSH debug info"
+git push origin main
 ```
 
-## After SSH Works — Verify AD
-
-```powershell
-Get-ADDomain
-Get-ADUser -Filter * | Select-Object Name, SamAccountName
-```
-
-## Report Back
-
-Create a file at `C:\donjon-platform\VM-STATUS.md` with:
-- SSH status (working/not)
-- AD domain name
-- AD users created
-- Python version
-- IP address
+Run this entire block. The output will be pushed to the repo so the main session can read it.
