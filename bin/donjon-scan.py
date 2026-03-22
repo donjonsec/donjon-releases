@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -79,11 +78,12 @@ def run_scan(
     if not scanners:
         raise ValueError("scanners must not be empty")
 
-    session_id: str = str(uuid.uuid4())
-    logger.info("Starting scan session %s — targets=%s scanners=%s", session_id, targets, scanners)
-
     evidence_mgr = get_evidence_manager()
-    evidence_mgr.start_session(session_id, scan_type="cli_scan")
+    session_id: str = evidence_mgr.start_session(
+        scan_type="cli_scan",
+        target_networks=targets,
+    )
+    logger.info("Starting scan session %s — targets=%s scanners=%s", session_id, targets, scanners)
 
     findings_count: int = 0
     exit_code: int = 0
@@ -107,6 +107,7 @@ def run_scan(
                 len(result.get("vulnerabilities", [])) or
                 len(result.get("hosts", [])) or
                 result.get("results_count", 0) or
+                result.get("summary", {}).get("findings_count", 0) or
                 result.get("summary", {}).get("total_findings", 0) or
                 result.get("summary", {}).get("total_ports", 0) or
                 0
