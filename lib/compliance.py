@@ -729,6 +729,12 @@ class ComplianceMapper:
 
         return result
 
+    # Controls that ANY scanner finding inherently provides evidence for.
+    # Every finding from a vulnerability/security scanner demonstrates that
+    # vulnerability scanning (RA-5), risk assessment (RA-3), continuous
+    # monitoring (CA-7), and flaw remediation tracking (SI-2) are active.
+    _UNIVERSAL_NIST_CONTROLS: List[str] = ['RA-5', 'RA-3', 'CA-7']
+
     def _load_mappings(self):
         """Load finding-to-control mappings."""
         # Maps finding types to controls across all frameworks
@@ -737,7 +743,7 @@ class ComplianceMapper:
                 'open_port',
                 'Open network port detected',
                 {
-                    'nist_800_53': ['CM-7', 'SC-7'],
+                    'nist_800_53': ['CM-7', 'SC-7', 'AC-4'],
                     'hipaa': ['164.312(e)(1)'],
                     'pci_dss_4': ['1.1', '1.2'],
                     'soc2': ['CC6.6'],
@@ -749,7 +755,7 @@ class ComplianceMapper:
                 'ssl_vulnerability',
                 'SSL/TLS vulnerability or misconfiguration',
                 {
-                    'nist_800_53': ['SC-8', 'SC-13'],
+                    'nist_800_53': ['SC-8', 'SC-12', 'SC-13', 'SC-23'],
                     'hipaa': ['164.312(e)(1)'],
                     'pci_dss_4': ['4.1'],
                     'soc2': ['CC6.7'],
@@ -781,7 +787,7 @@ class ComplianceMapper:
                 'cve_vulnerability',
                 'Known CVE vulnerability detected',
                 {
-                    'nist_800_53': ['RA-5', 'SI-2'],
+                    'nist_800_53': ['RA-5', 'SI-2', 'SI-5', 'SA-11'],
                     'hipaa': ['164.308(a)(1)', '164.308(a)(8)'],
                     'pci_dss_4': ['6.1', '6.3', '11.3'],
                     'soc2': ['CC7.1'],
@@ -793,7 +799,7 @@ class ComplianceMapper:
                 'missing_patch',
                 'Missing security patch or update',
                 {
-                    'nist_800_53': ['SI-2'],
+                    'nist_800_53': ['SI-2', 'SI-5', 'MA-6'],
                     'hipaa': ['164.308(a)(1)'],
                     'pci_dss_4': ['6.1', '6.3'],
                     'soc2': ['CC7.1'],
@@ -804,7 +810,7 @@ class ComplianceMapper:
                 'web_vulnerability',
                 'Web application vulnerability detected',
                 {
-                    'nist_800_53': ['RA-5', 'SI-2'],
+                    'nist_800_53': ['RA-5', 'SI-2', 'SA-11', 'SI-10'],
                     'pci_dss_4': ['6.2', '6.3', '11.3'],
                     'soc2': ['CC7.1'],
                     'iso_27001_2022': ['8.8']
@@ -814,7 +820,7 @@ class ComplianceMapper:
                 'authentication_weakness',
                 'Weak authentication configuration',
                 {
-                    'nist_800_53': ['IA-2', 'IA-5'],
+                    'nist_800_53': ['IA-2', 'IA-5', 'IA-6', 'IA-8', 'AC-7'],
                     'hipaa': ['164.312(d)'],
                     'pci_dss_4': ['8.3'],
                     'soc2': ['CC6.1'],
@@ -826,7 +832,7 @@ class ComplianceMapper:
                 'default_credentials',
                 'Default or weak credentials in use',
                 {
-                    'nist_800_53': ['IA-5'],
+                    'nist_800_53': ['IA-5', 'IA-2', 'IA-6'],
                     'hipaa': ['164.312(d)'],
                     'pci_dss_4': ['2.1', '8.3'],
                     'soc2': ['CC6.1'],
@@ -838,7 +844,7 @@ class ComplianceMapper:
                 'insecure_configuration',
                 'Insecure system or service configuration',
                 {
-                    'nist_800_53': ['CM-2', 'CM-6'],
+                    'nist_800_53': ['CM-2', 'CM-6', 'CM-3', 'SA-8'],
                     'hipaa': ['164.312(a)(1)'],
                     'pci_dss_4': ['2.1', '2.2'],
                     'soc2': ['CC6.1'],
@@ -849,7 +855,7 @@ class ComplianceMapper:
                 'missing_logging',
                 'Insufficient logging or monitoring',
                 {
-                    'nist_800_53': ['AU-2', 'AU-6', 'SI-4'],
+                    'nist_800_53': ['AU-2', 'AU-3', 'AU-6', 'AU-8', 'AU-12', 'SI-4'],
                     'hipaa': ['164.312(b)'],
                     'pci_dss_4': ['10.1', '10.2'],
                     'soc2': ['CC7.2'],
@@ -860,7 +866,7 @@ class ComplianceMapper:
                 'information_disclosure',
                 'Sensitive information disclosure',
                 {
-                    'nist_800_53': ['AC-3', 'SC-8'],
+                    'nist_800_53': ['AC-3', 'SC-8', 'SC-28', 'SI-12'],
                     'hipaa': ['164.312(e)(1)', '164.312(c)(1)'],
                     'pci_dss_4': ['3.1', '3.5'],
                     'soc2': ['CC6.7'],
@@ -871,7 +877,7 @@ class ComplianceMapper:
                 'network_service',
                 'Network service discovery',
                 {
-                    'nist_800_53': ['CM-7', 'SC-7'],
+                    'nist_800_53': ['CM-7', 'CM-8', 'SC-7', 'AC-4', 'AC-17'],
                     'pci_dss_4': ['1.1', '1.2'],
                     'soc2': ['CC6.6'],
                     'iso_27001_2022': ['8.20', '8.21']
@@ -881,7 +887,7 @@ class ComplianceMapper:
                 'host_discovery',
                 'Host/asset discovery',
                 {
-                    'nist_800_53': ['CM-8'],
+                    'nist_800_53': ['CM-8', 'PM-5'],
                     'pci_dss_4': ['1.1'],
                     'soc2': ['CC6.1'],
                     'iso_27001_2022': ['8.1']
@@ -892,7 +898,7 @@ class ComplianceMapper:
                 'endpoint_protection',
                 'Endpoint protection/antivirus configuration',
                 {
-                    'nist_800_53': ['SI-3', 'SI-4'],
+                    'nist_800_53': ['SI-3', 'SI-4', 'SI-8', 'SC-44'],
                     'hipaa': ['164.308(a)(1)'],
                     'pci_dss_4': ['5.1', '5.2'],
                     'soc2': ['CC6.8'],
@@ -903,7 +909,7 @@ class ComplianceMapper:
                 'disk_encryption',
                 'Disk/volume encryption status',
                 {
-                    'nist_800_53': ['SC-28'],
+                    'nist_800_53': ['SC-28', 'MP-5'],
                     'hipaa': ['164.312(a)(1)'],
                     'pci_dss_4': ['3.5'],
                     'soc2': ['CC6.7'],
@@ -914,7 +920,7 @@ class ComplianceMapper:
                 'firewall_config',
                 'Host firewall configuration',
                 {
-                    'nist_800_53': ['SC-7'],
+                    'nist_800_53': ['SC-7', 'AC-4', 'SC-5'],
                     'pci_dss_4': ['1.1', '1.2'],
                     'soc2': ['CC6.6'],
                     'iso_27001_2022': ['8.20']
@@ -924,7 +930,7 @@ class ComplianceMapper:
                 'audit_policy',
                 'System audit/logging policy',
                 {
-                    'nist_800_53': ['AU-2', 'AU-6'],
+                    'nist_800_53': ['AU-2', 'AU-3', 'AU-6', 'AU-8', 'AU-9', 'AU-12'],
                     'hipaa': ['164.312(b)'],
                     'pci_dss_4': ['10.1', '10.2'],
                     'soc2': ['CC7.2'],
@@ -935,7 +941,7 @@ class ComplianceMapper:
                 'password_policy',
                 'Password/credential policy',
                 {
-                    'nist_800_53': ['IA-5'],
+                    'nist_800_53': ['IA-5', 'IA-2', 'IA-4', 'IA-6'],
                     'hipaa': ['164.312(d)'],
                     'pci_dss_4': ['8.3'],
                     'soc2': ['CC6.1'],
@@ -946,7 +952,7 @@ class ComplianceMapper:
                 'account_hygiene',
                 'User account management and hygiene',
                 {
-                    'nist_800_53': ['AC-2', 'AC-6'],
+                    'nist_800_53': ['AC-2', 'AC-5', 'AC-6', 'AC-11', 'AC-17'],
                     'pci_dss_4': ['8.1', '7.1'],
                     'soc2': ['CC6.1'],
                     'iso_27001_2022': ['5.15']
@@ -984,16 +990,158 @@ class ComplianceMapper:
             ),
         }
 
-    def get_controls_for_finding(self, finding_type: str, frameworks: List[str] = None) -> Dict[str, List[str]]:
-        """Get applicable controls for a finding type."""
-        if finding_type not in self.mappings:
+    # Keyword-to-finding-type map for intelligent secondary matching.
+    # Each entry: keyword (lowercased) -> list of finding_type keys that apply.
+    _KEYWORD_FINDING_MAP: Dict[str, List[str]] = {
+        # Network / firewall
+        'firewall': ['firewall_config', 'open_port'],
+        'iptables': ['firewall_config'],
+        'nftables': ['firewall_config'],
+        'network boundary': ['firewall_config', 'network_service'],
+        'open port': ['open_port', 'network_service'],
+        'listening port': ['open_port', 'network_service'],
+        'smb': ['open_port', 'network_service', 'insecure_configuration'],
+        'rdp': ['open_port', 'network_service', 'authentication_weakness'],
+        'telnet': ['open_port', 'insecure_configuration'],
+        'ftp': ['open_port', 'insecure_configuration'],
+        'ssh': ['open_port', 'network_service'],
+        'port': ['open_port', 'network_service'],
+        # Authentication / passwords
+        'password': ['password_policy', 'authentication_weakness'],
+        'credential': ['default_credentials', 'authentication_weakness'],
+        'default credential': ['default_credentials'],
+        'weak password': ['password_policy', 'authentication_weakness'],
+        'authentication': ['authentication_weakness'],
+        'mfa': ['authentication_weakness'],
+        'multi-factor': ['authentication_weakness'],
+        'brute force': ['authentication_weakness', 'password_policy'],
+        'lockout': ['password_policy', 'authentication_weakness'],
+        # Encryption / SSL / TLS
+        'ssl': ['ssl_vulnerability'],
+        'tls': ['ssl_vulnerability'],
+        'certificate': ['expired_certificate', 'ssl_vulnerability'],
+        'cipher': ['weak_cipher'],
+        'encryption': ['ssl_vulnerability', 'disk_encryption'],
+        'bitlocker': ['disk_encryption'],
+        'cryptograph': ['weak_cipher', 'ssl_vulnerability'],
+        # Logging / audit
+        'logging': ['missing_logging', 'audit_policy'],
+        'log': ['missing_logging', 'audit_policy'],
+        'audit': ['audit_policy', 'missing_logging'],
+        'siem': ['missing_logging'],
+        'monitoring': ['missing_logging'],
+        'event log': ['missing_logging', 'audit_policy'],
+        # Vulnerabilities / patching
+        'cve': ['cve_vulnerability'],
+        'vulnerability': ['cve_vulnerability', 'web_vulnerability'],
+        'patch': ['missing_patch'],
+        'update': ['missing_patch'],
+        'outdated': ['missing_patch'],
+        'eol': ['missing_patch'],
+        'end of life': ['missing_patch'],
+        # Configuration
+        'configuration': ['insecure_configuration'],
+        'misconfiguration': ['insecure_configuration'],
+        'hardening': ['insecure_configuration'],
+        'baseline': ['insecure_configuration'],
+        'cis benchmark': ['insecure_configuration'],
+        # Access control / accounts
+        'privilege': ['privilege_escalation', 'account_hygiene'],
+        'admin': ['privilege_escalation', 'account_hygiene'],
+        'administrator': ['privilege_escalation', 'account_hygiene'],
+        'least privilege': ['privilege_escalation'],
+        'account': ['account_hygiene'],
+        'user account': ['account_hygiene'],
+        'stale account': ['account_hygiene'],
+        'inactive account': ['account_hygiene'],
+        'access control': ['account_hygiene', 'insecure_configuration'],
+        # Endpoint / malware
+        'antivirus': ['endpoint_protection'],
+        'anti-virus': ['endpoint_protection'],
+        'malware': ['endpoint_protection'],
+        'endpoint protection': ['endpoint_protection'],
+        'windows defender': ['endpoint_protection'],
+        'edr': ['endpoint_protection'],
+        # Information disclosure
+        'information disclosure': ['information_disclosure'],
+        'sensitive data': ['information_disclosure'],
+        'data exposure': ['information_disclosure'],
+        'data leak': ['information_disclosure'],
+        # Web
+        'xss': ['web_vulnerability'],
+        'sql injection': ['web_vulnerability'],
+        'sqli': ['web_vulnerability'],
+        'csrf': ['web_vulnerability'],
+        'injection': ['web_vulnerability'],
+        'web application': ['web_vulnerability'],
+        # Scheduled tasks / services
+        'scheduled task': ['scheduled_task_anomaly'],
+        'cron': ['scheduled_task_anomaly'],
+        'service': ['network_service'],
+        # AI
+        'unauthorized ai': ['unauthorized_ai'],
+        'ai tool': ['unauthorized_ai'],
+        'copilot': ['unauthorized_ai'],
+        'chatgpt': ['unauthorized_ai'],
+    }
+
+    def infer_finding_types(self, title: str, description: str = '') -> Set[str]:
+        """Infer applicable finding_type keys from a finding's title and description.
+
+        Uses keyword matching against ``_KEYWORD_FINDING_MAP`` to broaden
+        control coverage beyond the explicit ``finding_type`` assigned by the
+        scanner.  Returns a set of finding_type strings.
+        """
+        text = f"{title} {description}".lower()
+        matched: Set[str] = set()
+        for keyword, types in self._KEYWORD_FINDING_MAP.items():
+            if keyword in text:
+                matched.update(types)
+        return matched
+
+    def get_controls_for_finding(self, finding_type: str, frameworks: List[str] = None,
+                                  title: str = '', description: str = '') -> Dict[str, List[str]]:
+        """Get applicable controls for a finding type, enhanced with keyword inference.
+
+        If *title* or *description* are provided, keyword-based inference is
+        used to discover additional matching finding types beyond the explicit
+        ``finding_type``, broadening control coverage without false positives.
+        """
+        # Start with the explicit finding_type
+        types_to_check: Set[str] = set()
+        if finding_type in self.mappings:
+            types_to_check.add(finding_type)
+
+        # Augment with keyword-inferred types
+        if title or description:
+            types_to_check.update(self.infer_finding_types(title, description))
+
+        if not types_to_check:
             return {}
 
-        mapping = self.mappings[finding_type]
+        # Merge controls from all matched types
+        merged: Dict[str, List[str]] = {}
+        for ft in types_to_check:
+            mapping = self.mappings.get(ft)
+            if not mapping:
+                continue
+            for fw, ctrls in mapping.controls.items():
+                if frameworks and fw not in frameworks:
+                    continue
+                existing = merged.setdefault(fw, [])
+                for c in ctrls:
+                    if c not in existing:
+                        existing.append(c)
 
-        if frameworks:
-            return {fw: ctrls for fw, ctrls in mapping.controls.items() if fw in frameworks}
-        return mapping.controls
+        # Append universal NIST controls that every scan finding supports
+        nist_key = 'nist_800_53'
+        if not frameworks or nist_key in frameworks:
+            existing = merged.setdefault(nist_key, [])
+            for c in self._UNIVERSAL_NIST_CONTROLS:
+                if c not in existing:
+                    existing.append(c)
+
+        return merged
 
     def get_all_controls_for_framework(self, framework: str) -> Dict[str, Control]:
         """Get all controls for a specific framework."""
@@ -1009,9 +1157,16 @@ class ComplianceMapper:
         return list(self.controls.keys())
 
     def map_finding_to_controls(self, finding_type: str, evidence_id: str,
-                                 evidence_manager, frameworks: List[str] = None):
-        """Map a finding's evidence to all applicable controls."""
-        controls = self.get_controls_for_finding(finding_type, frameworks)
+                                 evidence_manager, frameworks: List[str] = None,
+                                 title: str = '', description: str = ''):
+        """Map a finding's evidence to all applicable controls.
+
+        Uses both the explicit *finding_type* and keyword inference from
+        *title*/*description* to maximise control coverage.
+        """
+        controls = self.get_controls_for_finding(
+            finding_type, frameworks, title=title, description=description
+        )
 
         for framework, control_ids in controls.items():
             for control_id in control_ids:

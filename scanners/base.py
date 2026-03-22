@@ -223,10 +223,11 @@ class BaseScanner(ABC):
                 scanner_name=self.SCANNER_NAME,
             )
 
-            # Map to compliance controls
+            # Map to compliance controls (keyword-enhanced)
             frameworks = self.config.get_frameworks()
             self.compliance.map_finding_to_controls(
-                finding_type, evidence_id, self.evidence, frameworks
+                finding_type, evidence_id, self.evidence, frameworks,
+                title=title, description=description
             )
 
     def save_results(self, filename: str = None) -> Path:

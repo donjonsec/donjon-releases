@@ -140,6 +140,7 @@ class EvidenceManager:
             ('findings', 'false_positive', 'INTEGER DEFAULT 0'),
             ('findings', 'fp_reason', 'TEXT'),
             ('findings', 'scanner_name', 'TEXT'),
+            ('findings', 'seen_count', 'INTEGER DEFAULT 1'),
         ]
 
         with sqlite3.connect(self.db_path) as conn:
@@ -291,19 +292,48 @@ class EvidenceManager:
                     cvss_score: float = 0.0, cve_ids: List[str] = None,
                     remediation: str = '', evidence_id: str = None,
                     metadata: Optional[Dict] = None) -> str:
-        """Add a security finding."""
-        finding_id = self._generate_id('FND')
+        """Add a security finding with cross-session deduplication.
+
+        Before inserting, checks whether an identical finding (same title,
+        affected_asset, and CVE set) already exists in *any* session.  If a
+        duplicate is found the existing row's timestamp is refreshed, its
+        ``seen_count`` is incremented, and the existing ``finding_id`` is
+        returned — no new row is created.
+        """
+        cve_json = json.dumps(sorted(cve_ids) if cve_ids else [])
 
         with sqlite3.connect(self.db_path) as conn:
+            # --- dedup check: same title + asset + CVEs = duplicate ---
+            row = conn.execute('''
+                SELECT finding_id FROM findings
+                WHERE title = ? AND affected_asset = ? AND cve_ids = ?
+                ORDER BY timestamp DESC LIMIT 1
+            ''', (title, affected_asset, cve_json)).fetchone()
+
+            if row:
+                existing_id = row[0]
+                now = datetime.now(timezone.utc).isoformat()
+                # Bump seen_count (defaults to 1 for legacy rows)
+                conn.execute('''
+                    UPDATE findings
+                    SET timestamp = ?,
+                        seen_count = COALESCE(seen_count, 1) + 1
+                    WHERE finding_id = ?
+                ''', (now, existing_id))
+                return existing_id
+
+            # --- new finding ---
+            finding_id = self._generate_id('FND')
             conn.execute('''
                 INSERT INTO findings
                 (finding_id, session_id, evidence_id, timestamp, severity, title,
-                 description, affected_asset, cvss_score, cve_ids, remediation, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 description, affected_asset, cvss_score, cve_ids, remediation,
+                 metadata, seen_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             ''', (
                 finding_id, session_id, evidence_id,
                 datetime.now(timezone.utc).isoformat(), severity, title, description,
-                affected_asset, cvss_score, json.dumps(cve_ids or []),
+                affected_asset, cvss_score, cve_json,
                 remediation, json.dumps(metadata or {})
             ))
 
