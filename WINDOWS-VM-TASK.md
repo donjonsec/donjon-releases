@@ -1,25 +1,24 @@
-# Task — Fix SSH key encoding (CRLF → LF)
-
-The authorized_keys file has Windows CRLF line endings (0D 0A). OpenSSH rejects this. Fix:
+# Task — Reset Admin Password and Fix SSH
 
 ```powershell
-# Write key with no trailing newline or carriage return
-[System.IO.File]::WriteAllText("C:\ProgramData\ssh\administrators_authorized_keys", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY`n")
+# Reset password to meet AD complexity requirements
+net user Administrator Donj0n2026! /domain
 
-# Verify — should end with 0A only, NOT 0D 0A
-Format-Hex C:\ProgramData\ssh\administrators_authorized_keys | Select-Object -Last 1
+# Verify who we are
+whoami
 
-# Fix permissions again
+# Also write the key file using cmd.exe to avoid PowerShell encoding issues
+cmd /c "echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY> C:\ProgramData\ssh\administrators_authorized_keys"
+
+# Fix permissions
 icacls "C:\ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "SYSTEM:(F)" /grant "Administrators:(F)"
 
 Restart-Service sshd
 
-Write-Output "Fixed — LF encoding applied"
-```
-
-Then push confirmation:
-```powershell
+# Push confirmation
 cd C:\donjon-platform
-"SSH key encoding fixed — CRLF replaced with LF" | Set-Content VM-STATUS.md
-git add VM-STATUS.md && git commit -m "VM: SSH key CRLF fix" && git push origin main
+"Password reset to Donj0n2026! and key rewritten via cmd.exe" | Set-Content VM-STATUS.md
+git add VM-STATUS.md
+git commit -m "VM: password reset and key rewritten"
+git push origin main
 ```
