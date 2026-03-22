@@ -1,29 +1,25 @@
-# Task for Claude on Windows VM — SSH Debug Round 2
+# Task — Fix SSH key encoding (CRLF → LF)
 
-Run this and push results:
+The authorized_keys file has Windows CRLF line endings (0D 0A). OpenSSH rejects this. Fix:
 
 ```powershell
-$out = @()
-$out += "# SSH Debug Round 2"
-$out += ""
-$out += "## File permissions on administrators_authorized_keys"
-$out += (icacls C:\ProgramData\ssh\administrators_authorized_keys 2>&1 | Out-String)
-$out += ""
-$out += "## OpenSSH event log"
-$out += (Get-WinEvent -LogName "OpenSSH/Operational" -MaxEvents 10 -ErrorAction SilentlyContinue | Format-List TimeCreated,Message | Out-String)
-$out += ""
-$out += "## sshd_config full dump"
-$out += (type C:\ProgramData\ssh\sshd_config | Out-String)
-$out += ""
-$out += "## administrators_authorized_keys content"
-$out += (type C:\ProgramData\ssh\administrators_authorized_keys 2>&1 | Out-String)
-$out += ""
-$out += "## File encoding check"
-$out += (Format-Hex C:\ProgramData\ssh\administrators_authorized_keys -Count 100 2>&1 | Out-String)
+# Write key with no trailing newline or carriage return
+[System.IO.File]::WriteAllText("C:\ProgramData\ssh\administrators_authorized_keys", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY`n")
 
-$out | Set-Content C:\donjon-platform\VM-STATUS.md
+# Verify — should end with 0A only, NOT 0D 0A
+Format-Hex C:\ProgramData\ssh\administrators_authorized_keys | Select-Object -Last 1
+
+# Fix permissions again
+icacls "C:\ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "SYSTEM:(F)" /grant "Administrators:(F)"
+
+Restart-Service sshd
+
+Write-Output "Fixed — LF encoding applied"
+```
+
+Then push confirmation:
+```powershell
 cd C:\donjon-platform
-git add VM-STATUS.md
-git commit -m "VM: SSH debug round 2 — permissions and logs"
-git push origin main
+"SSH key encoding fixed — CRLF replaced with LF" | Set-Content VM-STATUS.md
+git add VM-STATUS.md && git commit -m "VM: SSH key CRLF fix" && git push origin main
 ```
