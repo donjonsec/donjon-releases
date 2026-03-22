@@ -1,137 +1,109 @@
-# Task — Fix SSH + Disable Screen Lock + Log Learnings
+# Task — Fix SSH on Domain Controller (Research-Backed)
 
-Execute all steps in order.
+Execute in order. These are the top fixes from GitHub issues and Microsoft docs.
 
-## Step 1: Disable Screen Lock
-
+## Fix 1: Change sshd to run as LocalSystem
 ```powershell
-powercfg -change -monitor-timeout-ac 0
-powercfg -change -standby-timeout-ac 0
-reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization" /v NoLockScreen /t REG_DWORD /d 1 /f
-reg add "HKCU\Control Panel\Desktop" /v ScreenSaveActive /t REG_SZ /d 0 /f
-reg add "HKCU\Control Panel\Desktop" /v ScreenSaverIsSecure /t REG_SZ /d 0 /f
-reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v InactivityTimeoutSecs /t REG_DWORD /d 0 /f
-Write-Output "Screen lock disabled"
+sc.exe config sshd obj= "LocalSystem"
+Restart-Service sshd
+Write-Output "sshd now runs as LocalSystem"
 ```
 
-## Step 2: Fix SSH — Full Nuclear Approach
-
-The SSH key auth keeps failing. Debug and fix it completely.
-
+## Fix 2: Re-enable key auth with proper config
 ```powershell
-# Stop sshd
-Stop-Service sshd
-
-# Write a minimal sshd_config that ONLY uses password auth (no key complexity)
-$config = "Port 22`nPasswordAuthentication yes`nPubkeyAuthentication no`nSubsystem sftp sftp-server.exe"
+$config = @"
+Port 22
+PasswordAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+LogLevel DEBUG
+Subsystem sftp sftp-server.exe
+"@
 [System.IO.File]::WriteAllText("C:\ProgramData\ssh\sshd_config", $config, [System.Text.Encoding]::ASCII)
 
-# Remove ALL authorized_keys files to eliminate key conflicts
-Remove-Item "C:\ProgramData\ssh\administrators_authorized_keys" -Force -ErrorAction SilentlyContinue
-Remove-Item "C:\Users\Administrator\.ssh\authorized_keys" -Force -ErrorAction SilentlyContinue
+# Write the SSH key properly — ASCII, LF only
+$key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY"
+$bytes = [System.Text.Encoding]::ASCII.GetBytes($key + [char]10)
+[System.IO.File]::WriteAllBytes("C:\ProgramData\ssh\administrators_authorized_keys", $bytes)
+icacls "C:\ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "SYSTEM:(F)" /grant "Administrators:(F)"
 
-# Ensure admin password is set and known
-net user Administrator "Donj0n2026!" /domain
-
-# Start sshd
-Start-Service sshd
-
-# Wait and test locally
-Start-Sleep -Seconds 3
-$testResult = Test-NetConnection -ComputerName localhost -Port 22
-Write-Output "Port 22 open: $($testResult.TcpTestSucceeded)"
-Write-Output "sshd status: $((Get-Service sshd).Status)"
-
-# Dump the config to verify
-Write-Output "--- sshd_config ---"
-type C:\ProgramData\ssh\sshd_config
-Write-Output "--- end config ---"
-
-# Check Windows Firewall
-$rules = Get-NetFirewallRule -DisplayName "*SSH*" -ErrorAction SilentlyContinue
-if ($rules) {
-    Write-Output "Firewall rules for SSH:"
-    $rules | Format-Table DisplayName, Enabled, Direction, Action
-} else {
-    Write-Output "No SSH firewall rules found — adding one"
-    New-NetFirewallRule -Name "OpenSSH-Server" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
-    Write-Output "Firewall rule added"
-}
-
-# Check if AD Group Policy is overriding SSH settings
-$gpoResult = gpresult /r /scope:computer 2>&1 | Select-String -Pattern "SSH|Security|Logon" | Out-String
-if ($gpoResult) {
-    Write-Output "GPO matches:"
-    Write-Output $gpoResult
-}
-
-# Check if the account is locked or restricted
-$adminUser = Get-ADUser -Identity Administrator -Properties LockedOut, Enabled, PasswordExpired, PasswordLastSet
-Write-Output "Admin account status:"
-Write-Output "  Locked: $($adminUser.LockedOut)"
-Write-Output "  Enabled: $($adminUser.Enabled)"
-Write-Output "  Password expired: $($adminUser.PasswordExpired)"
-Write-Output "  Password last set: $($adminUser.PasswordLastSet)"
-
-# Check LogonType restrictions
-$secPol = secedit /export /cfg C:\donjon-agent\secpol.cfg 2>&1
-$logonRight = Select-String -Path C:\donjon-agent\secpol.cfg -Pattern "SeNetworkLogonRight|SeDenyNetworkLogonRight|SeInteractiveLogonRight" -ErrorAction SilentlyContinue
-if ($logonRight) {
-    Write-Output "Logon rights:"
-    $logonRight | ForEach-Object { Write-Output "  $_" }
-}
-
-# Test SSH to self
-Write-Output "Testing SSH to localhost..."
-$sshTest = ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes administrator@localhost "echo SSH_WORKS" 2>&1
-Write-Output "SSH self-test result: $sshTest"
+Restart-Service sshd
+Write-Output "sshd config reset with key auth + password auth"
 ```
 
-## Step 3: Push All Results
+## Fix 3: Fix GPO logon rights
+```powershell
+# Check current rights
+secedit /export /cfg C:\donjon-agent\secpol2.cfg
+$deny = Select-String -Path C:\donjon-agent\secpol2.cfg -Pattern "SeDenyNetworkLogonRight"
+$allow = Select-String -Path C:\donjon-agent\secpol2.cfg -Pattern "SeNetworkLogonRight"
+Write-Output "Deny network logon: $deny"
+Write-Output "Allow network logon: $allow"
 
+# Force GPO refresh
+gpupdate /force
+```
+
+## Fix 4: Check Security Event Log for exact failure
+```powershell
+$events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} -MaxEvents 5 -ErrorAction SilentlyContinue
+if ($events) {
+    foreach ($e in $events) {
+        $xml = [xml]$e.ToXml()
+        $subStatus = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'SubStatus'}).'#text'
+        $logonType = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'LogonType'}).'#text'
+        $targetUser = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'TargetUserName'}).'#text'
+        Write-Output "4625: User=$targetUser LogonType=$logonType SubStatus=$subStatus"
+    }
+} else {
+    Write-Output "No 4625 events found"
+}
+```
+
+## Fix 5: Check sshd service account
+```powershell
+$svc = Get-WmiObject win32_service | Where-Object {$_.Name -eq 'sshd'}
+Write-Output "sshd runs as: $($svc.StartName)"
+Write-Output "sshd state: $($svc.State)"
+```
+
+## Push Results
 ```powershell
 $out = @()
-$out += "# VM Status — SSH Debug + Screen Lock — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$out += "# SSH Fix Results — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 $out += ""
-$out += "## Screen Lock"
-$out += "Disabled: Yes"
-$out += ""
-$out += "## SSH Debug"
-$out += "Port 22: $((Test-NetConnection -ComputerName localhost -Port 22).TcpTestSucceeded)"
-$out += "sshd: $((Get-Service sshd).Status)"
+$out += "## sshd service account"
+$svc = Get-WmiObject win32_service | Where-Object {$_.Name -eq 'sshd'}
+$out += "Runs as: $($svc.StartName)"
+$out += "State: $($svc.State)"
 $out += ""
 $out += "## sshd_config"
 $out += (type C:\ProgramData\ssh\sshd_config | Out-String)
 $out += ""
-$out += "## Admin Account"
-$admin = Get-ADUser -Identity Administrator -Properties LockedOut, Enabled, PasswordExpired
-$out += "Locked: $($admin.LockedOut)"
-$out += "Enabled: $($admin.Enabled)"
-$out += "Password Expired: $($admin.PasswordExpired)"
-$out += ""
-$out += "## Firewall"
-$fwRules = Get-NetFirewallRule -DisplayName "*SSH*" -ErrorAction SilentlyContinue
-if ($fwRules) {
-    $out += ($fwRules | Format-Table DisplayName, Enabled, Direction, Action | Out-String)
+$out += "## Security Event 4625 (logon failures)"
+$events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} -MaxEvents 5 -ErrorAction SilentlyContinue
+if ($events) {
+    foreach ($e in $events) {
+        $xml = [xml]$e.ToXml()
+        $sub = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'SubStatus'}).'#text'
+        $lt = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'LogonType'}).'#text'
+        $usr = ($xml.Event.EventData.Data | Where-Object {$_.Name -eq 'TargetUserName'}).'#text'
+        $out += "  User=$usr LogonType=$lt SubStatus=$sub"
+    }
 } else {
-    $out += "No SSH rules"
+    $out += "  No 4625 events"
 }
 $out += ""
-$out += "## Logon Rights"
-if (Test-Path C:\donjon-agent\secpol.cfg) {
-    $rights = Select-String -Path C:\donjon-agent\secpol.cfg -Pattern "SeNetworkLogonRight|SeDenyNetworkLogonRight" -ErrorAction SilentlyContinue
-    $out += ($rights | Out-String)
-} else {
-    $out += "Could not export security policy"
-}
+$out += "## GPO Network Logon Rights"
+secedit /export /cfg C:\donjon-agent\secpol2.cfg 2>$null
+$out += (Select-String -Path C:\donjon-agent\secpol2.cfg -Pattern "SeNetworkLogonRight|SeDenyNetworkLogonRight" | Out-String)
 $out += ""
-$out += "## SSH Self-Test"
-$selfTest = ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes administrator@localhost "echo SSH_WORKS" 2>&1
-$out += "Result: $selfTest"
+$out += "## SSH Self-Test (password)"
+$out += (ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 administrator@localhost "echo SSH_WORKS" 2>&1 | Out-String)
 
 $out | Set-Content C:\donjon-platform\VM-STATUS.md -Encoding UTF8
 cd C:\donjon-platform
 git add VM-STATUS.md
-git commit -m "VM: SSH full debug + screen lock disabled"
+git commit -m "VM: SSH fix with LocalSystem + security event analysis"
 git push origin main
 ```
