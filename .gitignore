@@ -27,6 +27,9 @@ data/risk_register.db
 data/notifications.db
 data/scheduler.db
 
+# Demo output (runtime generated)
+data/demo/
+
 # Test artifacts
 data/test_report.json
 data/test_report.xml
