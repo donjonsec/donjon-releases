@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-03-22T03:21:38Z",
+  "platform": "win32",
+  "python": "3.13.5",
+  "benchmarks": {
+    "config_load": {
+      "seconds": 0.043,
+      "threshold": 1.0
+    },
+    "compliance_load": {
+      "seconds": 0.992,
+      "threshold": 2.0
+    },
+    "framework_query": {
+      "seconds": 0.0,
+      "threshold": 1.0,
+      "count": 31
+    },
+    "evidence_init": {
+      "seconds": 0.022,
+      "threshold": 1.0
+    },
+    "sarif_export_100": {
+      "seconds": 0.004,
+      "threshold": 5.0,
+      "bytes": 32504
+    },
+    "windows_scan_quick": {
+      "seconds": 15.463,
+      "threshold": 30.0,
+      "checks": 5
+    },
+    "server_startup": {
+      "seconds": 0.596,
+      "threshold": 10.0
+    }
+  }
+}
