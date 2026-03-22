@@ -393,6 +393,36 @@ def generate_shell() -> str:
         _tab_html["trends"] = generate_trends()
     except Exception:
         pass
+    try:
+        from web.dashboard_compliance_html import generate_compliance_html
+        _tab_html["compliance"] = generate_compliance_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_risk_html import generate_risk_html
+        _tab_html["risk-analysis"] = generate_risk_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_schedules_html import generate_schedules_html
+        _tab_html["schedules"] = generate_schedules_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_ai_html import generate_ai_html
+        _tab_html["ai-assistant"] = generate_ai_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_settings_html import generate_settings_html
+        _tab_html["settings"] = generate_settings_html()
+    except Exception:
+        pass
+    try:
+        from web.dashboard_patch_html import generate_patch_html
+        _tab_html["patch-verification"] = generate_patch_html()
+    except Exception:
+        pass
 
     for tab_id in all_tabs:
         active = ' active' if tab_id == 'overview' else ''
