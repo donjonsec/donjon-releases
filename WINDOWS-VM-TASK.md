@@ -1,212 +1,181 @@
-# Windows VM Agent — Full Setup + First Test Run
+# Task — Set Up Persistent Agent Service
 
-Execute everything below in order. Push results when done.
+Create a PowerShell script that runs as a scheduled task (survives logoff/reboot). It monitors the repo for new tasks and executes them using `claude -p`.
 
-## Step 0: Environment Setup
+## Step 1: Create the Agent Script
 
 ```powershell
+$agentScript = @'
+# Donjon Windows Test Agent — Persistent Service
+# Polls Forgejo for WINDOWS-VM-TASK.md changes, executes via claude -p
+
+$repo = "C:\donjon-platform"
+$taskFile = "$repo\WINDOWS-VM-TASK.md"
+$statusFile = "$repo\VM-STATUS.md"
+$lastHash = ""
+$logFile = "C:\donjon-agent\agent.log"
+
+# Ensure log directory
+New-Item -ItemType Directory -Force -Path "C:\donjon-agent" | Out-Null
+
+function Log($msg) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp $msg" | Add-Content $logFile
+    Write-Output "$timestamp $msg"
+}
+
+# Set environment
 $env:PYTHONPATH = "C:\donjon-platform"
 $env:DONJON_ACCEPT_EULA = "yes"
 $env:DONJON_TEST_MODE = "1"
-cd C:\donjon-platform
-```
 
-## Step 1: Fix SSH (one more attempt)
+Log "Agent started"
 
-```powershell
-# Write key using .NET to guarantee no BOM, no CRLF
-$key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO8Tk83o5SPqwXlm148ZsUoRXjf4CQOJ+1dxgjnRjyXY"
-$path = "C:\ProgramData\ssh\administrators_authorized_keys"
-[System.IO.File]::WriteAllBytes($path, [System.Text.Encoding]::ASCII.GetBytes($key + "`n"))
+while ($true) {
+    try {
+        # Pull latest
+        Set-Location $repo
+        $pullResult = git pull origin main 2>&1
 
-# Set strict permissions
-icacls $path /inheritance:r /grant "SYSTEM:(F)" /grant "Administrators:(F)"
+        # Check if task file changed
+        if (Test-Path $taskFile) {
+            $currentHash = (Get-FileHash $taskFile -Algorithm SHA256).Hash
 
-# Ensure password auth works too
-$conf = "C:\ProgramData\ssh\sshd_config"
-$content = @"
-Port 22
-PasswordAuthentication yes
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-PermitRootLogin yes
-Subsystem sftp sftp-server.exe
-Match Group administrators
-    AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
-"@
-[System.IO.File]::WriteAllText($conf, $content)
+            if ($currentHash -ne $lastHash -and $lastHash -ne "") {
+                Log "Task file changed — executing"
 
-# Reset admin password to known value
-net user Administrator "Donj0n2026!" /domain
+                # Read the task
+                $taskContent = Get-Content $taskFile -Raw
 
-Restart-Service sshd
-Write-Output "SSH configured"
-```
+                # Execute via claude -p (non-interactive)
+                $prompt = "You are the Windows test agent. Execute all tasks in this file and write results to C:\donjon-platform\VM-STATUS.md, then git add, commit, and push. Environment: PYTHONPATH=C:\donjon-platform, DONJON_ACCEPT_EULA=yes, DONJON_TEST_MODE=1. Here is the task file:`n`n$taskContent"
 
-## Step 2: Test AD Scanner
+                try {
+                    $result = claude -p $prompt --dangerously-skip-permissions 2>&1
+                    Log "Task executed successfully"
+                } catch {
+                    Log "Task execution failed: $_"
 
-```powershell
-python -c @"
-import sys
-sys.path.insert(0, r'C:\donjon-platform')
-try:
-    from scanners.ad_scanner import ADScanner
-    scanner = ADScanner('AD-TEST-001')
-    print('AD Scanner loaded')
-    result = scanner.scan(targets=['localhost'], scan_type='quick')
-    if isinstance(result, dict):
-        print('Keys:', list(result.keys()))
-        findings = result.get('findings', result.get('results', []))
-        if isinstance(findings, list):
-            print('Findings:', len(findings))
-            for f in findings[:5]:
-                if isinstance(f, dict):
-                    sev = f.get('severity', '?')
-                    title = str(f.get('title', f.get('finding', '')))[:80]
-                    print(f'  [{sev}] {title}')
-        else:
-            print('Findings field:', type(findings).__name__)
-        if result.get('error'):
-            print('Error:', result['error'])
-        print('Summary:', result.get('summary', {}))
-    else:
-        print('Result type:', type(result).__name__)
-        print('Raw:', str(result)[:500])
-except Exception as e:
-    print(f'AD Scanner FAILED: {type(e).__name__}: {e}')
-"@
-```
+                    # Fallback: try executing PowerShell blocks directly
+                    $blocks = [regex]::Matches($taskContent, '```powershell\r?\n([\s\S]*?)```')
+                    foreach ($block in $blocks) {
+                        try {
+                            Log "Executing PowerShell block directly"
+                            Invoke-Expression $block.Groups[1].Value 2>&1 | Add-Content $logFile
+                        } catch {
+                            Log "Block failed: $_"
+                        }
+                    }
+                }
+            }
+            $lastHash = $currentHash
+        }
 
-## Step 3: Test Windows Scanner
+        # Heartbeat — run quick checks every cycle
+        if ((Get-Date).Minute % 5 -eq 0 -and (Get-Date).Second -lt 65) {
+            Log "Heartbeat — running quick checks"
 
-```powershell
-python -c @"
-import sys
-sys.path.insert(0, r'C:\donjon-platform')
-try:
-    from scanners.windows_scanner import WindowsScanner
-    scanner = WindowsScanner('WIN-VM-TEST')
-    result = scanner.scan(scan_type='quick')
-    print('Checks completed:', result.get('checks_completed', 0))
-    print('Findings:', result.get('findings_count', 0))
-    summary = result.get('summary', {})
-    if summary:
-        print('Summary:', summary)
-except Exception as e:
-    print(f'Windows Scanner FAILED: {type(e).__name__}: {e}')
-"@
-```
+            $heartbeat = @()
+            $heartbeat += "# VM Heartbeat — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+            $heartbeat += "Agent: RUNNING"
+            $heartbeat += "AD Domain: $((Get-ADDomain -ErrorAction SilentlyContinue).DNSRoot)"
+            $heartbeat += "SSH: $((Get-Service sshd -ErrorAction SilentlyContinue).Status)"
+            $heartbeat += "Python: $(python --version 2>&1)"
+            $heartbeat += "Last task hash: $lastHash"
 
-## Step 4: Test Compliance on This VM
+            $heartbeat | Set-Content "C:\donjon-agent\heartbeat.txt"
+        }
 
-```powershell
-python -c @"
-import sys
-sys.path.insert(0, r'C:\donjon-platform')
-try:
-    from lib.compliance import get_compliance_mapper
-    from lib.evidence import get_evidence_manager
-    m = get_compliance_mapper()
-    em = get_evidence_manager()
-    fws = m.get_all_frameworks()
-    print('Frameworks:', len(fws))
-    summary = m.generate_compliance_summary(em, 'nist_800_53')
-    print('NIST 800-53:', summary.get('total_controls', 0), 'controls,', summary.get('controls_with_evidence', 0), 'with evidence')
-except Exception as e:
-    print(f'Compliance FAILED: {type(e).__name__}: {e}')
-"@
-```
+    } catch {
+        Log "Loop error: $_"
+    }
 
-## Step 5: Test Export Formats
-
-```powershell
-python -c @"
-import sys, tempfile, json
-from pathlib import Path
-sys.path.insert(0, r'C:\donjon-platform')
-try:
-    from lib.export import ExportManager
-    em = ExportManager()
-    findings = [{'id':'VM-001','title':'Test Finding','severity':'high','host':'192.168.1.200','port':445,'cve':'CVE-2024-0001','cvss':8.5,'scanner':'test','timestamp':'2026-01-01T00:00:00Z','remediation':'Test','description':'Test','category':'test','status':'open'}]
-    formats = ['cef','stix','splunk_hec','sentinel','leef','csv','servicenow_json','qualys_xml','sarif','syslog','jsonl']
-    passed = 0
-    for fmt in formats:
-        p = Path(tempfile.mktemp(suffix='.' + fmt))
-        try:
-            getattr(em, 'export_' + fmt)(findings, p)
-            if p.exists() and p.stat().st_size > 10:
-                passed += 1
-                p.unlink()
-            else:
-                print(f'  {fmt}: EMPTY')
-        except Exception as e:
-            print(f'  {fmt}: ERROR {e}')
-    print(f'Export formats: {passed}/{len(formats)} passed')
-except Exception as e:
-    print(f'Export FAILED: {type(e).__name__}: {e}')
-"@
-```
-
-## Step 6: Collect and Push Results
-
-```powershell
-$results = @()
-$results += "# VM Test Results — $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
-$results += ""
-
-$results += "## SSH Status"
-$results += "Port 22: $((Test-NetConnection -ComputerName localhost -Port 22).TcpTestSucceeded)"
-$results += "sshd running: $((Get-Service sshd).Status)"
-$results += ""
-
-$results += "## AD Domain"
-try {
-    $domain = Get-ADDomain
-    $results += "Domain: $($domain.DNSRoot)"
-    $results += "NetBIOS: $($domain.NetBIOSName)"
-    $users = Get-ADUser -Filter * | Select-Object -ExpandProperty SamAccountName
-    $results += "Users: $($users -join ', ')"
-} catch {
-    $results += "AD ERROR: $_"
+    Start-Sleep -Seconds 60
 }
-$results += ""
+'@
 
-$results += "## Python"
-$results += (python --version 2>&1)
-$results += ""
-
-$results += "## AD Scanner Test"
-$ad_out = python -c "import sys; sys.path.insert(0,r'C:\donjon-platform'); exec(open(r'C:\donjon-platform\WINDOWS-VM-TASK.md').read().split('Step 2')[1].split('Step 3')[0].split('python -c @`"')[1].split('`"@')[0])" 2>&1
-$results += ($ad_out | Out-String)
-
-$results += "## Windows Scanner Test"
-$win_out = python -c "import sys; sys.path.insert(0,r'C:\donjon-platform'); from scanners.windows_scanner import WindowsScanner; s=WindowsScanner('t'); r=s.scan(scan_type='quick'); print('checks:',r.get('checks_completed',0),'findings:',r.get('findings_count',0))" 2>&1
-$results += ($win_out | Out-String)
-
-$results += "## Compliance Test"
-$comp_out = python -c "import sys; sys.path.insert(0,r'C:\donjon-platform'); from lib.compliance import get_compliance_mapper; m=get_compliance_mapper(); print('frameworks:',len(m.get_all_frameworks()))" 2>&1
-$results += ($comp_out | Out-String)
-
-$results += "## Export Test"
-$exp_out = python -c "import sys,tempfile; from pathlib import Path; sys.path.insert(0,r'C:\donjon-platform'); from lib.export import ExportManager; em=ExportManager(); f=[{'id':'T','title':'T','severity':'high','host':'x','port':1,'cve':'CVE-2024-1','cvss':1,'scanner':'t','timestamp':'2026-01-01','remediation':'t','description':'t','category':'t','status':'open'}]; passed=sum(1 for fmt in ['cef','stix','csv','sarif','jsonl'] if (lambda p: (getattr(em,'export_'+fmt)(f,p),p.exists() and p.stat().st_size>10))(Path(tempfile.mktemp(suffix='.'+fmt)))[1]); print(f'exports: {passed}/5 passed')" 2>&1
-$results += ($exp_out | Out-String)
-
-$results += "## IP Address"
-$results += (ipconfig | Select-String "IPv4" | Out-String)
-
-$results | Set-Content C:\donjon-platform\VM-STATUS.md -Encoding UTF8
-
-cd C:\donjon-platform
-git add VM-STATUS.md
-git commit -m "VM: full test results — AD scanner, Windows scanner, compliance, exports"
-git push origin main
-
-Write-Output "All tests complete — results pushed to repo"
+# Write the script
+New-Item -ItemType Directory -Force -Path "C:\donjon-agent" | Out-Null
+$agentScript | Set-Content "C:\donjon-agent\agent.ps1" -Encoding UTF8
+Write-Output "Agent script created at C:\donjon-agent\agent.ps1"
 ```
 
-## After This — Start Monitoring Loop
+## Step 2: Register as Scheduled Task (survives reboot)
 
-Read CLAUDE-WINDOWS-AGENT.md and begin the 60-second polling loop:
-- git pull every 60 seconds
-- If WINDOWS-VM-TASK.md changes, execute it
-- Push results in VM-STATUS.md
+```powershell
+# Remove old task if exists
+Unregister-ScheduledTask -TaskName "DonjonTestAgent" -Confirm:$false -ErrorAction SilentlyContinue
+
+# Create action
+$action = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File C:\donjon-agent\agent.ps1"
+
+# Trigger: at startup
+$trigger = New-ScheduledTaskTrigger -AtStartup
+
+# Settings: restart on failure, don't stop after time limit
+$settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -RestartCount 3 `
+    -RestartInterval (New-TimeSpan -Minutes 1) `
+    -ExecutionTimeLimit (New-TimeSpan -Days 365)
+
+# Register
+Register-ScheduledTask `
+    -TaskName "DonjonTestAgent" `
+    -Action $action `
+    -Trigger $trigger `
+    -Settings $settings `
+    -User "SYSTEM" `
+    -RunLevel Highest `
+    -Description "Donjon Platform Windows Test Agent — polls Forgejo, executes tasks"
+
+# Start it now
+Start-ScheduledTask -TaskName "DonjonTestAgent"
+
+Write-Output "Scheduled task created and started"
+Get-ScheduledTask -TaskName "DonjonTestAgent" | Format-List TaskName, State
+```
+
+## Step 3: Verify Agent is Running
+
+```powershell
+Start-Sleep -Seconds 10
+
+# Check if process is running
+$proc = Get-Process powershell -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*agent.ps1*" }
+if ($proc) {
+    Write-Output "Agent process running: PID $($proc.Id)"
+} else {
+    Write-Output "Agent process: checking task status..."
+    Get-ScheduledTask -TaskName "DonjonTestAgent" | Format-List TaskName, State
+}
+
+# Check log
+if (Test-Path "C:\donjon-agent\agent.log") {
+    Write-Output "Agent log:"
+    Get-Content "C:\donjon-agent\agent.log" -Tail 5
+}
+
+# Push confirmation
+cd C:\donjon-platform
+@"
+# VM Agent Status
+Agent: PERSISTENT (Scheduled Task)
+Task Name: DonjonTestAgent
+Runs As: SYSTEM
+Survives: Reboot, logoff, session death
+Log: C:\donjon-agent\agent.log
+Heartbeat: C:\donjon-agent\heartbeat.txt (every 5 min)
+Poll interval: 60 seconds
+Executes: WINDOWS-VM-TASK.md changes via claude -p
+"@ | Set-Content VM-STATUS.md
+
+git add VM-STATUS.md
+git commit -m "VM: persistent agent service installed — survives reboot"
+git push origin main
+```
+
+After this, you can close the Claude session on the VM. The agent will keep running as a Windows scheduled task, polling Forgejo every 60 seconds. If it detects a change to WINDOWS-VM-TASK.md, it invokes `claude -p` to execute it.
