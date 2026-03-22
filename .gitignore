@@ -44,13 +44,14 @@ data/test_report.json
 data/test_report.xml
 data/test_run_log.json
 
-# Intel databases — distributed via GitHub Releases, not git
+# Intel databases — distributed via Forgejo/GitHub Releases, not git
 # Download with: bash bin/sync-intel-db.sh
 data/intel_feeds.db
 data/vuln_db/vuln_intel.db
 data/threat_intel/cisa_kev.json
 data/threat_intel/epss_cache.json
 data/manifest.json
+data/bundles/
 
 # Credentials and secrets (sensitive)
 .env
