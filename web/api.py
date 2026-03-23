@@ -2271,17 +2271,19 @@ class DonjonAPI:
             seen = set()
             for addr in addrs:
                 ip = addr[4][0]
-                if ip not in seen and not ip.startswith('127.'):
+                if ip not in seen and not ip.startswith('127.') and not ip.startswith('169.254.'):
                     seen.add(ip)
                     # Derive /24 subnet
                     parts = ip.split('.')
                     subnet = '.'.join(parts[:3]) + '.0/24'
+                    # Skip virtual/WSL adapters for suggested targets
+                    is_virtual = ip.startswith('172.') and int(parts[1]) in range(16, 32)
                     info['interfaces'].append({
                         'ip': ip,
                         'subnet': subnet,
                     })
-                    info['suggested_targets'].append(ip)
-                    info['suggested_targets'].append(subnet)
+                    if not is_virtual:
+                        info['suggested_targets'].append(subnet)
         except Exception:
             pass
 
@@ -2295,7 +2297,7 @@ class DonjonAPI:
                         continue
                     ip = addr.address
                     netmask = addr.netmask or ''
-                    if not ip or ip.startswith('127.'):
+                    if not ip or ip.startswith('127.') or ip.startswith('169.254.'):
                         continue
                     if ip in [i['ip'] for i in info['interfaces']]:
                         # Already found via socket — enrich with netmask/iface
