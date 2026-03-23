@@ -195,25 +195,17 @@ class OpenVASScanner(BaseScanner):
         return results
 
     def _scan_remote(self, targets: List[str], scan_type: str) -> List[Dict]:
-        """Scan using GMP protocol over TCP to a remote GVM instance."""
+        """Scan using GMP protocol over TCP to a remote GVM instance.
+
+        Tries connection methods in order:
+        1. Unix socket (if host is localhost and socket exists)
+        2. SSH tunnel (standard GVM deployment)
+        3. TLS connection (GVM with TLS enabled)
+        """
         findings = []
         try:
-            from gvm.connections import TLSConnection
             from gvm.protocols.gmp import Gmp
             from gvm.transforms import EtreeTransform
-
-            connection = TLSConnection(
-                hostname=self.gvm_host, port=self.gvm_port
-            )
-            transform = EtreeTransform()
-
-            with Gmp(connection=connection, transform=transform) as gmp:
-                gmp.authenticate(self.gvm_username, self.gvm_password)
-                self.scan_logger.info(
-                    "Connected to remote GVM at %s:%d", self.gvm_host, self.gvm_port
-                )
-                findings = self._run_gmp_scan(gmp, targets, scan_type)
-
         except ImportError:
             self.scan_logger.warning(
                 "python-gvm not installed. Install with: pip install python-gvm"
@@ -230,22 +222,156 @@ class OpenVASScanner(BaseScanner):
                 finding_type='openvas_config',
                 remediation='pip install python-gvm',
             )
+            return findings
+
+        connection = None
+        transform = EtreeTransform()
+
+        # Try Unix socket first for localhost
+        if self.gvm_host in ('localhost', '127.0.0.1', '::1'):
+            try:
+                from gvm.connections import UnixSocketConnection
+                # Check common socket paths
+                for sock_path in [self.gvm_socket, '/run/gvmd/gvmd.sock',
+                                  '/var/run/gvmd/gvmd.sock', '/tmp/gvm/gvmd.sock']:
+                    if Path(sock_path).exists():
+                        connection = UnixSocketConnection(path=sock_path)
+                        self.scan_logger.info("GVM: using Unix socket %s", sock_path)
+                        break
+                # Also try Docker exec socket
+                if connection is None:
+                    docker_sock = self._find_docker_gvm_socket()
+                    if docker_sock:
+                        connection = UnixSocketConnection(path=docker_sock)
+                        self.scan_logger.info("GVM: using Docker socket %s", docker_sock)
+            except Exception:
+                pass
+
+        # Try SSH connection (standard for remote GVM)
+        if connection is None:
+            try:
+                from gvm.connections import SSHConnection
+                connection = SSHConnection(
+                    hostname=self.gvm_host,
+                    port=22,
+                    username=self.gvm_username,
+                    password=self.gvm_password,
+                )
+                self.scan_logger.info(
+                    "GVM: trying SSH to %s", self.gvm_host
+                )
+            except Exception:
+                pass
+
+        # Try TLS as last resort
+        if connection is None:
+            try:
+                from gvm.connections import TLSConnection
+                connection = TLSConnection(
+                    hostname=self.gvm_host, port=self.gvm_port
+                )
+                self.scan_logger.info(
+                    "GVM: trying TLS to %s:%d", self.gvm_host, self.gvm_port
+                )
+            except Exception as e:
+                self.scan_logger.error("All GVM connection methods failed: %s", e)
+                self.add_finding(
+                    severity='MEDIUM',
+                    title=f'OpenVAS connection failed: {self.gvm_host}',
+                    description=f'Could not connect via socket, SSH, or TLS: {e}',
+                    affected_asset=self.gvm_host,
+                    finding_type='openvas_error',
+                    remediation='Verify GVM host, port, and credentials.',
+                )
+                return findings
+
+        try:
+            with Gmp(connection=connection, transform=transform) as gmp:
+                gmp.authenticate(self.gvm_username, self.gvm_password)
+                self.scan_logger.info(
+                    "Authenticated to GVM at %s", self.gvm_host
+                )
+                findings = self._run_gmp_scan(gmp, targets, scan_type)
         except Exception as e:
-            self.scan_logger.error("Remote GVM scan failed: %s", e)
+            self.scan_logger.error("GVM scan failed: %s", e)
             self.add_finding(
                 severity='MEDIUM',
-                title=f'OpenVAS connection failed: {self.gvm_host}:{self.gvm_port}',
-                description=str(e),
+                title=f'OpenVAS scan error: {self.gvm_host}',
+                description=str(e)[:300],
                 affected_asset=self.gvm_host,
                 finding_type='openvas_error',
-                remediation='Verify GVM host, port, and credentials in config or env vars.',
+                remediation='Check GVM credentials and service status.',
             )
+        return findings
+
+    def _find_docker_gvm_socket(self) -> Optional[str]:
+        """Find GVM socket exposed from a Docker container."""
+        try:
+            result = subprocess.run(
+                ['docker', 'exec', 'openvas', 'ls', '/run/gvmd/gvmd.sock'],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                # Socket exists in container — map it out
+                # Use docker exec approach instead
+                return None  # Can't use container socket directly
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+        return None
+
+    def _run_gmp_scan(self, gmp, targets: List[str], scan_type: str) -> List[Dict]:
+        """Execute a scan via an authenticated GMP connection.
+
+        Shared by both local socket and remote connection modes.
+        """
+        findings = []
+        target_list = ', '.join(targets)
+
+        # Create target in GVM
+        target_id = gmp.create_target(
+            name=f'Donjon-{datetime.now(timezone.utc).strftime("%Y%m%d%H%M")}',
+            hosts=targets,
+        ).get('id')
+
+        # Select scan config by type
+        config_map = {
+            'quick': 'daba56c8-73ec-11df-a475-002264764cea',     # Discovery
+            'standard': '085569ce-73ed-11df-83c3-002264764cea',   # Full and fast
+            'deep': '698f691e-7489-11df-9d8c-002264764cea',       # Full and deep
+        }
+        config_id = config_map.get(scan_type, config_map['standard'])
+
+        # Create and start task
+        task_id = gmp.create_task(
+            name=f'Donjon {scan_type} scan',
+            config_id=config_id,
+            target_id=target_id,
+            scanner_id='08b69003-5fc2-4037-a479-93b440211c73',
+        ).get('id')
+
+        gmp.start_task(task_id)
+        self.scan_logger.info("Started GVM task %s for %s", task_id, target_list)
+
+        self.add_finding(
+            severity='INFO',
+            title=f'OpenVAS scan started: {scan_type}',
+            description=(
+                f'GVM task {task_id} started for targets: {target_list}. '
+                f'Scan config: {scan_type}. Check GVM web UI for progress.'
+            ),
+            affected_asset=target_list,
+            finding_type='openvas_task',
+            remediation='Monitor scan progress in GVM dashboard.',
+        )
+
+        # TODO: poll for completion and retrieve results
+        # For long-running scans, the orchestrator should check back later
+
         return findings
 
     def _scan_gmp(self, targets: List[str], scan_type: str) -> List[Dict]:
         """Scan using GMP protocol via python-gvm (local socket)."""
         findings = []
-
         try:
             from gvm.connections import UnixSocketConnection
             from gvm.protocols.gmp import Gmp
@@ -256,45 +382,10 @@ class OpenVASScanner(BaseScanner):
 
             with Gmp(connection=connection, transform=transform) as gmp:
                 gmp.authenticate(self.gvm_username, self.gvm_password)
-
-                # Create target
-                target_list = ' '.join(targets)
-                target_id = gmp.create_target(
-                    name=f'Donjon-{datetime.now(timezone.utc).strftime("%Y%m%d%H%M")}',
-                    hosts=targets
-                ).get('id')
-
-                # Select scan config
-                config_map = {
-                    'quick': 'daba56c8-73ec-11df-a475-002264764cea',  # Discovery
-                    'standard': '085569ce-73ed-11df-83c3-002264764cea',  # Full and fast
-                    'deep': '698f691e-7489-11df-9d8c-002264764cea',  # Full and deep
-                }
-                config_id = config_map.get(scan_type, config_map['standard'])
-
-                # Create and start task
-                task_id = gmp.create_task(
-                    name=f'Donjon Scan {scan_type}',
-                    config_id=config_id,
-                    target_id=target_id,
-                    scanner_id='08b69003-5fc2-4037-a479-93b440211c73'
-                ).get('id')
-
-                gmp.start_task(task_id)
-                self.scan_logger.info(f"Started OpenVAS task: {task_id}")
-
-                # Note: In production, would poll for completion
-                # For now, log that task was started
-                findings.append({
-                    'title': 'OpenVAS scan started',
-                    'severity': 'INFO',
-                    'description': f'GMP task {task_id} started for {target_list}',
-                    'affected_host': target_list,
-                    'tool': 'openvas-gmp',
-                })
+                findings = self._run_gmp_scan(gmp, targets, scan_type)
 
         except Exception as e:
-            self.scan_logger.error(f"GMP scan error: {e}")
+            self.scan_logger.error("GMP local scan error: %s", e)
 
         return findings
 
@@ -306,7 +397,7 @@ class OpenVASScanner(BaseScanner):
         try:
             # Create XML command for gvm-cli
             cmd = [
-                'gvm-cli', '--gmp-username', 'admin', '--gmp-password', 'admin',
+                'gvm-cli', '--gmp-username', self.gvm_username, '--gmp-password', self.gvm_password,
                 'socket', '--xml',
                 f'<get_version/>'
             ]
