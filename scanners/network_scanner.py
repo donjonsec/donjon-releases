@@ -106,6 +106,10 @@ class NetworkScanner(BaseScanner):
         self.scan_logger.info(f"Discovered {len(live_hosts)} live hosts")
         results['hosts'] = live_hosts
 
+        if not live_hosts:
+            self.set_status('failed', f'No live hosts found in targets: {", ".join(targets)}. '
+                           f'Check that targets are reachable and not blocking ICMP/TCP probes.')
+
         # Phase 2: Port scanning
         self.scan_logger.info("Phase 2: Port Scanning")
         for host in live_hosts:
@@ -154,6 +158,9 @@ class NetworkScanner(BaseScanner):
                 self.scan_logger.warning(f"Asset registration error: {e}")
 
         self.end_time = datetime.now(timezone.utc)
+
+        if self.scan_status != 'failed':
+            self.set_status('complete')
 
         # Save results and add to evidence
         self.save_results()

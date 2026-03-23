@@ -180,8 +180,14 @@ class OpenVASScanner(BaseScanner):
         elif self.gvm_mode == 'cli':
             results['findings'] = self._scan_cli(targets, scan_type)
         else:
-            self.scan_logger.warning("No live OpenVAS scanner available. Use import mode.")
-            results['error'] = 'No live OpenVAS scanner. Provide report_path for import.'
+            self.set_status('failed', 'No OpenVAS/GVM instance found. Configure GVM_HOST or install GVM.')
+            results['error'] = (
+                'No live OpenVAS scanner detected. Options:\n'
+                '  1. Set GVM_HOST and GVM_PORT env vars to point to your GVM instance\n'
+                '  2. Configure tools.openvas.host in config/active/config.yaml\n'
+                '  3. Install OpenVAS/GVM locally\n'
+                '  4. Provide report_path= to import an existing OpenVAS XML report'
+            )
 
         # Enrich all findings with KEV/EPSS
         if get_threat_intel is not None:

@@ -169,15 +169,28 @@ class AssessmentOrchestrator:
 
                 finding_count = len(findings)
                 all_findings.extend(findings)
+
+                # Check scanner status — did it actually scan or just fail silently?
+                scan_stat = getattr(scanner, 'scan_status', 'complete')
+                warnings = getattr(scanner, 'warnings', [])
+
                 scanner_results[scanner_id] = {
-                    'status': 'completed',
+                    'status': scan_stat if scan_stat != 'pending' else 'completed',
                     'findings': finding_count,
+                    'warnings': warnings,
                     'summary': result.get('summary', {}) if isinstance(result, dict) else {},
                 }
                 completed_scanners += 1
 
                 if self.tui:
-                    self.tui.success(f"  {scanner_id}: {finding_count} findings")
+                    if scan_stat == 'failed':
+                        self.tui.warning(f"  {scanner_id}: FAILED — {warnings[0] if warnings else 'unknown'}")
+                    elif scan_stat == 'partial':
+                        self.tui.warning(f"  {scanner_id}: {finding_count} findings (partial — {warnings[0][:50] if warnings else ''})")
+                    elif finding_count == 0 and not result.get('error'):
+                        self.tui.success(f"  {scanner_id}: clean (0 findings)")
+                    else:
+                        self.tui.success(f"  {scanner_id}: {finding_count} findings")
 
             except KeyboardInterrupt:
                 if self.tui:

@@ -57,6 +57,8 @@ class BaseScanner(ABC):
 
         self.results: List[Dict] = []
         self.findings: List[Dict] = []
+        self.warnings: List[str] = []
+        self.scan_status: str = 'pending'  # pending, running, complete, partial, failed, skipped
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
 
@@ -97,6 +99,57 @@ class BaseScanner(ABC):
         except Exception as e:
             self.scan_logger.error(f"Command failed: {e}")
             raise
+
+    def warn(self, message: str):
+        """Record a scanner warning — surfaced to user in reports.
+
+        Use for conditions that don't prevent scanning but limit coverage:
+        - Target unreachable on some ports
+        - Required tool not installed (scanner falls back to subset)
+        - Service not configured (e.g., GVM host not set)
+        """
+        self.warnings.append(message)
+        self.scan_logger.warning(message)
+
+    def set_status(self, status: str, reason: str = ''):
+        """Set scanner completion status.
+
+        Statuses:
+          complete — scanned successfully, findings (or lack thereof) are trustworthy
+          partial  — scanned but with reduced coverage (missing tools, partial target access)
+          failed   — could not scan at all (target unreachable, missing deps)
+          skipped  — intentionally not run (wrong platform, excluded)
+        """
+        self.scan_status = status
+        if reason:
+            self.warn(f"Scanner status: {status} — {reason}")
+
+    def get_summary_with_status(self) -> Dict:
+        """Return scan summary including status and warnings.
+
+        This is what the UI/report should display — not just finding counts.
+        """
+        return {
+            'scanner': self.SCANNER_NAME,
+            'status': self.scan_status,
+            'findings_count': len(self.findings),
+            'warnings': self.warnings,
+            'trustworthy': self.scan_status == 'complete',
+            'message': self._status_message(),
+        }
+
+    def _status_message(self) -> str:
+        if self.scan_status == 'complete' and not self.findings:
+            return f'{self.SCANNER_NAME}: scan complete, no issues found'
+        elif self.scan_status == 'complete':
+            return f'{self.SCANNER_NAME}: {len(self.findings)} findings'
+        elif self.scan_status == 'partial':
+            return f'{self.SCANNER_NAME}: partial scan — {"; ".join(self.warnings[:2])}'
+        elif self.scan_status == 'failed':
+            return f'{self.SCANNER_NAME}: SCAN FAILED — {"; ".join(self.warnings[:2])}'
+        elif self.scan_status == 'skipped':
+            return f'{self.SCANNER_NAME}: skipped — {"; ".join(self.warnings[:1])}'
+        return f'{self.SCANNER_NAME}: {self.scan_status}'
 
     def add_result(self, result_type: str, data: Dict, target: str = ""):
         """Add a scan result."""
