@@ -6,6 +6,7 @@ Three modes: GMP protocol, CLI mode, and XML import mode.
 Enriches imported findings with our KEV/EPSS data (value-add over standalone OpenVAS).
 """
 
+import os
 import re
 import json
 import sys
@@ -47,11 +48,50 @@ class OpenVASScanner(BaseScanner):
         super().__init__(session_id)
         self.gvm_available = False
         self.gvm_mode = None
+        # Connection config — from env vars, config file, or auto-detect
+        self.gvm_host = os.environ.get('GVM_HOST', '')
+        self.gvm_port = int(os.environ.get('GVM_PORT', '9390'))
+        self.gvm_username = os.environ.get('GVM_USERNAME', 'admin')
+        self.gvm_password = os.environ.get('GVM_PASSWORD', 'admin')
+        self.gvm_socket = os.environ.get('GVM_SOCKET', '/run/gvmd/gvmd.sock')
+        self._load_config()
         self._detect_gvm()
 
+    def _load_config(self):
+        """Load GVM connection settings from platform config."""
+        try:
+            from config import Config
+            cfg = Config()
+            gvm_cfg = cfg.get('tools.openvas', {})
+            if isinstance(gvm_cfg, dict):
+                self.gvm_host = gvm_cfg.get('host', self.gvm_host)
+                self.gvm_port = int(gvm_cfg.get('port', self.gvm_port))
+                self.gvm_username = gvm_cfg.get('username', self.gvm_username)
+                self.gvm_password = gvm_cfg.get('password', self.gvm_password)
+                self.gvm_socket = gvm_cfg.get('socket', self.gvm_socket)
+        except Exception:
+            pass
+
     def _detect_gvm(self):
-        """Detect available GVM integration mode."""
-        # Check for python-gvm library
+        """Detect available GVM integration mode.
+
+        Priority:
+        1. Remote TCP (GVM_HOST configured) — connects over network
+        2. python-gvm library (local socket) — direct GMP protocol
+        3. gvm-cli binary — command-line interface
+        4. Docker container (local) — exec into container
+        5. Import mode — always available for XML files
+        """
+        # 1. Remote TCP — if GVM_HOST is set, use it
+        if self.gvm_host:
+            self.gvm_mode = 'remote'
+            self.gvm_available = True
+            self.scan_logger.info(
+                "GVM configured: remote TCP %s:%d", self.gvm_host, self.gvm_port
+            )
+            return
+
+        # 2. python-gvm library (local socket)
         try:
             import gvm
             self.gvm_mode = 'gmp'
@@ -61,7 +101,7 @@ class OpenVASScanner(BaseScanner):
         except ImportError:
             pass
 
-        # Check for gvm-cli
+        # 3. gvm-cli binary
         import shutil
         if shutil.which('gvm-cli'):
             self.gvm_mode = 'cli'
@@ -69,13 +109,13 @@ class OpenVASScanner(BaseScanner):
             self.scan_logger.info("GVM detected: gvm-cli (CLI mode)")
             return
 
-        # Check for Docker image
+        # 4. Docker container (local)
         try:
             result = subprocess.run(
                 ['docker', 'images', '--format', '{{.Repository}}'],
                 capture_output=True, text=True, timeout=10
             )
-            if 'greenbone' in result.stdout.lower() or 'gvm' in result.stdout.lower():
+            if 'greenbone' in result.stdout.lower() or 'gvm' in result.stdout.lower() or 'openvas' in result.stdout.lower():
                 self.gvm_mode = 'docker'
                 self.gvm_available = True
                 self.scan_logger.info("GVM detected: Docker container")
@@ -83,9 +123,31 @@ class OpenVASScanner(BaseScanner):
         except (subprocess.SubprocessError, FileNotFoundError):
             pass
 
-        # Import mode is always available (for XML files)
+        # 5. Auto-discover on common network addresses
+        for candidate_host in ['localhost', '192.168.1.101']:
+            if self._probe_gvm_port(candidate_host, 9390):
+                self.gvm_host = candidate_host
+                self.gvm_port = 9390
+                self.gvm_mode = 'remote'
+                self.gvm_available = True
+                self.scan_logger.info(
+                    "GVM auto-discovered: %s:%d", candidate_host, 9390
+                )
+                return
+
+        # 6. Import mode is always available
         self.gvm_mode = 'import'
         self.scan_logger.info("GVM: Import mode only (no live scanner detected)")
+
+    @staticmethod
+    def _probe_gvm_port(host: str, port: int, timeout: float = 2.0) -> bool:
+        """Check if a GVM instance is listening on host:port."""
+        import socket
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (OSError, socket.timeout):
+            return False
 
     def scan(self, targets: List[str], scan_type: str = 'standard',
              report_path: str = None, **kwargs) -> Dict:
@@ -111,6 +173,8 @@ class OpenVASScanner(BaseScanner):
             # Import mode
             results['findings'] = self.import_openvas_report(report_path)
             results['mode'] = 'import'
+        elif self.gvm_mode == 'remote':
+            results['findings'] = self._scan_remote(targets, scan_type)
         elif self.gvm_mode == 'gmp':
             results['findings'] = self._scan_gmp(targets, scan_type)
         elif self.gvm_mode == 'cli':
@@ -130,8 +194,56 @@ class OpenVASScanner(BaseScanner):
 
         return results
 
+    def _scan_remote(self, targets: List[str], scan_type: str) -> List[Dict]:
+        """Scan using GMP protocol over TCP to a remote GVM instance."""
+        findings = []
+        try:
+            from gvm.connections import TLSConnection
+            from gvm.protocols.gmp import Gmp
+            from gvm.transforms import EtreeTransform
+
+            connection = TLSConnection(
+                hostname=self.gvm_host, port=self.gvm_port
+            )
+            transform = EtreeTransform()
+
+            with Gmp(connection=connection, transform=transform) as gmp:
+                gmp.authenticate(self.gvm_username, self.gvm_password)
+                self.scan_logger.info(
+                    "Connected to remote GVM at %s:%d", self.gvm_host, self.gvm_port
+                )
+                findings = self._run_gmp_scan(gmp, targets, scan_type)
+
+        except ImportError:
+            self.scan_logger.warning(
+                "python-gvm not installed. Install with: pip install python-gvm"
+            )
+            self.add_finding(
+                severity='INFO',
+                title='OpenVAS Remote: python-gvm library required',
+                description=(
+                    f'GVM remote host configured ({self.gvm_host}:{self.gvm_port}) '
+                    f'but python-gvm library is not installed. '
+                    f'Install with: pip install python-gvm'
+                ),
+                affected_asset=self.gvm_host,
+                finding_type='openvas_config',
+                remediation='pip install python-gvm',
+            )
+        except Exception as e:
+            self.scan_logger.error("Remote GVM scan failed: %s", e)
+            self.add_finding(
+                severity='MEDIUM',
+                title=f'OpenVAS connection failed: {self.gvm_host}:{self.gvm_port}',
+                description=str(e),
+                affected_asset=self.gvm_host,
+                finding_type='openvas_error',
+                remediation='Verify GVM host, port, and credentials in config or env vars.',
+            )
+        return findings
+
     def _scan_gmp(self, targets: List[str], scan_type: str) -> List[Dict]:
-        """Scan using GMP protocol via python-gvm."""
+        """Scan using GMP protocol via python-gvm (local socket)."""
         findings = []
 
         try:
@@ -139,11 +251,11 @@ class OpenVASScanner(BaseScanner):
             from gvm.protocols.gmp import Gmp
             from gvm.transforms import EtreeTransform
 
-            connection = UnixSocketConnection()
+            connection = UnixSocketConnection(path=self.gvm_socket)
             transform = EtreeTransform()
 
             with Gmp(connection=connection, transform=transform) as gmp:
-                gmp.authenticate('admin', 'admin')
+                gmp.authenticate(self.gvm_username, self.gvm_password)
 
                 # Create target
                 target_list = ' '.join(targets)
