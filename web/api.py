@@ -727,6 +727,15 @@ class DonjonAPI:
             result = handle_settings_request("/settings/config", None)
             return json_response(result["json_response"]())
         except Exception as exc:
+            # If tier-gated, return basic config instead of 500
+            if 'tier' in str(exc).lower() or 'license' in str(exc).lower():
+                try:
+                    cfg = _config.to_dict() if _config else {}
+                    cfg['_read_only'] = True
+                    cfg['_upgrade_note'] = 'Upgrade to Pro to modify settings'
+                    return json_response(cfg)
+                except Exception:
+                    pass
             return error_response(str(exc), 500)
 
     def _api_settings_config_put(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
@@ -741,6 +750,17 @@ class DonjonAPI:
             result = handle_settings_request("/settings/paths", None)
             return json_response(result["json_response"]())
         except Exception as exc:
+            if 'tier' in str(exc).lower() or 'license' in str(exc).lower():
+                try:
+                    from lib.paths import paths as _paths
+                    return json_response({
+                        'data': str(_paths.data),
+                        'config': str(_paths.config_active),
+                        '_read_only': True,
+                        '_upgrade_note': 'Upgrade to Pro to modify paths',
+                    })
+                except Exception:
+                    pass
             return error_response(str(exc), 500)
 
     def _api_settings_paths_put(self, body: Optional[Dict] = None, **kw) -> Tuple[bytes, int, str]:
