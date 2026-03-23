@@ -49,6 +49,11 @@ try:
 except ImportError:
     ShadowAIScanner = None
 
+try:
+    from .quantum_scanner import QuantumReadinessScanner
+except ImportError:
+    QuantumReadinessScanner = None
+
 __all__ = [
     'BaseScanner',
     'NetworkScanner',
@@ -64,4 +69,5 @@ __all__ = [
     'SBOMScanner',
     'MalwareScanner',
     'ShadowAIScanner',
+    'QuantumReadinessScanner',
 ]
