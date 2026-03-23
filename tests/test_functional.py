@@ -70,7 +70,7 @@ class TestHealthEndpoint:
 
     def test_version_is_730(self):
         data = _get("/api/v1/health")
-        assert data["version"] == "7.3.0", f"Health version is {data['version']}"
+        assert data["version"] == "7.4.0", f"Health version is {data['version']}"
 
     def test_has_module_status(self):
         data = _get("/api/v1/health")
@@ -243,7 +243,7 @@ class TestDashboard:
 
     def test_version_correct(self):
         _, _, body = _get_raw("/")
-        assert "v7.3.0" in body, "Dashboard should show v7.3.0"
+        assert "v7.4.0" in body, "Dashboard should show v7.4.0"
         assert "v2.0" not in body, "Dashboard must NOT show v2.0"
 
     def test_substantial_size(self):

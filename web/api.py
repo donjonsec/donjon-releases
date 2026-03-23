@@ -1225,7 +1225,7 @@ class DonjonAPI:
         }
         return json_response({
             'status': 'healthy',
-            'version': _config.version if _config else '7.3.0',
+            'version': _config.version if _config else '7.4.0',
             'uptime_seconds': round(uptime, 2),
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'modules': modules,

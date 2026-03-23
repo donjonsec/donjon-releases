@@ -203,7 +203,7 @@ class TestConfig:
         if hasattr(cfg, "get"):
             version = cfg.get("version")
             if version:
-                assert version == "7.3.0", f"Config version is {version}"
+                assert version == "7.4.0", f"Config version is {version}"
 
 
 # ===================================================================

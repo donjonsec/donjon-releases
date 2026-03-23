@@ -1,0 +1,111 @@
+{
+  "bundle_version": "1.0",
+  "created_at": "2026-03-22T18:37:27.144095+00:00",
+  "created_by": "Donjon Platform Intel Bundle Builder",
+  "platform_version": "7.3.0",
+  "sources": {
+    "nvd_cves": {
+      "authority": "National Institute of Standards and Technology (NIST)",
+      "url": "https://services.nvd.nist.gov/rest/json/cves/2.0/",
+      "license": "Public Domain (US Government Work)",
+      "description": "National Vulnerability Database \u2014 all CVE records with CVSS scores, CWEs, references",
+      "records": 324593,
+      "data_file": "vuln_db/vuln_intel.db"
+    },
+    "cisa_kev": {
+      "authority": "Cybersecurity and Infrastructure Security Agency (CISA)",
+      "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+      "license": "Public Domain (US Government Work)",
+      "description": "Known Exploited Vulnerabilities catalog \u2014 actively exploited CVEs with remediation deadlines",
+      "records": 1551,
+      "data_file": "threat_intel/cisa_kev.json"
+    },
+    "epss_scores": {
+      "authority": "Forum of Incident Response and Security Teams (FIRST.org)",
+      "url": "https://api.first.org/data/v1/epss",
+      "license": "CC BY-SA 4.0",
+      "description": "Exploit Prediction Scoring System \u2014 probability of exploitation in next 30 days",
+      "records": 0,
+      "data_file": "vuln_db/vuln_intel.db"
+    },
+    "exploit_refs": {
+      "authority": "OffSec (Offensive Security)",
+      "url": "https://gitlab.com/exploit-database/exploitdb",
+      "license": "GPL-2.0",
+      "description": "ExploitDB \u2014 public exploits and proof-of-concept code mapped to CVEs",
+      "records": 46496,
+      "data_file": "intel_feeds.db"
+    },
+    "osv": {
+      "authority": "Google Open Source Security",
+      "url": "https://api.osv.dev/v1/",
+      "license": "CC BY 4.0",
+      "description": "Open Source Vulnerabilities \u2014 PyPI, npm, Go, Maven, NuGet, RubyGems, crates.io",
+      "records": 252748,
+      "data_file": "intel_feeds.db"
+    },
+    "github_advisories": {
+      "authority": "GitHub / MITRE CVE Numbering Authority",
+      "url": "https://api.github.com/advisories",
+      "license": "CC BY 4.0",
+      "description": "GitHub Security Advisories \u2014 cross-ecosystem vulnerability advisories",
+      "records": 100,
+      "data_file": "intel_feeds.db"
+    },
+    "cisa_alerts": {
+      "authority": "Cybersecurity and Infrastructure Security Agency (CISA)",
+      "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+      "license": "Public Domain (US Government Work)",
+      "description": "CISA cybersecurity alerts and ICS-CERT advisories",
+      "records": 1581,
+      "data_file": "intel_feeds.db"
+    },
+    "mitre_attack": {
+      "authority": "MITRE Corporation",
+      "url": "https://github.com/mitre/cti",
+      "license": "Apache 2.0",
+      "description": "MITRE ATT&CK Enterprise \u2014 tactics, techniques, and mitigations",
+      "records": 691,
+      "data_file": "intel_feeds.db"
+    },
+    "urlhaus": {
+      "authority": "abuse.ch (Bern University of Applied Sciences)",
+      "url": "https://urlhaus-api.abuse.ch/v1/",
+      "license": "CC0 1.0 (Public Domain Dedication)",
+      "description": "URLhaus \u2014 malicious URLs used for malware distribution",
+      "records": 0,
+      "data_file": "intel_feeds.db"
+    },
+    "threatfox": {
+      "authority": "abuse.ch (Bern University of Applied Sciences)",
+      "url": "https://threatfox-api.abuse.ch/api/v1/",
+      "license": "CC0 1.0 (Public Domain Dedication)",
+      "description": "ThreatFox \u2014 indicators of compromise (IOCs) shared by the infosec community",
+      "records": 0,
+      "data_file": "intel_feeds.db"
+    }
+  },
+  "files": {
+    "vuln_db/vuln_intel.db": {
+      "size_bytes": 704909312,
+      "sha256": "91b2b59686cbc24b73bad9e4ada8180c87aa77087f8603ea8aa9c3aef87bcc87",
+      "modified_at": "2026-03-22T18:34:52.747159+00:00"
+    },
+    "threat_intel/cisa_kev.json": {
+      "size_bytes": 1137618,
+      "sha256": "7c3e23192d65ac8e28131df8b8cc66ed956f7056733571ad450c2fc6196d84fb",
+      "modified_at": "2026-03-22T18:20:43.995037+00:00"
+    },
+    "intel_feeds.db": {
+      "size_bytes": 227614720,
+      "sha256": "ec569083bb3f77bd6961b45c71aea3dc4518c0aef450fda5a07cb456c794f0ec",
+      "modified_at": "2026-03-22T18:22:46.734481+00:00"
+    }
+  },
+  "totals": {
+    "sources": 10,
+    "records": 627760,
+    "files": 3,
+    "size_bytes": 933661650
+  }
+}
