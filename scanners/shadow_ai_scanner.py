@@ -105,6 +105,24 @@ class ShadowAIScanner(BaseScanner):
         (r'r8_[a-zA-Z0-9]{20,}', 'Replicate'),
     ]
 
+    # Environment variables that indicate AI service usage
+    AI_ENV_INDICATORS = [
+        ('OPENAI_API_KEY', 'OpenAI'),
+        ('ANTHROPIC_API_KEY', 'Anthropic Claude'),
+        ('OLLAMA_URL', 'Ollama (remote)'),
+        ('OLLAMA_HOST', 'Ollama (remote)'),
+        ('GEMINI_API_KEY', 'Google Gemini'),
+        ('MISTRAL_API_KEY', 'Mistral AI'),
+        ('COHERE_API_KEY', 'Cohere'),
+        ('XAI_API_KEY', 'xAI Grok'),
+        ('DEEPSEEK_API_KEY', 'DeepSeek'),
+        ('TOGETHER_API_KEY', 'Together AI'),
+        ('GROQ_API_KEY', 'Groq'),
+        ('HUGGINGFACE_TOKEN', 'Hugging Face'),
+        ('REPLICATE_API_TOKEN', 'Replicate'),
+        ('AWS_BEDROCK_MODEL', 'AWS Bedrock'),
+    ]
+
     AI_MODEL_EXTENSIONS = [
         '.gguf', '.ggml', '.safetensors', '.bin', '.pth', '.pt', '.onnx',
     ]
@@ -137,6 +155,7 @@ class ShadowAIScanner(BaseScanner):
         # Quick checks (always run)
         self._check_ai_processes(target)
         self._check_ai_ports(target)
+        self._check_ai_env_vars(target)
 
         # Standard checks
         if scan_type in ('standard', 'deep'):
@@ -308,6 +327,94 @@ class ShadowAIScanner(BaseScanner):
                     f"If unauthorized, stop the service and block the port."
                 ),
                 detection_method='port_scan',
+            )
+
+    # -----------------------------------------------------------------
+    # Check: AI environment variables and config files
+    # -----------------------------------------------------------------
+
+    def _check_ai_env_vars(self, target: str) -> None:
+        """Check for AI-related environment variables and config files."""
+        self.scan_logger.info("Checking for AI environment variables and configs...")
+
+        found_env = []
+        for env_var, provider in self.AI_ENV_INDICATORS:
+            value = os.environ.get(env_var)
+            if value:
+                # Mask the value for security
+                masked = value[:8] + '...' if len(value) > 12 else '***'
+                found_env.append({'var': env_var, 'provider': provider, 'masked': masked})
+
+        # Check for AI config files in common locations
+        found_configs = []
+        config_paths = [
+            Path.home() / '.ollama',
+            Path.home() / '.config' / 'ollama',
+            Path.home() / '.openai',
+            Path.home() / '.anthropic',
+        ]
+        # Also check for ai_config.json in any nearby data/ dirs
+        for p in [Path('.'), Path.home()]:
+            cfg = p / 'data' / 'ai_config.json'
+            if cfg.exists():
+                try:
+                    import json as _json
+                    with open(cfg) as f:
+                        ai_cfg = _json.load(f)
+                    backend = ai_cfg.get('backend', 'unknown')
+                    model = ai_cfg.get('model', ai_cfg.get('ollama_model', ''))
+                    url = ai_cfg.get('ollama_url', ai_cfg.get('api_url', ''))
+                    found_configs.append({
+                        'file': str(cfg), 'backend': backend,
+                        'model': model, 'url': url,
+                    })
+                except Exception:
+                    pass
+
+        for p in config_paths:
+            if p.exists() and p.is_dir():
+                found_configs.append({'file': str(p), 'type': 'directory'})
+
+        self.add_result('ai_env_vars', {
+            'env_found': len(found_env), 'configs_found': len(found_configs),
+        }, target)
+
+        for item in found_env:
+            self.add_finding(
+                severity='MEDIUM',
+                title=f"AI Environment Variable: {item['var']} ({item['provider']})",
+                description=(
+                    f"Environment variable {item['var']} is set (value: {item['masked']}), "
+                    f"indicating {item['provider']} is configured on this system."
+                ),
+                affected_asset=target,
+                finding_type='shadow_ai_env',
+                remediation=(
+                    f"Verify that {item['provider']} usage is authorized. "
+                    f"Ensure API keys are stored in a vault, not shell profiles."
+                ),
+                detection_method='env_scan',
+            )
+
+        for item in found_configs:
+            backend = item.get('backend', 'unknown')
+            url = item.get('url', '')
+            sev = 'HIGH' if url and 'localhost' not in url and '127.0.0.1' not in url else 'MEDIUM'
+            self.add_finding(
+                severity=sev,
+                title=f"AI Config: {item['file']} (backend={backend})",
+                description=(
+                    f"AI configuration file found at {item['file']}. "
+                    f"Backend: {backend}, Model: {item.get('model', '?')}. "
+                    + (f"Remote endpoint: {url}" if url else "")
+                ),
+                affected_asset=target,
+                finding_type='shadow_ai_config',
+                remediation=(
+                    "Review AI configuration for authorized use. "
+                    "Ensure remote AI endpoints are approved and data classification allows it."
+                ),
+                detection_method='config_scan',
             )
 
     # -----------------------------------------------------------------
