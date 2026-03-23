@@ -98,18 +98,86 @@ def _validate_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 AI_DISCLAIMER = "\n--- AI-Generated - Verify Before Acting ---\n"
 
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
 STEPFUN_API_URL = "https://api.stepfun.ai/v1/chat/completions"
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+# AWS Bedrock — region-specific endpoint, constructed at runtime
+BEDROCK_API_TEMPLATE = "https://bedrock-runtime.{region}.amazonaws.com/model/{model}/invoke"
+
+# OpenAI-compatible cloud providers — all use Bearer auth + chat/completions
+_OPENAI_COMPAT_PROVIDERS = {
+    'mistral': {
+        'url': 'https://api.mistral.ai/v1/chat/completions',
+        'env_key': 'MISTRAL_API_KEY',
+        'default_model': 'mistral-large-latest',
+        'label': 'Mistral AI',
+    },
+    'cohere': {
+        'url': 'https://api.cohere.com/v2/chat',
+        'env_key': 'COHERE_API_KEY',
+        'default_model': 'command-r-plus',
+        'label': 'Cohere',
+    },
+    'xai': {
+        'url': 'https://api.x.ai/v1/chat/completions',
+        'env_key': 'XAI_API_KEY',
+        'default_model': 'grok-3',
+        'label': 'xAI Grok',
+    },
+    'deepseek': {
+        'url': 'https://api.deepseek.com/chat/completions',
+        'env_key': 'DEEPSEEK_API_KEY',
+        'default_model': 'deepseek-chat',
+        'label': 'DeepSeek',
+    },
+    'together': {
+        'url': 'https://api.together.xyz/v1/chat/completions',
+        'env_key': 'TOGETHER_API_KEY',
+        'default_model': 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+        'label': 'Together AI',
+    },
+    'groq': {
+        'url': 'https://api.groq.com/openai/v1/chat/completions',
+        'env_key': 'GROQ_API_KEY',
+        'default_model': 'llama-3.3-70b-versatile',
+        'label': 'Groq',
+    },
+    'fireworks': {
+        'url': 'https://api.fireworks.ai/inference/v1/chat/completions',
+        'env_key': 'FIREWORKS_API_KEY',
+        'default_model': 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+        'label': 'Fireworks AI',
+    },
+    'azure': {
+        'url': '',  # Requires AZURE_OPENAI_ENDPOINT env var
+        'env_key': 'AZURE_OPENAI_API_KEY',
+        'default_model': 'gpt-4',
+        'label': 'Azure OpenAI',
+    },
+    'openrouter': {
+        'url': 'https://openrouter.ai/api/v1/chat/completions',
+        'env_key': 'OPENROUTER_API_KEY',
+        'default_model': 'anthropic/claude-sonnet-4',
+        'label': 'OpenRouter (multi-model)',
+    },
+}
 
 # Model preference order when scanning Ollama for available models
 _OLLAMA_MODEL_PREFERENCE = [
+    'qwen3-coder', 'qwen3.5', 'qwen2.5-coder',
     'step-3.5-flash', 'donjon-security',
     'llama3.2', 'llama3.1', 'llama3', 'mistral', 'codellama',
     'mixtral', 'phi3', 'gemma2', 'deepseek-coder', 'qwen2',
 ]
+
+# Bedrock model IDs — mapped to friendly names for config
+_BEDROCK_MODELS = {
+    'claude-sonnet': 'anthropic.claude-sonnet-4-20250514-v1:0',
+    'claude-haiku': 'anthropic.claude-haiku-4-5-20251001-v1:0',
+    'claude-opus': 'anthropic.claude-opus-4-20250514-v1:0',
+}
 
 # Severity helpers for template fallback
 _SEVERITY_ORDER = {'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'INFO': 1}
@@ -140,6 +208,16 @@ class AIEngine:
         self.model_name: Optional[str] = None
         self._api_key: Optional[str] = None
         self._api_url: Optional[str] = None
+        # AWS Bedrock fields
+        self._aws_region: str = 'us-east-1'
+        self._aws_access_key: Optional[str] = None
+        self._aws_secret_key: Optional[str] = None
+        self._aws_session_token: Optional[str] = None
+        # Usage metering — tracks tokens for billing (especially Bedrock)
+        self._usage_log: List[Dict] = []
+        self._total_input_tokens: int = 0
+        self._total_output_tokens: int = 0
+        self._total_requests: int = 0
 
         # Resolve config path
         if paths:
@@ -205,6 +283,27 @@ class AIEngine:
             self._api_key = cfg.get('api_key', '')
             self.model_name = cfg.get('api_model') or cfg.get('model') or 'gemini-2.5-flash'
             return True
+        elif backend in _OPENAI_COMPAT_PROVIDERS:
+            provider = _OPENAI_COMPAT_PROVIDERS[backend]
+            self.backend = 'openai'
+            self._api_key = cfg.get('api_key', '') or os.environ.get(provider['env_key'], '')
+            self._api_url = cfg.get('api_url', '') or provider['url']
+            self.model_name = cfg.get('model', '') or provider['default_model']
+            if backend == 'azure':
+                base = cfg.get('azure_endpoint', '') or os.environ.get('AZURE_OPENAI_ENDPOINT', '')
+                deployment = cfg.get('model', '') or os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4')
+                self._api_url = f"{base}/openai/deployments/{deployment}/chat/completions?api-version=2024-02-01"
+                self.model_name = deployment
+            return True
+        elif backend == 'bedrock':
+            self.backend = 'bedrock'
+            self._aws_region = cfg.get('aws_region', 'us-east-1')
+            self._aws_access_key = cfg.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+            self._aws_secret_key = cfg.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+            self._aws_session_token = cfg.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+            model_alias = cfg.get('model', 'claude-sonnet')
+            self.model_name = _BEDROCK_MODELS.get(model_alias, model_alias)
+            return True
         elif backend == 'custom':
             self.backend = 'openai'  # custom uses OpenAI-compatible format
             self._api_key = cfg.get('api_key', '')
@@ -247,6 +346,42 @@ class AIEngine:
                 'model': self.model_name,
                 'error': str(exc),
             }
+
+    @staticmethod
+    def get_supported_backends() -> List[Dict]:
+        """Return list of all supported AI backends with their config requirements."""
+        backends = [
+            {'id': 'ollama', 'label': 'Ollama (Local)', 'requires': 'OLLAMA_URL or localhost:11434',
+             'airgap': True, 'metered': False},
+            {'id': 'bedrock', 'label': 'AWS Bedrock', 'requires': 'AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY',
+             'airgap': False, 'metered': True, 'billing_note': 'Per-token billing via AWS'},
+            {'id': 'anthropic', 'label': 'Anthropic Claude (Direct)', 'requires': 'ANTHROPIC_API_KEY',
+             'airgap': False, 'metered': True},
+            {'id': 'openai', 'label': 'OpenAI', 'requires': 'OPENAI_API_KEY',
+             'airgap': False, 'metered': True},
+            {'id': 'gemini', 'label': 'Google Gemini', 'requires': 'GEMINI_API_KEY',
+             'airgap': False, 'metered': True},
+            {'id': 'stepfun', 'label': 'StepFun Step 3.5 Flash', 'requires': 'STEPFUN_API_KEY',
+             'airgap': False, 'metered': True},
+        ]
+        for pid, pinfo in _OPENAI_COMPAT_PROVIDERS.items():
+            if pid not in ('azure',):  # Azure is special
+                backends.append({
+                    'id': pid, 'label': pinfo['label'],
+                    'requires': pinfo['env_key'],
+                    'default_model': pinfo['default_model'],
+                    'airgap': False, 'metered': True,
+                })
+        backends.append({
+            'id': 'azure', 'label': 'Azure OpenAI',
+            'requires': 'AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT',
+            'airgap': False, 'metered': True,
+        })
+        backends.append({
+            'id': 'template', 'label': 'Template Fallback (No LLM)',
+            'requires': 'Nothing', 'airgap': True, 'metered': False,
+        })
+        return backends
 
     def get_config(self) -> Dict:
         """Return current config (with masked API keys)."""
@@ -298,7 +433,17 @@ class AIEngine:
         except Exception:
             pass
 
-        # 2. StepFun Step 3.5 Flash (196B MoE, 11B active, fast agentic model)
+        # 2. AWS Bedrock (for managed environments)
+        if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('DONJON_AI_BACKEND') == 'bedrock':
+            self.backend = 'bedrock'
+            self._aws_region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+            self._aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+            self._aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+            self._aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
+            self.model_name = _BEDROCK_MODELS.get('claude-sonnet', 'anthropic.claude-sonnet-4-20250514-v1:0')
+            return
+
+        # 3. StepFun Step 3.5 Flash (196B MoE, 11B active, fast agentic model)
         if os.environ.get('STEPFUN_API_KEY'):
             self.backend = 'stepfun'
             self.model_name = 'step-3.5-flash'
@@ -322,7 +467,24 @@ class AIEngine:
             self.model_name = 'gpt-4'
             return
 
-        # 6. Fallback
+        # 7. Any OpenAI-compatible cloud provider (check env keys)
+        for provider_id, provider_info in _OPENAI_COMPAT_PROVIDERS.items():
+            env_key = provider_info['env_key']
+            if os.environ.get(env_key):
+                self.backend = 'openai'  # All use OpenAI-compatible format
+                self._api_key = os.environ[env_key]
+                self._api_url = provider_info['url']
+                self.model_name = provider_info['default_model']
+                # Azure needs endpoint from env
+                if provider_id == 'azure':
+                    base = os.environ.get('AZURE_OPENAI_ENDPOINT', '')
+                    deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4')
+                    self._api_url = f"{base}/openai/deployments/{deployment}/chat/completions?api-version=2024-02-01"
+                    self.model_name = deployment
+                logger.info("Detected %s via %s", provider_info['label'], env_key)
+                return
+
+        # 8. Fallback
         self.backend = 'template'
         self.model_name = None
 
@@ -368,6 +530,7 @@ class AIEngine:
         )
 
         chunks: List[str] = []
+        final_obj = {}
         with urllib.request.urlopen(req, timeout=180) as resp:
             for line in resp:
                 if not line:
@@ -378,9 +541,18 @@ class AIEngine:
                     if token:
                         chunks.append(token)
                     if obj.get('done', False):
+                        final_obj = obj
                         break
                 except json.JSONDecodeError:
                     continue
+
+        # Ollama returns token counts in the final 'done' message
+        if final_obj:
+            self._record_usage(
+                input_tokens=final_obj.get('prompt_eval_count', 0),
+                output_tokens=final_obj.get('eval_count', 0),
+                model=self.model_name or 'ollama',
+            )
 
         return ''.join(chunks).strip()
 
@@ -415,6 +587,14 @@ class AIEngine:
 
         with urllib.request.urlopen(req, timeout=90, context=ctx) as resp:  # nosec B310 -- URL is hardcoded ANTHROPIC_API_URL constant
             result = json.loads(resp.read().decode('utf-8'))
+
+        # Track usage for billing
+        usage = result.get('usage', {})
+        self._record_usage(
+            input_tokens=usage.get('input_tokens', 0),
+            output_tokens=usage.get('output_tokens', 0),
+            model=self.model_name or 'anthropic',
+        )
 
         content_blocks = result.get('content', [])
         texts = [b.get('text', '') for b in content_blocks if b.get('type') == 'text']
@@ -567,15 +747,167 @@ class AIEngine:
         with urllib.request.urlopen(req, timeout=90, context=ctx) as resp:
             result = json.loads(resp.read().decode('utf-8'))
 
+        # Track usage (OpenAI format)
+        usage = result.get('usage', {})
+        if usage:
+            self._record_usage(
+                input_tokens=usage.get('prompt_tokens', 0),
+                output_tokens=usage.get('completion_tokens', 0),
+                model=self.model_name or 'openai',
+            )
+
         choices = result.get('choices', [])
         if choices:
             return choices[0].get('message', {}).get('content', '').strip()
         return ''
 
+    def _call_bedrock(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """Call AWS Bedrock InvokeModel using SigV4 auth (stdlib only, no boto3).
+
+        Uses the Anthropic Messages format via Bedrock's /invoke endpoint.
+        Tracks input/output tokens for metered billing.
+        """
+        import hashlib
+        import hmac
+        from datetime import datetime as dt
+
+        region = self._aws_region or 'us-east-1'
+        model_id = self.model_name or _BEDROCK_MODELS['claude-sonnet']
+        service = 'bedrock'
+
+        # Build Anthropic-format payload
+        messages = [{'role': 'user', 'content': prompt}]
+        body = {
+            'anthropic_version': 'bedrock-2023-05-31',
+            'max_tokens': 2048,
+            'messages': messages,
+            'temperature': 0.3,
+        }
+        if system_prompt:
+            body['system'] = system_prompt
+
+        body_bytes = json.dumps(body).encode('utf-8')
+
+        # SigV4 signing
+        now = dt.utcnow()
+        datestamp = now.strftime('%Y%m%d')
+        amz_date = now.strftime('%Y%m%dT%H%M%SZ')
+
+        host = f'bedrock-runtime.{region}.amazonaws.com'
+        endpoint = f'https://{host}/model/{urllib.parse.quote(model_id, safe="")}/invoke'
+        canonical_uri = f'/model/{urllib.parse.quote(model_id, safe="")}/invoke'
+
+        content_hash = hashlib.sha256(body_bytes).hexdigest()
+
+        headers_to_sign = {
+            'content-type': 'application/json',
+            'host': host,
+            'x-amz-date': amz_date,
+            'x-amz-content-sha256': content_hash,
+        }
+        if self._aws_session_token:
+            headers_to_sign['x-amz-security-token'] = self._aws_session_token
+
+        signed_headers = ';'.join(sorted(headers_to_sign.keys()))
+        canonical_headers = ''.join(
+            f'{k}:{v}\n' for k, v in sorted(headers_to_sign.items())
+        )
+        canonical_request = '\n'.join([
+            'POST', canonical_uri, '',
+            canonical_headers, signed_headers, content_hash,
+        ])
+
+        credential_scope = f'{datestamp}/{region}/{service}/aws4_request'
+        string_to_sign = '\n'.join([
+            'AWS4-HMAC-SHA256', amz_date, credential_scope,
+            hashlib.sha256(canonical_request.encode()).hexdigest(),
+        ])
+
+        def _sign(key, msg):
+            return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+        k_date = _sign(('AWS4' + (self._aws_secret_key or '')).encode('utf-8'), datestamp)
+        k_region = hmac.new(k_date, region.encode('utf-8'), hashlib.sha256).digest()
+        k_service = hmac.new(k_region, service.encode('utf-8'), hashlib.sha256).digest()
+        k_signing = hmac.new(k_service, b'aws4_request', hashlib.sha256).digest()
+        signature = hmac.new(k_signing, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+        auth_header = (
+            f'AWS4-HMAC-SHA256 Credential={self._aws_access_key}/{credential_scope}, '
+            f'SignedHeaders={signed_headers}, Signature={signature}'
+        )
+
+        req_headers = {
+            'Content-Type': 'application/json',
+            'Host': host,
+            'X-Amz-Date': amz_date,
+            'X-Amz-Content-Sha256': content_hash,
+            'Authorization': auth_header,
+            'User-Agent': 'Donjon/1.0',
+        }
+        if self._aws_session_token:
+            req_headers['X-Amz-Security-Token'] = self._aws_session_token
+
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            endpoint, data=body_bytes, headers=req_headers, method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=120, context=ctx) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+
+        # Track usage for billing
+        usage = result.get('usage', {})
+        self._record_usage(
+            input_tokens=usage.get('input_tokens', 0),
+            output_tokens=usage.get('output_tokens', 0),
+            model=model_id,
+        )
+
+        # Parse Anthropic response format
+        content_blocks = result.get('content', [])
+        texts = [b.get('text', '') for b in content_blocks if b.get('type') == 'text']
+        return '\n'.join(texts).strip()
+
+    def _record_usage(self, input_tokens: int, output_tokens: int, model: str) -> None:
+        """Record token usage for metered billing."""
+        self._total_input_tokens += input_tokens
+        self._total_output_tokens += output_tokens
+        self._total_requests += 1
+        entry = {
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'backend': self.backend,
+            'model': model,
+            'input_tokens': input_tokens,
+            'output_tokens': output_tokens,
+        }
+        self._usage_log.append(entry)
+        # Persist to usage file for billing aggregation
+        try:
+            usage_path = (self._CONFIG_PATH.parent / 'ai_usage.jsonl') if self._CONFIG_PATH else Path('data/ai_usage.jsonl')
+            with open(usage_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(entry) + '\n')
+        except Exception:
+            pass
+
+    def get_usage(self) -> Dict:
+        """Return cumulative token usage for billing."""
+        return {
+            'total_requests': self._total_requests,
+            'total_input_tokens': self._total_input_tokens,
+            'total_output_tokens': self._total_output_tokens,
+            'total_tokens': self._total_input_tokens + self._total_output_tokens,
+            'backend': self.backend,
+            'model': self.model_name,
+            'session_log': self._usage_log[-20:],  # Last 20 entries
+        }
+
     def _call_ai(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """Route to the detected backend and return the raw text response."""
         if self.backend == 'ollama':
             return self._call_ollama(prompt, system_prompt)
+        elif self.backend == 'bedrock':
+            return self._call_bedrock(prompt, system_prompt)
         elif self.backend == 'stepfun':
             return self._call_stepfun(prompt, system_prompt)
         elif self.backend == 'anthropic':
