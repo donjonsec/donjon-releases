@@ -512,7 +512,7 @@ class DonjonLauncher:
                         scanner_result = s.scan(scan_type='quick')
                         scanner_findings = list(s.findings)
                     elif stype == 'network':
-                        from orchestrator import AssessmentOrchestrator
+                        from lib.orchestrator import AssessmentOrchestrator
                         orch = AssessmentOrchestrator()
                         scanner_result = orch.run_full_assessment(
                             targets=network_targets,
@@ -601,7 +601,7 @@ class DonjonLauncher:
             print()
 
         try:
-            from orchestrator import AssessmentOrchestrator
+            from lib.orchestrator import AssessmentOrchestrator
             orchestrator = AssessmentOrchestrator()
             results = orchestrator.run_full_assessment(assessment_type='standard')
 
@@ -645,7 +645,7 @@ class DonjonLauncher:
             print()
 
         try:
-            from orchestrator import AssessmentOrchestrator
+            from lib.orchestrator import AssessmentOrchestrator
             orchestrator = AssessmentOrchestrator()
             results = orchestrator.run_full_assessment(assessment_type='deep')
 

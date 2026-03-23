@@ -82,9 +82,26 @@ class NetworkScanner(BaseScanner):
         self.scan_logger.info("Phase 1: Host Discovery")
         live_hosts = []
         for target in targets:
-            discovered = self._discover_hosts(target)
-            live_hosts.extend(discovered)
+            # If target is a single IP (not CIDR), treat it as known-live
+            # to avoid discovery failures when ICMP is blocked
+            if '/' not in target and re.match(r'^\d+\.\d+\.\d+\.\d+$', target):
+                live_hosts.append({
+                    'ip': target, 'hostname': None,
+                    'is_up': True, 'mac': None, 'vendor': None,
+                })
+            else:
+                discovered = self._discover_hosts(target)
+                live_hosts.extend(discovered)
             self.human_delay()
+
+        # If discovery found nothing on CIDRs, try direct connect
+        if not live_hosts:
+            self.scan_logger.warning("No hosts from discovery, trying direct scan")
+            for target in targets:
+                if '/' in target:
+                    # Re-try with TCP connect instead of ICMP
+                    discovered = self._discover_hosts_tcp(target)
+                    live_hosts.extend(discovered)
 
         self.scan_logger.info(f"Discovered {len(live_hosts)} live hosts")
         results['hosts'] = live_hosts
@@ -144,6 +161,17 @@ class NetworkScanner(BaseScanner):
 
         return results
 
+    def _discover_hosts_tcp(self, network: str) -> List[Dict]:
+        """Fallback: discover hosts via TCP connect when ICMP is blocked."""
+        self.scan_logger.info(f"TCP fallback discovery on {network}")
+        cmd = [
+            str(self.nmap_path),
+            '-sn', '-PS22,80,443,3389,8080', '--max-retries', '1',
+            network,
+        ]
+        result = self.run_tool(cmd, timeout=300, description=f"TCP discovery on {network}")
+        return self._parse_host_discovery(result.stdout)
+
     def _discover_hosts(self, network: str) -> List[Dict]:
         """Discover live hosts on a network."""
         self.scan_logger.info(f"Discovering hosts on {network}")
@@ -172,14 +200,28 @@ class NetworkScanner(BaseScanner):
 
         for line in output.split('\n'):
             if 'Nmap scan report for' in line:
+                # Flush previous host if not yet added
+                if current_host and current_host not in hosts:
+                    hosts.append(current_host)
+
+                # Also handle "Nmap scan report for hostname (ip)" and "for ip"
                 match = re.search(r'for\s+(?:(\S+)\s+\()?(\d+\.\d+\.\d+\.\d+)', line)
-                if match:
+                if not match:
+                    # Try bare hostname format: "Nmap scan report for hostname"
+                    match = re.search(r'for\s+(\S+)', line)
+                    if match:
+                        current_host = {
+                            'hostname': match.group(1),
+                            'ip': match.group(1),
+                            'is_up': True, 'mac': None, 'vendor': None,
+                        }
+                    else:
+                        current_host = None
+                else:
                     current_host = {
                         'hostname': match.group(1),
                         'ip': match.group(2),
-                        'is_up': True,
-                        'mac': None,
-                        'vendor': None
+                        'is_up': True, 'mac': None, 'vendor': None,
                     }
 
             elif 'MAC Address:' in line and current_host:
@@ -187,12 +229,13 @@ class NetworkScanner(BaseScanner):
                 if match:
                     current_host['mac'] = match.group(1)
                     current_host['vendor'] = match.group(2)
-                hosts.append(current_host)
-                current_host = None
 
             elif 'Host is up' in line and current_host:
-                hosts.append(current_host)
-                current_host = None
+                pass  # Already marked is_up=True
+
+        # Don't forget the last host
+        if current_host and current_host not in hosts:
+            hosts.append(current_host)
 
         return hosts
 
