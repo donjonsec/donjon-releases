@@ -68,7 +68,7 @@ def _handle_config(
         for key, value in body.items():
             cfg.set(key, value)
         logger.info("Updated config keys: %s", list(body.keys()))
-    return {"config": cfg.as_dict()}
+    return {"config": cfg.to_dict() if hasattr(cfg, 'to_dict') else cfg.as_dict()}
 
 
 def _handle_paths(
@@ -80,7 +80,7 @@ def _handle_paths(
         for key, value in body.items():
             paths.set(key, value)
         logger.info("Updated path keys: %s", list(body.keys()))
-    return {"paths": paths.as_dict()}
+    return {"paths": paths.to_dict() if hasattr(paths, 'to_dict') else (paths.as_dict() if hasattr(paths, 'as_dict') else {'data': str(paths.data), 'config': str(paths.config_active)})}
 
 
 def _handle_license(
