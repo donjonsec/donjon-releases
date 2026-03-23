@@ -133,6 +133,7 @@ class QuantumReadinessScanner(BaseScanner):
             local_audit, compliance, agility_score, and summary.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.scan_logger.info(
             f"Starting PQC readiness scan ({scan_type}) on {len(targets)} target(s)"
         )
@@ -226,6 +227,7 @@ class QuantumReadinessScanner(BaseScanner):
             'summary': summary,
         }
 
+        self.set_status('complete')
         self.save_results()
         return result
 

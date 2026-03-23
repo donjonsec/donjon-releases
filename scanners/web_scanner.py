@@ -42,10 +42,12 @@ class WebScanner(BaseScanner):
             scan_type: 'quick', 'standard', or 'deep'
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         # Check for nikto
         if not self.check_tool('nikto'):
             self.scan_logger.error("Nikto not available")
+            self.set_status('failed', 'Required tool nikto not found')
             return {'error': 'Nikto not installed'}
 
         self.nikto_path = self.paths.find_tool('nikto')
@@ -91,6 +93,7 @@ class WebScanner(BaseScanner):
         }
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         return results

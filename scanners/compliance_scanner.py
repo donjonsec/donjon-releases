@@ -38,6 +38,7 @@ class ComplianceScanner(BaseScanner):
             frameworks: List of frameworks to assess (default: all configured)
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         # Get frameworks to assess
         if not frameworks:
@@ -68,6 +69,7 @@ class ComplianceScanner(BaseScanner):
 
             except Exception as e:
                 self.scan_logger.error(f"Error assessing {framework}: {e}")
+                self.set_status('partial', f'Error assessing {framework}: {e}')
 
             self.human_delay()
 
@@ -78,6 +80,8 @@ class ComplianceScanner(BaseScanner):
         results['recommendations'] = self._generate_recommendations(results)
 
         self.end_time = datetime.now(timezone.utc)
+        if self.scan_status != 'partial':
+            self.set_status('complete')
         self.save_results()
 
         # Add compliance evidence

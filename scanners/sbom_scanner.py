@@ -103,6 +103,7 @@ class SBOMScanner(BaseScanner):
             Dict with scan results and summary.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.scan_logger.info(f"Starting {scan_type} SBOM scan")
 
         if not targets:
@@ -211,6 +212,7 @@ class SBOMScanner(BaseScanner):
                 )
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         summary = self.get_summary()

@@ -152,6 +152,7 @@ class CloudScanner(BaseScanner):
             Dict with scan results and summary.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.scan_logger.info(f"Starting {scan_type} cloud scan")
 
         # Detect available providers
@@ -164,6 +165,7 @@ class CloudScanner(BaseScanner):
 
         if not self.available_providers:
             self.scan_logger.warning("No cloud providers available")
+            self.set_status('failed', 'No cloud providers detected (aws/az/gcloud not configured)')
             self.add_finding(
                 severity='INFO',
                 title='No Cloud Providers Detected',
@@ -224,6 +226,7 @@ class CloudScanner(BaseScanner):
                 self.human_delay()
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         summary = self.get_summary()

@@ -147,6 +147,7 @@ class ShadowAIScanner(BaseScanner):
             scan_type, len(targets),
         )
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.results = []
         self.findings = []
 
@@ -173,6 +174,7 @@ class ShadowAIScanner(BaseScanner):
             self._check_ai_scheduled_tasks(target)
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         duration = (self.end_time - self.start_time).total_seconds()
 
         summary = {

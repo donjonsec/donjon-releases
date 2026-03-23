@@ -86,6 +86,7 @@ class ASMScanner(BaseScanner):
                 active: Enable active enumeration (default False, passive only)
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         scan_type = kwargs.get('scan_type', 'standard')
         active = kwargs.get('active', False)
 
@@ -184,6 +185,7 @@ class ASMScanner(BaseScanner):
         results['findings'] = self.findings.copy()
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         return results

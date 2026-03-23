@@ -54,10 +54,12 @@ class SSLScanner(BaseScanner):
             scan_type: 'quick', 'standard', or 'deep'
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         # Check for testssl.sh
         if not self.check_tool('testssl.sh'):
             self.scan_logger.error("testssl.sh not available")
+            self.set_status('failed', 'Required tool testssl.sh not found')
             return {'error': 'testssl.sh not installed'}
 
         self.testssl_path = self.paths.find_tool('testssl.sh')
@@ -93,6 +95,7 @@ class SSLScanner(BaseScanner):
         results['summary'] = self._generate_summary(results)
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         return results

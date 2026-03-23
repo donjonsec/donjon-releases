@@ -174,6 +174,7 @@ class ADScanner(BaseScanner):
             Dict with scan results and summary.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.scan_logger.info(
             f"Starting {scan_type} Active Directory scan"
         )
@@ -181,6 +182,7 @@ class ADScanner(BaseScanner):
         # Verify prerequisites
         if sys.platform != 'win32':
             self.scan_logger.error("AD scanner requires Windows")
+            self.set_status('skipped', 'Requires Windows')
             self.end_time = datetime.now(timezone.utc)
             return {'error': 'AD scanner requires Windows'}
 
@@ -188,6 +190,7 @@ class ADScanner(BaseScanner):
             self.scan_logger.error(
                 "ActiveDirectory PowerShell module not available"
             )
+            self.set_status('failed', 'ActiveDirectory PowerShell module not available')
             self.add_finding(
                 severity='HIGH',
                 title='AD PowerShell Module Not Available',
@@ -259,6 +262,7 @@ class ADScanner(BaseScanner):
             self.human_delay()
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         summary = self.get_summary()

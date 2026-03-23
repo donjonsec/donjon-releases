@@ -40,6 +40,7 @@ class BaseScanner(ABC):
 
     SCANNER_NAME = "base"
     SCANNER_DESCRIPTION = "Base scanner class"
+    scan_status: str = 'pending'  # class-level default for hasattr() checks
 
     def __init__(self, session_id: Optional[str] = None):
         self.paths = get_paths()

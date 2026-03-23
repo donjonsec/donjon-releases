@@ -771,6 +771,7 @@ class AdversaryScanner(BaseScanner):
             ``'deep'`` runs all profiles.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         # Determine which profiles to run
         if profile == 'all':
@@ -834,6 +835,7 @@ class AdversaryScanner(BaseScanner):
         }
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         results['summary'] = self.get_summary()
         self.save_results()
         return results

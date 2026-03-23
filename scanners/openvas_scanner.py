@@ -160,6 +160,7 @@ class OpenVASScanner(BaseScanner):
             report_path: Path to existing OpenVAS XML report to import
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         results = {
             'scan_type': scan_type,
@@ -196,6 +197,8 @@ class OpenVASScanner(BaseScanner):
         results['summary'] = self._generate_summary(results['findings'])
 
         self.end_time = datetime.now(timezone.utc)
+        if self.scan_status != 'failed':
+            self.set_status('complete')
         self.save_results()
 
         return results

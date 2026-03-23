@@ -152,11 +152,13 @@ class ContainerScanner(BaseScanner):
             Dict with scan results and summary.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.scan_logger.info(f"Starting {scan_type} container scan")
 
         self._detect_tools()
 
         if not self.docker_cmd and not self.has_kubectl:
+            self.set_status('failed', 'No container tools detected (docker/podman/kubectl)')
             self.add_finding(
                 severity='INFO',
                 title='No Container Tools Detected',
@@ -213,6 +215,7 @@ class ContainerScanner(BaseScanner):
                 self.human_delay()
 
         self.end_time = datetime.now(timezone.utc)
+        self.set_status('complete')
         self.save_results()
 
         summary = self.get_summary()

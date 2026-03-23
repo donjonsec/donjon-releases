@@ -43,9 +43,11 @@ class CredentialScanner(BaseScanner):
     def scan(self, targets: List[str], scan_type: str = 'standard', **kwargs) -> Dict:
         """Execute authenticated scan on targets with configured credentials."""
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
 
         if not self.cred_manager:
             self.scan_logger.warning("Credential manager not available")
+            self.set_status('failed', 'Credential manager not available')
             return {'error': 'Credential manager not available', 'targets': targets}
 
         results = {
@@ -96,6 +98,12 @@ class CredentialScanner(BaseScanner):
         }
 
         self.end_time = datetime.now(timezone.utc)
+        if results['skipped_hosts'] and not results['authenticated_hosts']:
+            self.set_status('failed', 'No hosts could be authenticated')
+        elif results['skipped_hosts']:
+            self.set_status('partial', f"{len(results['skipped_hosts'])} hosts skipped")
+        else:
+            self.set_status('complete')
         self.save_results()
         return results
 

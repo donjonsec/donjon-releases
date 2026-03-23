@@ -174,6 +174,7 @@ class WindowsScanner(BaseScanner):
             ``'deep'`` runs all 10 with additional depth.
         """
         self.start_time = datetime.now(timezone.utc)
+        self.scan_status = 'running'
         self.is_admin = self._check_admin()
 
         hostname = (subprocess.getoutput('hostname') or 'localhost').strip()
@@ -237,6 +238,12 @@ class WindowsScanner(BaseScanner):
 
         # Wrap up -----------------------------------------------------------------
         self.end_time = datetime.now(timezone.utc)
+        if results['checks_skipped'] > 0 and results['checks_completed'] > 0:
+            self.set_status('partial', f"{results['checks_skipped']} checks skipped")
+        elif results['checks_completed'] == 0:
+            self.set_status('failed', 'All checks skipped or failed')
+        else:
+            self.set_status('complete')
         results['summary'] = self.get_summary()
         self.save_results()
         return results
