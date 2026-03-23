@@ -54,7 +54,7 @@ _SCANNER_REGISTRY = [
     ('compliance',    'scanners.compliance_scanner',     'ComplianceScanner',       False,  None),
     ('cloud',         'scanners.cloud_scanner',          'CloudScanner',            False,  None),
     ('container',     'scanners.container_scanner',      'ContainerScanner',        False,  None),
-    ('credential',    'scanners.credential_scanner',     'CredentialScanner',       False,  None),
+    ('credential',    'scanners.credential_scanner',     'CredentialScanner',       True,   None),
     ('sbom',          'scanners.sbom_scanner',           'SBOMScanner',             False,  None),
     ('shadow_ai',     'scanners.shadow_ai_scanner',      'ShadowAIScanner',         True,   None),
     ('quantum',       'scanners.quantum_scanner',        'QuantumReadinessScanner', True,   None),
