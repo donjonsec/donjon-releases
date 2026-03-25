@@ -85,3 +85,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+"data/"
+"*.db"
+"*.log"
+patch_bridge.py
+research_daemon.py

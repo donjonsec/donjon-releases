@@ -180,7 +180,7 @@ Output: `sha256:<64 hex chars>`
 **Natural upgrade trigger:** "I found issues, now I need a client report / scheduled scans / deeper analysis."
 
 ### Pro (License Required)
-- ALL 17 scanners, ALL depths, no throttle
+- ALL 19 scanners, ALL depths, no throttle
 - Unlimited targets, unlimited history
 - ALL export formats (HTML, PDF, SARIF, XML, CSV, JSON)
 - Unlimited compliance frameworks, unlimited AI

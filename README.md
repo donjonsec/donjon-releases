@@ -20,7 +20,7 @@ Donjon replaces $110K+/yr in commercial tooling (Tenable, Qualys, RiskLens, Drat
 
 | What You Get | The Alternative |
 |---|---|
-| 17 scanners in one platform | Tenable ($65K) + Qualys ($30K) + Rapid7 ($25K) |
+| 19 scanners in one platform | Tenable ($65K) + Qualys ($30K) + Rapid7 ($25K) |
 | 30 compliance frameworks | Drata ($10K) + manual mapping |
 | FAIR risk quantification with Monte Carlo | RiskLens ($50K/yr) |
 | AI-powered analysis (6 providers) | Manual analyst hours |
