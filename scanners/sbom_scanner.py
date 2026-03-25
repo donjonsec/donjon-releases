@@ -186,6 +186,9 @@ class SBOMScanner(BaseScanner):
             detection_method='manifest_parse',
         )
 
+        # Supply chain: .pth file detection (TeamPCP/LiteLLM attack vector)
+        self._check_pth_backdoors(targets)
+
         # Standard + Deep: vulnerability lookup
         if scan_type in ('standard', 'deep'):
             self.scan_logger.info("Checking vulnerabilities...")
@@ -565,6 +568,121 @@ class SBOMScanner(BaseScanner):
                 seen.add(key)
                 unique.append(dep)
         return unique
+
+    # -----------------------------------------------------------------------
+    # Supply chain: .pth backdoor detection (TeamPCP/LiteLLM vector)
+    # -----------------------------------------------------------------------
+
+    def _check_pth_backdoors(self, targets: List[str]) -> None:
+        """Detect malicious .pth files in Python site-packages.
+
+        .pth files auto-execute on every Python interpreter startup.
+        TeamPCP used this in the LiteLLM supply chain attack (March 2026)
+        to install persistent backdoors that steal SSH keys, cloud tokens,
+        K8s secrets, and .env files.
+
+        CVE-2026-33634 (CVSS 9.4) — cascading supply chain attack.
+        """
+        import site
+        self.scan_logger.info("Checking for .pth backdoor files...")
+
+        # Get all site-packages directories
+        site_dirs = site.getsitepackages() if hasattr(site, 'getsitepackages') else []
+        user_site = site.getusersitepackages() if hasattr(site, 'getusersitepackages') else None
+        if user_site:
+            site_dirs.append(user_site)
+
+        # Also check targets for virtualenv site-packages
+        for target in targets:
+            venv_sites = list(Path(target).rglob('site-packages'))
+            site_dirs.extend(str(s) for s in venv_sites[:5])
+
+        # Known-legitimate .pth files from trusted packages
+        known_safe_pth = {
+            'distutils-precedence.pth', 'pytest-cov.pth', 'pywin32.pth',
+            'a1_coverage.pth', 'coverage.pth', 'easy-install.pth',
+            'setuptools.pth', 'virtualenv.pth', 'mpl-data.pth',
+        }
+
+        suspicious_patterns = [
+            'import ', 'exec(', 'eval(', '__import__', 'subprocess',
+            'os.system', 'urllib', 'requests.', 'socket.', 'base64',
+            'compile(', 'marshal.loads',
+        ]
+
+        found_malicious = []
+        found_clean = 0
+
+        for site_dir in site_dirs:
+            site_path = Path(site_dir)
+            if not site_path.exists():
+                continue
+
+            for pth_file in site_path.glob('*.pth'):
+                try:
+                    content = pth_file.read_text(encoding='utf-8', errors='ignore')
+                    lines = content.strip().split('\n')
+
+                    is_suspicious = False
+                    suspicious_lines = []
+
+                    for line in lines:
+                        line_stripped = line.strip()
+                        if not line_stripped or line_stripped.startswith('#'):
+                            continue
+                        # Normal .pth files contain only directory paths
+                        # Suspicious: any line with executable code
+                        for pattern in suspicious_patterns:
+                            if pattern in line_stripped:
+                                is_suspicious = True
+                                suspicious_lines.append(line_stripped[:100])
+                                break
+
+                    if is_suspicious and pth_file.name not in known_safe_pth:
+                        found_malicious.append({
+                            'file': str(pth_file),
+                            'lines': suspicious_lines[:5],
+                        })
+                        self.add_finding(
+                            severity='CRITICAL',
+                            title=f'Suspicious .pth file: {pth_file.name}',
+                            description=(
+                                f'The file {pth_file} contains executable code that runs '
+                                f'on every Python interpreter startup. This is the same '
+                                f'vector used in the TeamPCP/LiteLLM supply chain attack '
+                                f'(CVE-2026-33634). Suspicious content: '
+                                f'{"; ".join(suspicious_lines[:3])}'
+                            ),
+                            affected_asset=str(pth_file),
+                            finding_type='supply_chain_backdoor',
+                            cvss_score=9.4,
+                            remediation=(
+                                'Immediately investigate this .pth file. Remove if not '
+                                'from a trusted package. Check pip install logs for the '
+                                'package that created it. Rotate all credentials on this '
+                                'system. Review: SSH keys, cloud tokens, .env files, '
+                                'K8s secrets, CI/CD credentials.'
+                            ),
+                            detection_method='pth_file_scan',
+                        )
+                    else:
+                        found_clean += 1
+
+                except (PermissionError, OSError):
+                    continue
+
+        self.add_result('pth_scan', {
+            'site_dirs_checked': len(site_dirs),
+            'clean_pth_files': found_clean,
+            'suspicious_pth_files': len(found_malicious),
+            'details': found_malicious[:10],
+        })
+
+        if not found_malicious:
+            self.scan_logger.info(
+                "No suspicious .pth files found (%d clean in %d dirs)",
+                found_clean, len(site_dirs),
+            )
 
     # -----------------------------------------------------------------------
     # Vulnerability checking
