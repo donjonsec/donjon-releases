@@ -7,8 +7,10 @@ Active enumeration requires explicit opt-in.
 """
 
 import json
+import re
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import time
@@ -104,21 +106,56 @@ class ASMScanner(BaseScanner):
             'summary': {}
         }
 
-        for domain in targets:
-            self.scan_logger.info(f"Scanning domain: {domain}")
+        for target in targets:
+            self.scan_logger.info(f"Scanning target: {target}")
+
+            # Determine if target is an IP or domain
+            domain = target
+            is_ip = self._is_ip_address(target)
+            if is_ip:
+                # Reverse DNS lookup to get domain from IP
+                rdns = self._reverse_dns(target)
+                if rdns:
+                    self.scan_logger.info(f"Reverse DNS for {target}: {rdns}")
+                    domain = rdns
+                    self.add_finding(
+                        severity='INFO',
+                        title=f"Reverse DNS: {target} -> {rdns}",
+                        description=(
+                            f"IP address {target} resolves to hostname {rdns} "
+                            "via reverse DNS lookup."
+                        ),
+                        affected_asset=target,
+                        finding_type='reverse_dns',
+                        remediation="Verify reverse DNS record is intentional.",
+                        detection_method='reverse_dns'
+                    )
+                else:
+                    self.scan_logger.info(
+                        f"No reverse DNS for {target}, scanning as IP only"
+                    )
+
             domain_entry = {'domain': domain, 'subdomains': [], 'certificates': []}
 
-            # Always run passive checks
-            ct_results = self._check_certificate_transparency(domain)
-            domain_entry['certificates'] = ct_results
-            results['certificates'].extend(ct_results)
+            # DNS record enumeration (MX, TXT, NS, CNAME)
+            if not is_ip or (is_ip and domain != target):
+                dns_record_results = self._check_dns_records(domain)
+                results.setdefault('dns_records', []).extend(dns_record_results)
 
-            # Extract subdomains from CT results
-            ct_subdomains = set()
-            for cert in ct_results:
-                for name in cert.get('names', []):
-                    if name.endswith(f'.{domain}') or name == domain:
-                        ct_subdomains.add(name)
+            # Always run passive checks (skip CT for bare IPs with no rDNS)
+            if not is_ip or (is_ip and domain != target):
+                ct_results = self._check_certificate_transparency(domain)
+                domain_entry['certificates'] = ct_results
+                results['certificates'].extend(ct_results)
+
+                # Extract subdomains from CT results
+                ct_subdomains = set()
+                for cert in ct_results:
+                    for name in cert.get('names', []):
+                        if name.endswith(f'.{domain}') or name == domain:
+                            ct_subdomains.add(name)
+            else:
+                ct_subdomains = set()
 
             dns_results = self._enumerate_dns(domain)
             domain_entry['subdomains'] = dns_results
@@ -133,6 +170,22 @@ class ASMScanner(BaseScanner):
                         'source': 'certificate_transparency',
                         'addresses': []
                     })
+
+            # Web fingerprinting on discovered hosts (always run, even for bare IPs)
+            fingerprint_targets = set()
+            fingerprint_targets.add(target)  # Always fingerprint the original target
+            if domain != target:
+                fingerprint_targets.add(domain)
+            for sub_entry in dns_results:
+                fingerprint_targets.add(sub_entry['hostname'])
+
+            for fp_target in fingerprint_targets:
+                for scheme in ['https', 'http']:
+                    url = f"{scheme}://{fp_target}"
+                    fp_results = self._fingerprint_web(url, domain)
+                    if fp_results:
+                        results.setdefault('web_fingerprints', []).append(fp_results)
+                        break  # If HTTPS works, skip HTTP
 
             # Active enumeration only if explicitly enabled
             if active:
@@ -153,6 +206,22 @@ class ASMScanner(BaseScanner):
                     shodan_data = self._check_shodan(addr)
                     if shodan_data and shodan_data.get('ports'):
                         sub_entry['shodan'] = shodan_data
+
+            # For bare IPs with no findings, report what was checked
+            if is_ip and domain == target and len(self.findings) == 0:
+                self.add_finding(
+                    severity='INFO',
+                    title=f"IP scanned: {target} — no web services or rDNS detected",
+                    description=(
+                        f"Scanned IP {target}: no reverse DNS hostname, no HTTP/HTTPS "
+                        "services detected. The host may run non-web services or "
+                        "be behind a firewall."
+                    ),
+                    affected_asset=target,
+                    finding_type='ip_scan_no_services',
+                    remediation="Use a network scanner for port/service discovery.",
+                    detection_method='asm_scan'
+                )
 
             results['domains'].append(domain_entry)
             self.human_delay()
@@ -661,6 +730,427 @@ class ASMScanner(BaseScanner):
             )
 
         return shodan_result
+
+    def _is_ip_address(self, target: str) -> bool:
+        """Check if target is an IP address (v4 or v6)."""
+        try:
+            socket.inet_pton(socket.AF_INET, target)
+            return True
+        except (socket.error, OSError):
+            pass
+        try:
+            socket.inet_pton(socket.AF_INET6, target)
+            return True
+        except (socket.error, OSError):
+            pass
+        return False
+
+    def _reverse_dns(self, ip_address: str) -> Optional[str]:
+        """Perform reverse DNS lookup on an IP address."""
+        try:
+            hostname, _, _ = socket.gethostbyaddr(ip_address)
+            # Strip trailing dot if present
+            return hostname.rstrip('.')
+        except (socket.herror, socket.gaierror, OSError):
+            return None
+
+    def _check_dns_records(self, domain: str) -> List[Dict]:
+        """
+        Enumerate DNS records: MX, TXT (SPF/DKIM/DMARC), NS, CNAME.
+
+        Uses nslookup (available on Windows and most Linux) or dig.
+        Generates findings for missing email security records.
+        """
+        self.scan_logger.info(f"Checking DNS records for {domain}")
+        records = []
+
+        # Use nslookup which is available cross-platform
+        nslookup_path = shutil.which('nslookup')
+        dig_path = shutil.which('dig')
+
+        # --- MX Records ---
+        mx_records = self._query_dns_record(domain, 'MX', nslookup_path, dig_path)
+        if mx_records:
+            records.append({
+                'domain': domain, 'type': 'MX', 'values': mx_records
+            })
+            self.add_finding(
+                severity='INFO',
+                title=f"MX records found for {domain}",
+                description=(
+                    f"Mail exchange records for {domain}: "
+                    f"{', '.join(mx_records[:5])}"
+                ),
+                affected_asset=domain,
+                finding_type='dns_mx_records',
+                remediation="Verify MX records point to intended mail servers.",
+                detection_method='dns_enumeration'
+            )
+
+        # --- NS Records ---
+        ns_records = self._query_dns_record(domain, 'NS', nslookup_path, dig_path)
+        if ns_records:
+            records.append({
+                'domain': domain, 'type': 'NS', 'values': ns_records
+            })
+            self.add_finding(
+                severity='INFO',
+                title=f"NS records for {domain}: {len(ns_records)} nameservers",
+                description=(
+                    f"Nameservers for {domain}: {', '.join(ns_records[:5])}"
+                ),
+                affected_asset=domain,
+                finding_type='dns_ns_records',
+                remediation="Ensure nameservers are properly configured and redundant.",
+                detection_method='dns_enumeration'
+            )
+
+        # --- TXT Records (SPF, DKIM, DMARC) ---
+        txt_records = self._query_dns_record(domain, 'TXT', nslookup_path, dig_path)
+        if txt_records:
+            records.append({
+                'domain': domain, 'type': 'TXT', 'values': txt_records
+            })
+
+        # Check for SPF
+        has_spf = any('v=spf1' in r.lower() for r in txt_records)
+        if has_spf:
+            spf_record = next(r for r in txt_records if 'v=spf1' in r.lower())
+            self.add_finding(
+                severity='INFO',
+                title=f"SPF record found for {domain}",
+                description=f"SPF record: {spf_record[:120]}",
+                affected_asset=domain,
+                finding_type='dns_spf_present',
+                remediation="Review SPF record for correctness.",
+                detection_method='dns_enumeration'
+            )
+        else:
+            self.add_finding(
+                severity='MEDIUM',
+                title=f"Missing SPF record for {domain}",
+                description=(
+                    f"No SPF (Sender Policy Framework) TXT record found for {domain}. "
+                    "Without SPF, attackers can spoof emails from this domain."
+                ),
+                affected_asset=domain,
+                finding_type='missing_spf',
+                remediation=(
+                    "Add a TXT record with SPF policy, e.g.: "
+                    "v=spf1 include:_spf.google.com ~all"
+                ),
+                detection_method='dns_enumeration'
+            )
+
+        # Check for DMARC
+        dmarc_records = self._query_dns_record(
+            f"_dmarc.{domain}", 'TXT', nslookup_path, dig_path
+        )
+        has_dmarc = any('v=dmarc1' in r.lower() for r in dmarc_records)
+        if has_dmarc:
+            dmarc_record = next(r for r in dmarc_records if 'v=dmarc1' in r.lower())
+            self.add_finding(
+                severity='INFO',
+                title=f"DMARC record found for {domain}",
+                description=f"DMARC record: {dmarc_record[:120]}",
+                affected_asset=domain,
+                finding_type='dns_dmarc_present',
+                remediation="Review DMARC policy for strictness (p=reject recommended).",
+                detection_method='dns_enumeration'
+            )
+            # Check if DMARC policy is weak
+            if 'p=none' in dmarc_record.lower():
+                self.add_finding(
+                    severity='LOW',
+                    title=f"Weak DMARC policy (p=none) for {domain}",
+                    description=(
+                        f"DMARC policy is set to 'none' for {domain}, which only "
+                        "monitors but does not reject spoofed emails."
+                    ),
+                    affected_asset=domain,
+                    finding_type='weak_dmarc',
+                    remediation="Upgrade DMARC policy to p=quarantine or p=reject.",
+                    detection_method='dns_enumeration'
+                )
+        else:
+            self.add_finding(
+                severity='MEDIUM',
+                title=f"Missing DMARC record for {domain}",
+                description=(
+                    f"No DMARC record found at _dmarc.{domain}. "
+                    "Without DMARC, email receivers cannot verify the authenticity "
+                    "of messages claiming to be from this domain."
+                ),
+                affected_asset=domain,
+                finding_type='missing_dmarc',
+                remediation=(
+                    "Add a TXT record at _dmarc.{domain}: "
+                    "v=DMARC1; p=reject; rua=mailto:dmarc@{domain}"
+                ),
+                detection_method='dns_enumeration'
+            )
+
+        return records
+
+    def _query_dns_record(self, domain: str, record_type: str,
+                          nslookup_path: Optional[str],
+                          dig_path: Optional[str]) -> List[str]:
+        """Query a specific DNS record type using available tools.
+
+        Uses public DNS (1.1.1.1) to avoid local resolver limitations.
+        """
+        results = []
+
+        if dig_path:
+            try:
+                proc = subprocess.run(
+                    [dig_path, '+short', record_type, domain, '@1.1.1.1'],
+                    capture_output=True, text=True, timeout=10
+                )
+                for line in proc.stdout.strip().split('\n'):
+                    line = line.strip().strip('"')
+                    if line:
+                        results.append(line)
+            except (subprocess.TimeoutExpired, Exception):
+                pass
+
+        if not results and nslookup_path:
+            try:
+                # Use public DNS server to bypass local resolver limitations
+                proc = subprocess.run(
+                    [nslookup_path, '-type=' + record_type, domain, '1.1.1.1'],
+                    capture_output=True, text=True, timeout=10
+                )
+                output = proc.stdout + proc.stderr
+                for line in output.split('\n'):
+                    line = line.strip()
+                    # Parse nslookup output for different record types
+                    if record_type == 'MX' and 'mail exchanger' in line.lower():
+                        # "domain MX preference = 10, mail exchanger = mx.example.com"
+                        match = re.search(r'mail exchanger\s*=\s*(.+)', line, re.I)
+                        if match:
+                            results.append(match.group(1).strip().rstrip('.'))
+                    elif record_type == 'NS' and 'nameserver' in line.lower():
+                        match = re.search(r'nameserver\s*=\s*(.+)', line, re.I)
+                        if match:
+                            results.append(match.group(1).strip().rstrip('.'))
+                    elif record_type == 'TXT' and ('text' in line.lower() or line.startswith('"')):
+                        # Extract TXT value
+                        match = re.search(r'text\s*=\s*"?(.+?)"?\s*$', line, re.I)
+                        if match:
+                            results.append(match.group(1).strip().strip('"'))
+                        elif line.startswith('"'):
+                            results.append(line.strip('"'))
+            except (subprocess.TimeoutExpired, Exception):
+                pass
+
+        # Fallback: use socket for basic resolution if no tools available
+        if not results and record_type in ('MX', 'NS'):
+            # Can't get MX/NS/TXT via socket, but we tried
+            pass
+
+        return results
+
+    def _fingerprint_web(self, url: str, parent_domain: str) -> Optional[Dict]:
+        """
+        HTTP header analysis and web technology fingerprinting.
+
+        Checks:
+        - Server header (Apache, nginx, IIS version)
+        - X-Powered-By (PHP, ASP.NET, Express)
+        - Technology detection (WordPress, Drupal, etc.)
+        - SSL certificate info
+        - Missing security headers
+        """
+        if urlopen is None:
+            return None
+
+        self.scan_logger.info(f"Fingerprinting web: {url}")
+        fingerprint = {'url': url, 'headers': {}, 'technologies': [], 'security_headers': {}}
+
+        try:
+            req = Request(url, headers={'User-Agent': 'Donjon-ASM/7.0'})
+            response = urlopen(req, timeout=10)  # nosec B310
+            headers = dict(response.headers)
+            fingerprint['status_code'] = response.status
+            fingerprint['headers'] = headers
+        except HTTPError as e:
+            headers = dict(e.headers) if hasattr(e, 'headers') else {}
+            fingerprint['status_code'] = e.code
+            fingerprint['headers'] = headers
+        except (URLError, Exception) as e:
+            self.scan_logger.debug(f"Web fingerprint failed for {url}: {e}")
+            return None
+
+        # --- Server header ---
+        server = headers.get('Server', headers.get('server', ''))
+        if server:
+            fingerprint['server'] = server
+            self.add_finding(
+                severity='INFO',
+                title=f"Web server identified: {server[:60]}",
+                description=(
+                    f"Server header on {url}: {server}. "
+                    "Exposing server version may aid attackers in identifying "
+                    "known vulnerabilities."
+                ),
+                affected_asset=parent_domain,
+                finding_type='web_server_fingerprint',
+                remediation="Consider removing or obfuscating the Server header.",
+                detection_method='http_header_analysis'
+            )
+
+        # --- X-Powered-By ---
+        powered_by = headers.get('X-Powered-By', headers.get('x-powered-by', ''))
+        if powered_by:
+            fingerprint['powered_by'] = powered_by
+            self.add_finding(
+                severity='LOW',
+                title=f"Technology disclosed: X-Powered-By: {powered_by[:50]}",
+                description=(
+                    f"The X-Powered-By header on {url} reveals: {powered_by}. "
+                    "This aids attackers in targeting known vulnerabilities."
+                ),
+                affected_asset=parent_domain,
+                finding_type='technology_disclosure',
+                remediation="Remove the X-Powered-By header in server configuration.",
+                detection_method='http_header_analysis'
+            )
+
+        # --- Missing security headers ---
+        security_headers = {
+            'X-Frame-Options': (
+                'MEDIUM', 'clickjacking protection',
+                'Add X-Frame-Options: DENY or SAMEORIGIN header.'
+            ),
+            'Content-Security-Policy': (
+                'MEDIUM', 'Content Security Policy',
+                'Implement a Content-Security-Policy header to prevent XSS and injection attacks.'
+            ),
+            'Strict-Transport-Security': (
+                'MEDIUM', 'HTTP Strict Transport Security (HSTS)',
+                'Add Strict-Transport-Security header with appropriate max-age.'
+            ),
+            'X-Content-Type-Options': (
+                'LOW', 'MIME-type sniffing protection',
+                'Add X-Content-Type-Options: nosniff header.'
+            ),
+        }
+
+        # Normalize header keys to lowercase for matching
+        lower_headers = {k.lower(): v for k, v in headers.items()}
+
+        for header_name, (sev, desc_name, remed) in security_headers.items():
+            present = header_name.lower() in lower_headers
+            fingerprint['security_headers'][header_name] = present
+            if not present and url.startswith('https://'):
+                self.add_finding(
+                    severity=sev,
+                    title=f"Missing {header_name} header on {url[:50]}",
+                    description=(
+                        f"The {desc_name} header ({header_name}) is missing on {url}. "
+                        "This may leave the application vulnerable to certain attacks."
+                    ),
+                    affected_asset=parent_domain,
+                    finding_type=f'missing_{header_name.lower().replace("-", "_")}',
+                    remediation=remed,
+                    detection_method='http_header_analysis'
+                )
+
+        # --- Technology detection via common paths ---
+        # Each entry: (path, tech_name, description, content_signature)
+        # content_signature is required in the response body to confirm a real hit
+        # (avoids false positives from soft 404 pages)
+        tech_checks = [
+            ('/wp-login.php', 'WordPress', 'WordPress CMS detected', 'wp-login'),
+            ('/wp-admin/', 'WordPress', 'WordPress admin path accessible', 'wp-admin'),
+            ('/misc/drupal.js', 'Drupal', 'Drupal CMS detected', 'Drupal'),
+            ('/administrator/', 'Joomla', 'Joomla admin path detected', 'com_login'),
+            ('/.git/HEAD', 'Git Repository', 'Exposed .git directory', 'ref:'),
+            ('/.env', 'Environment File', 'Exposed .env file', '='),
+            ('/robots.txt', 'robots.txt', 'robots.txt file found', 'User-agent'),
+        ]
+
+        base_url = url.rstrip('/')
+        for path, tech_name, tech_desc, content_sig in tech_checks:
+            try:
+                check_url = f"{base_url}{path}"
+                check_req = Request(check_url, headers={'User-Agent': 'Donjon-ASM/7.0'})
+                check_resp = urlopen(check_req, timeout=5)  # nosec B310
+                if check_resp.status == 200:
+                    # Read response body to verify it's a real hit, not a soft 404
+                    body = check_resp.read(4096).decode('utf-8', errors='replace')
+                    content_type = check_resp.headers.get('Content-Type', '')
+
+                    # For .git/HEAD and .env, the response should NOT be HTML
+                    is_html = '<html' in body.lower()[:500] or 'text/html' in content_type.lower()
+
+                    if tech_name in ('Git Repository', 'Environment File'):
+                        # These files are never HTML; if we get HTML, it's a soft 404
+                        if is_html or content_sig.lower() not in body.lower()[:500]:
+                            continue
+                    elif content_sig.lower() not in body.lower()[:4096]:
+                        # Content signature not found — soft 404
+                        continue
+
+                    fingerprint['technologies'].append(tech_name)
+
+                    # Sensitive file exposure is higher severity
+                    if tech_name in ('Git Repository', 'Environment File'):
+                        self.add_finding(
+                            severity='HIGH',
+                            title=f"Sensitive file exposed: {path} on {url[:40]}",
+                            description=(
+                                f"Sensitive file {path} is accessible on {base_url}. "
+                                "This may expose source code, credentials, or "
+                                "configuration details."
+                            ),
+                            affected_asset=parent_domain,
+                            finding_type='sensitive_file_exposure',
+                            remediation=f"Block access to {path} in web server configuration.",
+                            detection_method='web_path_check'
+                        )
+                    elif tech_name not in ('robots.txt',):
+                        self.add_finding(
+                            severity='INFO',
+                            title=f"Technology detected: {tech_name} on {url[:40]}",
+                            description=f"{tech_desc} at {check_url}",
+                            affected_asset=parent_domain,
+                            finding_type='technology_detection',
+                            remediation="Keep CMS and frameworks updated to latest versions.",
+                            detection_method='web_path_check'
+                        )
+            except (HTTPError, URLError, Exception):
+                continue
+
+        # --- SSL certificate info (for HTTPS URLs) ---
+        if url.startswith('https://'):
+            hostname = url.split('://')[1].split('/')[0].split(':')[0]
+            try:
+                ctx = ssl.create_default_context()
+                with ctx.wrap_socket(
+                    socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                    server_hostname=hostname
+                ) as ssock:
+                    ssock.settimeout(5)
+                    ssock.connect((hostname, 443))
+                    cert = ssock.getpeercert()
+                    if cert:
+                        fingerprint['ssl_subject'] = dict(
+                            x[0] for x in cert.get('subject', ())
+                        )
+                        fingerprint['ssl_issuer'] = dict(
+                            x[0] for x in cert.get('issuer', ())
+                        )
+                        fingerprint['ssl_not_after'] = cert.get('notAfter', '')
+                        fingerprint['ssl_san'] = [
+                            v for t, v in cert.get('subjectAltName', ())
+                            if t == 'DNS'
+                        ]
+            except (ssl.SSLError, socket.error, OSError, Exception) as e:
+                self.scan_logger.debug(f"SSL cert check failed for {hostname}: {e}")
+
+        return fingerprint
 
     def _compare_internal_external(self, internal_results: List[Dict],
                                     external_results: List[Dict]) -> List[Dict]:

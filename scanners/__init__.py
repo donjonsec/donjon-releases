@@ -54,6 +54,11 @@ try:
 except ImportError:
     QuantumReadinessScanner = None
 
+try:
+    from .mcp_scanner import MCPSecurityScanner
+except ImportError:
+    MCPSecurityScanner = None
+
 __all__ = [
     'BaseScanner',
     'NetworkScanner',
@@ -70,4 +75,5 @@ __all__ = [
     'MalwareScanner',
     'ShadowAIScanner',
     'QuantumReadinessScanner',
+    'MCPSecurityScanner',
 ]

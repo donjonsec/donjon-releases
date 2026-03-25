@@ -61,6 +61,7 @@ _SCANNER_REGISTRY = [
     ('asm',           'scanners.asm_scanner',            'ASMScanner',              True,   None),
     ('malware',       'scanners.malware_scanner',        'MalwareScanner',          False,  None),
     ('adversary',     'scanners.adversary_scanner',      'AdversaryScanner',        True,   None),
+    ('mcp',           'scanners.mcp_scanner',            'MCPSecurityScanner',      True,   None),
 ]
 
 # Which scanners run at each tier
@@ -69,11 +70,12 @@ _SCAN_TIERS = {
     'standard': [
         'windows', 'linux', 'network', 'ssl', 'web', 'vulnerability',
         'compliance', 'credential', 'shadow_ai', 'quantum', 'cloud', 'container',
+        'mcp',
     ],
     'deep': [
         'windows', 'linux', 'network', 'ssl', 'web', 'ad', 'vulnerability',
         'compliance', 'cloud', 'container', 'credential', 'sbom', 'shadow_ai',
-        'quantum', 'asm', 'malware', 'adversary',
+        'quantum', 'asm', 'malware', 'adversary', 'mcp',
     ],
 }
 

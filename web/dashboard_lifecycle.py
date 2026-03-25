@@ -223,7 +223,7 @@ def generate_lifecycle() -> str:
         '<div class="lc-card" id="lcStartTrialSection" style="display:none;">'
         '<div class="lc-section-title">Try Pro Free for 14 Days</div>'
         '<p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">'
-        'Unlock all 17 scanners, 30 compliance frameworks, AI analysis, '
+        'Unlock all 19 scanners, 30 compliance frameworks, AI analysis, '
         'scheduled scans, and PDF/SARIF export. No credit card required.</p>'
         '<button class="lc-upgrade-btn" id="lcStartTrialBtn" '
         'onclick="startFreeTrial()">'
@@ -375,10 +375,10 @@ def generate_lifecycle() -> str:
             }
 
             // Scanner count based on tier
-            var scannerCounts = {community: 7, pro: 17, enterprise: 17, managed: 17};
+            var scannerCounts = {community: 7, pro: 19, enterprise: 19, managed: 19};
             var frameworkCounts = {community: 3, pro: 30, enterprise: 30, managed: 30};
             document.getElementById("lcScanners").textContent = scannerCounts[tier] || 7;
-            document.getElementById("lcScannersSub").textContent = tier === "community" ? "7 core scanners" : "All 17 scanners";
+            document.getElementById("lcScannersSub").textContent = tier === "community" ? "7 core scanners" : "All 19 scanners";
             document.getElementById("lcFrameworks").textContent = frameworkCounts[tier] || 3;
             document.getElementById("lcFrameworksSub").textContent = tier === "community" ? "3 basic frameworks" : "All 30 frameworks";
 
