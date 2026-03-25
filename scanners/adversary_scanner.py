@@ -805,6 +805,13 @@ class AdversaryScanner(BaseScanner):
             except Exception as exc:
                 self.scan_logger.warning("Profile %s failed: %s", pid, exc)
 
+        # Purple team matrix (standard and deep)
+        if scan_type in ('standard', 'deep'):
+            self.scan_logger.info("=== Purple Team Matrix Assessment ===")
+            target_list = targets if targets else ['localhost']
+            purple_results = self._run_purple_team_matrix(target_list)
+            results['purple_team'] = purple_results
+
         # Overall summary
         total_techniques = 0
         total_detected = 0
@@ -1688,6 +1695,414 @@ class AdversaryScanner(BaseScanner):
     def _sim_generic_check(self, ttp: Dict) -> str:
         """Fallback: verify basic logging coverage for the technique."""
         return self._sim_check_logging_coverage(ttp)
+
+    # ===================================================================== #
+    #  Purple Team Simulation Matrix (Magnet-pattern)                       #
+    # ===================================================================== #
+
+    PURPLE_MATRIX = [
+        {
+            'technique': 'T1190', 'name': 'Exploit Public-Facing Application',
+            'tactic': 'Initial Access',
+            'test': 'Check for exposed admin panels, default creds on web services',
+            'detect': 'Check for WAF rules, IDS signatures for exploit attempts',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': ['http', 'https', 'ssh', 'rdp'],
+        },
+        {
+            'technique': 'T1110', 'name': 'Brute Force',
+            'tactic': 'Credential Access',
+            'test': 'Check for account lockout policy, rate limiting',
+            'detect': 'Check for failed logon monitoring (Event 4625, auth.log)',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': ['ssh', 'rdp', 'smb'],
+        },
+        {
+            'technique': 'T1059.001', 'name': 'PowerShell Execution',
+            'tactic': 'Execution',
+            'test': 'Check if PowerShell execution policy is unrestricted',
+            'detect': 'Check for PowerShell script block logging enabled',
+            'os_relevance': ['windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1059.004', 'name': 'Unix Shell',
+            'tactic': 'Execution',
+            'test': 'Check for unrestricted shell access, no command auditing',
+            'detect': 'Check for auditd command logging, bash history forwarding',
+            'os_relevance': ['linux'],
+            'service_indicators': ['bash', 'sh'],
+        },
+        {
+            'technique': 'T1003', 'name': 'OS Credential Dumping',
+            'tactic': 'Credential Access',
+            'test': 'Check /etc/shadow permissions, LSASS protection',
+            'detect': 'Check for credential access alerts, file integrity on shadow/SAM',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1021', 'name': 'Remote Services (SSH/RDP)',
+            'tactic': 'Lateral Movement',
+            'test': 'Check for SSH/RDP exposure, key-only auth enforcement',
+            'detect': 'Check for lateral movement monitoring, session logging',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': ['ssh', 'rdp'],
+        },
+        {
+            'technique': 'T1486', 'name': 'Data Encrypted for Impact',
+            'tactic': 'Impact',
+            'test': 'Check backup integrity, immutable storage',
+            'detect': 'Check for ransomware canary files, mass file change alerts',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1078', 'name': 'Valid Accounts',
+            'tactic': 'Defense Evasion',
+            'test': 'Check for stale accounts, shared credentials, MFA bypass',
+            'detect': 'Check for anomalous logon monitoring, impossible travel',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1071', 'name': 'Application Layer Protocol (C2)',
+            'tactic': 'Command and Control',
+            'test': 'Check for unrestricted outbound HTTP/HTTPS/DNS',
+            'detect': 'Check for DNS monitoring, proxy inspection, IDS signatures',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': ['dns', 'http'],
+        },
+        {
+            'technique': 'T1567', 'name': 'Exfiltration Over Web Service',
+            'tactic': 'Exfiltration',
+            'test': 'Check for unrestricted cloud storage/SaaS upload access',
+            'detect': 'Check for DLP rules, egress volume monitoring',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1053', 'name': 'Scheduled Task/Job',
+            'tactic': 'Persistence',
+            'test': 'Check cron/at/systemd timer access controls',
+            'detect': 'Check for crontab change monitoring, scheduled task audit',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': ['cron', 'systemd'],
+        },
+        {
+            'technique': 'T1562', 'name': 'Impair Defenses',
+            'tactic': 'Defense Evasion',
+            'test': 'Check if security tools can be stopped by non-root',
+            'detect': 'Check for tamper protection, service watchdog alerts',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1070', 'name': 'Indicator Removal',
+            'tactic': 'Defense Evasion',
+            'test': 'Check if logs can be cleared by non-root users',
+            'detect': 'Check for remote log forwarding, immutable logs',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1136', 'name': 'Create Account',
+            'tactic': 'Persistence',
+            'test': 'Check who can create local/domain accounts',
+            'detect': 'Check for new account creation alerts, audit rules',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+        {
+            'technique': 'T1218', 'name': 'Signed Binary Proxy Execution (LOLBins)',
+            'tactic': 'Defense Evasion',
+            'test': 'Check for unrestricted access to certutil, mshta, rundll32',
+            'detect': 'Check for application whitelisting, LOLBin execution alerts',
+            'os_relevance': ['linux', 'windows'],
+            'service_indicators': [],
+        },
+    ]
+
+    def _run_purple_team_matrix(self, targets: List[str]) -> Dict:
+        """Run purple team attack/detect gap analysis across the MITRE matrix.
+
+        For each technique, assesses:
+        - Attack surface: is the technique feasible against this target?
+        - Detection capability: would we detect the attack?
+        - Gap: attackable but not detectable = critical gap
+        """
+        import platform
+        os_type = 'windows' if platform.system() == 'Windows' else 'linux'
+
+        hostname = self._run_cmd('hostname') or 'localhost'
+        results = {
+            'techniques_assessed': 0,
+            'attack_feasible': 0,
+            'detection_present': 0,
+            'critical_gaps': 0,
+            'gap_details': [],
+        }
+
+        for entry in self.PURPLE_MATRIX:
+            # Skip techniques not relevant to this OS
+            if os_type not in entry.get('os_relevance', ['linux', 'windows']):
+                continue
+
+            results['techniques_assessed'] += 1
+            technique_id = entry['technique']
+            technique_name = entry['name']
+            tactic = entry['tactic']
+
+            # Assess attack surface
+            attack_feasible = self._assess_attack_surface(entry, os_type)
+
+            # Assess detection capability
+            detection_present = self._assess_detection_capability(entry, os_type)
+
+            if attack_feasible:
+                results['attack_feasible'] += 1
+            if detection_present:
+                results['detection_present'] += 1
+
+            # Gap = attackable but not detectable
+            is_gap = attack_feasible and not detection_present
+            if is_gap:
+                results['critical_gaps'] += 1
+                results['gap_details'].append({
+                    'technique': technique_id,
+                    'name': technique_name,
+                    'tactic': tactic,
+                    'test': entry['test'],
+                    'detect': entry['detect'],
+                })
+
+                self.add_finding(
+                    severity='HIGH',
+                    title='Purple Team Gap: {} - {} ({})'.format(
+                        technique_id, technique_name, tactic
+                    ),
+                    description=(
+                        'Purple team simulation found a critical detection gap. '
+                        'Technique {} ({}) is feasible against this target but '
+                        'no detection capability was found. '
+                        'Attack test: {}. Detection check: {}.'.format(
+                            technique_id, technique_name,
+                            entry['test'], entry['detect'],
+                        )
+                    ),
+                    affected_asset=hostname,
+                    finding_type='purple_team_gap',
+                    cvss_score=7.5,
+                    remediation='Implement detection for {} ({}). {}'.format(
+                        technique_name, technique_id, entry['detect']
+                    ),
+                    detection_method='purple_team_simulation',
+                )
+            elif attack_feasible and detection_present:
+                self.add_finding(
+                    severity='INFO',
+                    title='Purple Team Covered: {} - {} ({})'.format(
+                        technique_id, technique_name, tactic
+                    ),
+                    description=(
+                        'Purple team simulation confirmed detection capability '
+                        'for technique {} ({}). Attack is feasible but '
+                        'detection is present.'.format(
+                            technique_id, technique_name,
+                        )
+                    ),
+                    affected_asset=hostname,
+                    finding_type='purple_team_coverage',
+                    detection_method='purple_team_simulation',
+                )
+
+        # Summary finding
+        total = results['techniques_assessed']
+        gaps = results['critical_gaps']
+        coverage_pct = (
+            (total - gaps) / total * 100 if total > 0 else 0
+        )
+        grade = self._grade(coverage_pct)
+
+        self.add_finding(
+            severity='INFO' if gaps == 0 else 'MEDIUM',
+            title='Purple Team Matrix Summary | Coverage: {:.0f}% | Grade: {} | Gaps: {}'.format(
+                coverage_pct, grade, gaps
+            ),
+            description=(
+                'Assessed {} MITRE ATT&CK techniques. '
+                'Attack feasible: {}. Detection present: {}. '
+                'Critical gaps (attackable, no detection): {}.'.format(
+                    total, results['attack_feasible'],
+                    results['detection_present'], gaps,
+                )
+            ),
+            affected_asset=hostname,
+            finding_type='purple_team_summary',
+            detection_method='purple_team_simulation',
+        )
+
+        return results
+
+    def _assess_attack_surface(self, entry: Dict, os_type: str) -> bool:
+        """Determine if a technique is feasible against this target."""
+        technique = entry['technique']
+
+        # T1190 - Public-facing app exploitation
+        if technique == 'T1190':
+            ss = self._run_cmd('ss -tlnp 2>/dev/null')
+            if ss and re.search(r'(0\.0\.0\.0|::|\*):(\d+)', ss):
+                return True
+            return False
+
+        # T1110 - Brute force
+        if technique == 'T1110':
+            # Feasible if SSH or other auth services are listening
+            ss = self._run_cmd('ss -tlnp 2>/dev/null')
+            if ss and (':22 ' in ss or ':3389 ' in ss or ':445 ' in ss):
+                return True
+            return False
+
+        # T1059.001 - PowerShell
+        if technique == 'T1059.001':
+            return os_type == 'windows'
+
+        # T1059.004 - Unix Shell
+        if technique == 'T1059.004':
+            return os_type == 'linux'
+
+        # T1003 - Credential dumping
+        if technique == 'T1003':
+            # Always feasible if shadow exists or running as potential target
+            shadow = self._run_cmd('test -f /etc/shadow && echo yes')
+            return shadow is not None or os_type == 'windows'
+
+        # T1021 - Remote services
+        if technique == 'T1021':
+            ss = self._run_cmd('ss -tlnp 2>/dev/null')
+            if ss and (':22 ' in ss or ':3389 ' in ss):
+                return True
+            return False
+
+        # T1486 - Ransomware / data encryption
+        if technique == 'T1486':
+            # Always feasible on any system with writable data
+            return True
+
+        # T1078 - Valid accounts
+        if technique == 'T1078':
+            # Check for stale accounts (feasible if any exist)
+            users = self._run_cmd(
+                'awk -F: \'$3 >= 1000 && $7 !~ /nologin|false/ {print $1}\' '
+                '/etc/passwd 2>/dev/null'
+            )
+            return bool(users)
+
+        # T1071 - C2 via application layer protocol
+        if technique == 'T1071':
+            # Feasible if outbound internet is unrestricted
+            return self._sim_check_firewall_egress({'id': 'T1071'}) != DETECTED
+
+        # T1567 - Exfil over web service
+        if technique == 'T1567':
+            return self._sim_check_firewall_egress({'id': 'T1567'}) != DETECTED
+
+        # T1053 - Scheduled tasks
+        if technique == 'T1053':
+            crontab = self._run_cmd('which crontab 2>/dev/null')
+            return bool(crontab) or os_type == 'windows'
+
+        # T1562 - Impair defenses
+        if technique == 'T1562':
+            return True  # Always a risk
+
+        # T1070 - Indicator removal
+        if technique == 'T1070':
+            return True  # Always a risk
+
+        # T1136 - Create account
+        if technique == 'T1136':
+            return True  # Always a risk on any system
+
+        # T1218 - LOLBins
+        if technique == 'T1218':
+            if os_type == 'linux':
+                # Check for common LOLBins
+                for binary in ['curl', 'wget', 'python3', 'perl', 'nc']:
+                    if shutil.which(binary):
+                        return True
+            return os_type == 'windows'
+
+        # Default: assume feasible
+        return True
+
+    def _assess_detection_capability(self, entry: Dict, os_type: str) -> bool:
+        """Determine if detection exists for a technique."""
+        technique = entry['technique']
+
+        # T1190 - WAF / IDS for exploit detection
+        if technique == 'T1190':
+            return self._sim_check_ids_rules({'id': 'T1190'}) == DETECTED
+
+        # T1110 - Brute force monitoring
+        if technique == 'T1110':
+            status = self._sim_check_account_policies({'id': 'T1110'})
+            return status in (DETECTED, PARTIAL)
+
+        # T1059.001 - PowerShell logging
+        if technique == 'T1059.001':
+            return self._sim_check_logging_coverage({'id': 'T1059.001'}) == DETECTED
+
+        # T1059.004 - Shell command auditing
+        if technique == 'T1059.004':
+            return self._sim_check_logging_coverage({'id': 'T1059.004'}) == DETECTED
+
+        # T1003 - Credential access monitoring
+        if technique == 'T1003':
+            return self._sim_check_credential_hygiene({'id': 'T1003'}) == DETECTED
+
+        # T1021 - Remote service monitoring
+        if technique == 'T1021':
+            return self._sim_check_ssh_hardening({'id': 'T1021'}) == DETECTED
+
+        # T1486 - Ransomware detection
+        if technique == 'T1486':
+            return self._sim_check_backup_integrity({'id': 'T1486'}) == DETECTED
+
+        # T1078 - Account anomaly detection
+        if technique == 'T1078':
+            return self._sim_check_mfa_enforcement({'id': 'T1078'}) == DETECTED
+
+        # T1071 - C2 detection
+        if technique == 'T1071':
+            return self._sim_check_dns_monitoring({'id': 'T1071'}) == DETECTED
+
+        # T1567 - Exfil detection
+        if technique == 'T1567':
+            return self._sim_check_firewall_egress({'id': 'T1567'}) == DETECTED
+
+        # T1053 - Scheduled task monitoring
+        if technique == 'T1053':
+            return self._sim_check_logging_coverage({'id': 'T1053'}) == DETECTED
+
+        # T1562 - Tamper protection
+        if technique == 'T1562':
+            return self._sim_check_file_integrity({'id': 'T1562'}) == DETECTED
+
+        # T1070 - Log integrity (remote forwarding)
+        if technique == 'T1070':
+            return self._sim_check_logging_coverage({'id': 'T1070'}) == DETECTED
+
+        # T1136 - Account creation monitoring
+        if technique == 'T1136':
+            return self._sim_check_logging_coverage({'id': 'T1136'}) == DETECTED
+
+        # T1218 - LOLBin detection
+        if technique == 'T1218':
+            return self._sim_check_logging_coverage({'id': 'T1218'}) == DETECTED
+
+        # Default: no detection
+        return False
 
     # ===================================================================== #
     #  Scorecard Formatting                                                  #
