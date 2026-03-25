@@ -90,3 +90,6 @@ Thumbs.db
 "*.log"
 patch_bridge.py
 research_daemon.py
+data/ai_config.json
+data/trial-license.json
+data/.trial-used
