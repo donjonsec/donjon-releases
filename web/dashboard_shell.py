@@ -12,7 +12,7 @@ def generate_shell() -> str:
         from lib.config import Config
         _version = Config().version
     except Exception:
-        _version = '7.4.0'
+        _version = '7.5.0'
 
     parts = []
 

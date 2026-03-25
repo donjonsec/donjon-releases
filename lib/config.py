@@ -23,7 +23,7 @@ class Config:
 
     # Default configuration with 365-day retention
     DEFAULTS = {
-        'version': '7.4.0',
+        'version': '7.5.0',
         'platform': {
             'name': 'Donjon',
             'mode': 'portable',
