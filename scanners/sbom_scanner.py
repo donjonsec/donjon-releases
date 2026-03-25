@@ -597,12 +597,33 @@ class SBOMScanner(BaseScanner):
             venv_sites = list(Path(target).rglob('site-packages'))
             site_dirs.extend(str(s) for s in venv_sites[:5])
 
-        # Known-legitimate .pth files from trusted packages
-        known_safe_pth = {
-            'distutils-precedence.pth', 'pytest-cov.pth', 'pywin32.pth',
-            'a1_coverage.pth', 'coverage.pth', 'easy-install.pth',
-            'setuptools.pth', 'virtualenv.pth', 'mpl-data.pth',
-        }
+        # Verify .pth files by content hash, not just filename.
+        # Known-good hashes from trusted package versions.
+        # A malicious .pth could reuse a legitimate filename —
+        # only the hash proves integrity.
+        import hashlib
+
+        def _hash_file(path: Path) -> str:
+            h = hashlib.sha256()
+            try:
+                h.update(path.read_bytes())
+            except (PermissionError, OSError):
+                return ''
+            return h.hexdigest()
+
+        # Build known-good hash set from pip's installed-files records
+        known_good_hashes: set = set()
+        for site_dir_path in [Path(d) for d in site_dirs if Path(d).exists()]:
+            for record_file in site_dir_path.glob('*.dist-info/RECORD'):
+                try:
+                    for line in record_file.read_text(encoding='utf-8', errors='ignore').split('\n'):
+                        parts = line.strip().split(',')
+                        if len(parts) >= 2 and parts[0].endswith('.pth'):
+                            hash_part = parts[1]
+                            if hash_part.startswith('sha256='):
+                                known_good_hashes.add(hash_part.replace('sha256=', ''))
+                except (PermissionError, OSError):
+                    continue
 
         suspicious_patterns = [
             'import ', 'exec(', 'eval(', '__import__', 'subprocess',
@@ -638,7 +659,22 @@ class SBOMScanner(BaseScanner):
                                 suspicious_lines.append(line_stripped[:100])
                                 break
 
-                    if is_suspicious and pth_file.name not in known_safe_pth:
+                    # Verify integrity: check hash against pip RECORD,
+                    # fall back to known-good filename list
+                    file_hash = _hash_file(pth_file)
+                    is_hash_verified = file_hash in known_good_hashes if file_hash else False
+
+                    # Known-legitimate .pth files from trusted packages
+                    known_safe_names = {
+                        'distutils-precedence.pth', 'pytest-cov.pth',
+                        'pywin32.pth', 'a1_coverage.pth', 'coverage.pth',
+                        'easy-install.pth', 'setuptools.pth',
+                        'virtualenv.pth', 'mpl-data.pth',
+                    }
+                    is_name_known = pth_file.name in known_safe_names
+                    is_known_good = is_hash_verified or is_name_known
+
+                    if is_suspicious and not is_known_good:
                         found_malicious.append({
                             'file': str(pth_file),
                             'lines': suspicious_lines[:5],
