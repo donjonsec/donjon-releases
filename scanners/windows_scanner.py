@@ -1820,14 +1820,27 @@ class WindowsScanner(BaseScanner):
     # ===================================================================== #
 
     def _check_event_logs(self, hostname: str, scan_type: str) -> None:
-        """Analyse security event logs for suspicious activity."""
+        """Analyse security event logs for suspicious activity.
+
+        DeepBlueCLI-style threat hunting across Security and System logs:
+          - 4625  Failed logon (brute-force burst detection)
+          - 4648  Explicit credential logon (lateral movement)
+          - 4672  Special privileges assigned (privilege escalation)
+          - 4720  User account created (persistence)
+          - 4732  User added to security-enabled group (priv esc)
+          - 1102  Audit log cleared (anti-forensics)
+          - 4688  Suspicious process creation (living-off-the-land)
+          - 7045  Service installed (persistence)
+        """
         self._check_failed_logons(hostname, scan_type)
+        self._check_brute_force_burst(hostname)
+        self._check_explicit_credential_logon(hostname)
         self._check_privilege_use(hostname)
         self._check_account_creation(hostname)
-
-        if scan_type == 'deep':
-            self._check_service_installs(hostname)
-            self._check_log_cleared(hostname)
+        self._check_group_membership_change(hostname)
+        self._check_suspicious_process_creation(hostname)
+        self._check_service_installs(hostname)
+        self._check_log_cleared(hostname)
 
     def _check_failed_logons(self, hostname: str, scan_type: str) -> None:
         """Analyse Event ID 4625 (failed logons)."""
@@ -1897,6 +1910,151 @@ class WindowsScanner(BaseScanner):
                 detection_method='event_log_analysis',
             )
 
+    def _check_brute_force_burst(self, hostname: str) -> None:
+        """DeepBlueCLI: detect 10+ failed logons (4625) within a 5-minute window.
+
+        This complements the weekly count in _check_failed_logons by looking
+        for concentrated bursts that indicate an active brute-force attack.
+        """
+        # Fetch timestamps of recent 4625 events (last 24h, up to 500)
+        raw = self._run_ps(
+            "$events = Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;"
+            "StartTime=(Get-Date).AddHours(-24)} "
+            "-MaxEvents 500 -ErrorAction SilentlyContinue; "
+            "if ($events) { $events | ForEach-Object { $_.TimeCreated.ToString('o') } }",
+            timeout=30,
+        )
+        if raw is None:
+            return
+
+        timestamps: list = []
+        for line in raw.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ts = datetime.fromisoformat(line.replace('Z', '+00:00'))
+                timestamps.append(ts)
+            except (ValueError, TypeError):
+                continue
+
+        if len(timestamps) < 10:
+            return
+
+        timestamps.sort()
+
+        # Sliding window: find any 5-minute window with >= 10 events
+        burst_detected = False
+        burst_count = 0
+        burst_window_start = None
+        window = timedelta(minutes=5)
+
+        for i in range(len(timestamps)):
+            count_in_window = 0
+            for j in range(i, len(timestamps)):
+                if timestamps[j] - timestamps[i] <= window:
+                    count_in_window += 1
+                else:
+                    break
+            if count_in_window >= 10 and count_in_window > burst_count:
+                burst_detected = True
+                burst_count = count_in_window
+                burst_window_start = timestamps[i]
+
+        if burst_detected:
+            self.add_finding(
+                severity='HIGH',
+                title=f'Brute-force burst: {burst_count} failed logons in 5 minutes',
+                description=(
+                    f'Detected {burst_count} failed logon events (Event ID 4625) '
+                    f'within a 5-minute window starting at '
+                    f'{burst_window_start.isoformat() if burst_window_start else "unknown"}.  '
+                    f'This pattern strongly indicates an active brute-force or '
+                    f'password-spraying attack (DeepBlueCLI pattern).'
+                ),
+                affected_asset=hostname,
+                finding_type='authentication_weakness',
+                cvss_score=8.0,
+                remediation=(
+                    'Immediately investigate source IPs: '
+                    'Get-WinEvent -FilterHashtable @{LogName="Security";Id=4625} -MaxEvents 100 | '
+                    'Select TimeCreated, @{N="IP";E={$_.Properties[19].Value}}, '
+                    '@{N="Account";E={$_.Properties[5].Value}}.  '
+                    'Consider enabling account lockout and blocking offending IPs.'
+                ),
+                raw_data={
+                    'event_id': 4625,
+                    'burst_count': burst_count,
+                    'window_start': burst_window_start.isoformat() if burst_window_start else None,
+                    'detection': 'deepbluecli_brute_force',
+                },
+                detection_method='event_log_analysis',
+            )
+
+    def _check_explicit_credential_logon(self, hostname: str) -> None:
+        """DeepBlueCLI: detect Event ID 4648 (explicit credential logon).
+
+        Lateral movement indicator — credentials were explicitly provided
+        to log on to another host or service.
+        """
+        events = self._run_ps_json(
+            "Get-WinEvent -FilterHashtable @{LogName='Security';Id=4648;"
+            "StartTime=(Get-Date).AddDays(-7)} "
+            "-MaxEvents 50 -ErrorAction SilentlyContinue "
+            "| Select-Object TimeCreated, Message"
+        )
+
+        if events is None:
+            return
+
+        events_list = self._ensure_list(events)
+        if not events_list:
+            return
+
+        count = len(events_list)
+
+        # Extract target server names from messages
+        target_servers: list = []
+        for evt in events_list:
+            msg = str(evt.get('Message', ''))
+            m = re.search(r'Target Server Name:\s*(\S+)', msg)
+            if m and m.group(1) != '-':
+                srv = m.group(1)
+                if srv not in target_servers:
+                    target_servers.append(srv)
+
+        sev = 'MEDIUM' if count <= 20 else 'HIGH'
+
+        self.add_finding(
+            severity=sev,
+            title=f'{count} explicit credential logon event(s) in the last 7 days',
+            description=(
+                f'Detected {count} explicit credential logon events '
+                f'(Event ID 4648) in the past 7 days.  This event fires when '
+                f'credentials are explicitly provided to access a remote resource, '
+                f'which is a lateral movement indicator.  '
+                + (f'Target servers: {", ".join(target_servers[:10])}.  '
+                   if target_servers else '')
+                + '(DeepBlueCLI pattern)'
+            ),
+            affected_asset=hostname,
+            finding_type='authentication_weakness',
+            cvss_score=5.5,
+            remediation=(
+                'Review explicit credential usage: '
+                'Get-WinEvent -FilterHashtable @{LogName="Security";Id=4648} -MaxEvents 50 | '
+                'Select TimeCreated, Message | Format-List.  '
+                'Investigate whether these represent legitimate admin activity.'
+            ),
+            raw_data={
+                'event_id': 4648,
+                'count_7d': count,
+                'target_servers': target_servers[:10],
+                'detection': 'deepbluecli_lateral_movement',
+            },
+            detection_method='event_log_analysis',
+        )
+
     def _check_privilege_use(self, hostname: str) -> None:
         """Report Event ID 4672 (special privileges assigned) count."""
         count_raw = self._run_ps(
@@ -1915,17 +2073,30 @@ class WindowsScanner(BaseScanner):
         except (ValueError, TypeError):
             return
 
+        # DeepBlueCLI: 4672 is a privilege escalation indicator (MEDIUM)
+        sev = 'MEDIUM'
+        if count > 200:
+            sev = 'HIGH'
+
         self.add_finding(
-            severity='INFO',
+            severity=sev,
             title=f'{count} special privilege logon events in the last 7 days',
             description=(
                 f'Event ID 4672 (special privileges assigned at logon) '
-                f'occurred {count} times in the past 7 days.  High counts '
-                f'are normal on servers with frequent admin activity.'
+                f'occurred {count} times in the past 7 days.  While some '
+                f'activity is normal on servers, elevated counts may indicate '
+                f'privilege escalation or misuse of privileged accounts '
+                f'(DeepBlueCLI pattern).'
             ),
             affected_asset=hostname,
-            finding_type='audit_policy',
-            raw_data={'event_id': 4672, 'count_7d': count},
+            finding_type='privilege_escalation',
+            cvss_score=5.0,
+            remediation=(
+                'Review which accounts are receiving special privileges: '
+                'Get-WinEvent -FilterHashtable @{LogName="Security";Id=4672} -MaxEvents 50 | '
+                'Select TimeCreated, @{N="Account";E={$_.Properties[1].Value}}'
+            ),
+            raw_data={'event_id': 4672, 'count_7d': count, 'detection': 'deepbluecli_priv_esc'},
             detection_method='event_log_analysis',
         )
 
@@ -1973,6 +2144,179 @@ class WindowsScanner(BaseScanner):
             cvss_score=5.0,
             remediation='Review: Get-WinEvent -FilterHashtable @{LogName="Security";Id=4720} -MaxEvents 20',
             raw_data={'event_id': 4720, 'count_30d': count, 'users': created_users[:10]},
+            detection_method='event_log_analysis',
+        )
+
+    def _check_group_membership_change(self, hostname: str) -> None:
+        """DeepBlueCLI: detect Event ID 4732 (user added to security-enabled group).
+
+        HIGH severity if the target group is Administrators.
+        """
+        events = self._run_ps_json(
+            "Get-WinEvent -FilterHashtable @{LogName='Security';Id=4732;"
+            "StartTime=(Get-Date).AddDays(-30)} "
+            "-MaxEvents 30 -ErrorAction SilentlyContinue "
+            "| Select-Object TimeCreated, Message"
+        )
+
+        if events is None:
+            return
+
+        events_list = self._ensure_list(events)
+        if not events_list:
+            return
+
+        admin_additions: list = []
+        other_additions: list = []
+
+        for evt in events_list:
+            msg = str(evt.get('Message', ''))
+            # Extract group name and member
+            group_match = re.search(r'Group Name:\s*(.+)', msg)
+            member_match = re.search(r'Member.*?Account Name:\s*(\S+)', msg, re.DOTALL)
+            group_name = group_match.group(1).strip() if group_match else 'Unknown'
+            member_name = member_match.group(1).strip() if member_match else 'Unknown'
+
+            entry = {'group': group_name, 'member': member_name,
+                     'time': str(evt.get('TimeCreated', ''))}
+
+            if 'administrator' in group_name.lower():
+                admin_additions.append(entry)
+            else:
+                other_additions.append(entry)
+
+        if admin_additions:
+            members = [e['member'] for e in admin_additions]
+            self.add_finding(
+                severity='HIGH',
+                title=f'{len(admin_additions)} user(s) added to Administrators group in 30 days',
+                description=(
+                    f'Detected {len(admin_additions)} events where users were added '
+                    f'to the Administrators group (Event ID 4732).  '
+                    f'Members added: {", ".join(members[:10])}.  '
+                    f'This is a privilege escalation indicator (DeepBlueCLI pattern).'
+                ),
+                affected_asset=hostname,
+                finding_type='privilege_escalation',
+                cvss_score=8.0,
+                remediation=(
+                    'Verify all additions are authorised.  '
+                    'Review: Get-WinEvent -FilterHashtable @{LogName="Security";Id=4732} -MaxEvents 30'
+                ),
+                raw_data={
+                    'event_id': 4732,
+                    'admin_additions': admin_additions[:10],
+                    'detection': 'deepbluecli_priv_esc_admin_group',
+                },
+                detection_method='event_log_analysis',
+            )
+
+        if other_additions:
+            groups = list({e['group'] for e in other_additions})
+            self.add_finding(
+                severity='MEDIUM',
+                title=f'{len(other_additions)} user(s) added to security groups in 30 days',
+                description=(
+                    f'Detected {len(other_additions)} group-membership-change events '
+                    f'(Event ID 4732).  Groups: {", ".join(groups[:10])}.  '
+                    f'Verify all additions are authorised (DeepBlueCLI pattern).'
+                ),
+                affected_asset=hostname,
+                finding_type='privilege_escalation',
+                cvss_score=5.0,
+                remediation='Review: Get-WinEvent -FilterHashtable @{LogName="Security";Id=4732} -MaxEvents 30',
+                raw_data={
+                    'event_id': 4732,
+                    'other_additions': other_additions[:10],
+                    'groups': groups[:10],
+                    'detection': 'deepbluecli_group_change',
+                },
+                detection_method='event_log_analysis',
+            )
+
+    def _check_suspicious_process_creation(self, hostname: str) -> None:
+        """DeepBlueCLI: detect Event ID 4688 with suspicious processes.
+
+        Looks for living-off-the-land binaries (LOLBins) and encoded
+        PowerShell commands in process-creation audit events.
+        """
+        SUSPICIOUS_PATTERNS = [
+            'powershell.*-enc',
+            'powershell.*-encodedcommand',
+            'powershell.*-nop.*-w hidden',
+            'powershell.*downloadstring',
+            'powershell.*iex',
+            'cmd.*/c',
+            'certutil.*-urlcache',
+            'certutil.*-decode',
+            'bitsadmin.*/transfer',
+            'mshta.*http',
+            'mshta.*javascript',
+            'regsvr32.*/s.*/u.*scrobj',
+            'wmic.*process.*call.*create',
+            'rundll32.*javascript',
+        ]
+
+        # Query recent 4688 events - need audit policy to be enabled
+        raw = self._run_ps(
+            "$events = Get-WinEvent -FilterHashtable @{LogName='Security';Id=4688;"
+            "StartTime=(Get-Date).AddDays(-7)} "
+            "-MaxEvents 500 -ErrorAction SilentlyContinue; "
+            "if ($events) { $events | ForEach-Object { "
+            "$_.TimeCreated.ToString('o') + '|' + $_.Properties[5].Value "
+            "} }",
+            timeout=45,
+        )
+
+        if raw is None:
+            self.scan_logger.debug("Could not query Event ID 4688 (process audit may not be enabled)")
+            return
+
+        suspicious_hits: list = []
+        for line in raw.strip().splitlines():
+            line = line.strip()
+            if not line or '|' not in line:
+                continue
+            parts = line.split('|', 1)
+            timestamp_str = parts[0]
+            cmdline = parts[1] if len(parts) > 1 else ''
+
+            for pattern in SUSPICIOUS_PATTERNS:
+                if re.search(pattern, cmdline, re.IGNORECASE):
+                    suspicious_hits.append({
+                        'time': timestamp_str,
+                        'command': cmdline[:200],
+                        'pattern': pattern,
+                    })
+                    break  # one match per event is enough
+
+        if not suspicious_hits:
+            return
+
+        self.add_finding(
+            severity='HIGH',
+            title=f'{len(suspicious_hits)} suspicious process creation event(s) in 7 days',
+            description=(
+                f'Detected {len(suspicious_hits)} process-creation events '
+                f'(Event ID 4688) matching known attack patterns.  '
+                f'Examples: '
+                + '; '.join(h['command'][:80] for h in suspicious_hits[:3])
+                + '.  These patterns match LOLBin/living-off-the-land techniques '
+                f'(DeepBlueCLI pattern).'
+            ),
+            affected_asset=hostname,
+            finding_type='malware_indicator',
+            cvss_score=8.0,
+            remediation=(
+                'Investigate each flagged process.  '
+                'Review: Get-WinEvent -FilterHashtable @{LogName="Security";Id=4688} | '
+                'Where {$_.Properties[5].Value -match "powershell|certutil|mshta|bitsadmin"}'
+            ),
+            raw_data={
+                'event_id': 4688,
+                'hits': suspicious_hits[:20],
+                'detection': 'deepbluecli_suspicious_process',
+            },
             detection_method='event_log_analysis',
         )
 
@@ -2033,18 +2377,24 @@ class WindowsScanner(BaseScanner):
 
         count = len(events_list)
         self.add_finding(
-            severity='HIGH',
+            severity='CRITICAL',
             title=f'Security log was cleared {count} time(s) in the last 90 days',
             description=(
                 f'Event ID 1102 indicates the Security event log was '
-                f'cleared {count} time(s).  Attackers clear logs to cover '
-                f'their tracks.  Investigate who cleared the log and why.'
+                f'cleared {count} time(s).  This is a CRITICAL anti-forensics '
+                f'indicator — attackers clear logs to cover their tracks.  '
+                f'Investigate who cleared the log and why immediately '
+                f'(DeepBlueCLI pattern).'
             ),
             affected_asset=hostname,
             finding_type='audit_policy',
-            cvss_score=7.0,
-            remediation='Enable log forwarding to a SIEM to prevent loss of evidence.',
-            raw_data={'event_id': 1102, 'count_90d': count},
+            cvss_score=9.0,
+            remediation=(
+                'Enable log forwarding to a SIEM to prevent loss of evidence.  '
+                'Investigate: Get-WinEvent -FilterHashtable @{LogName="Security";Id=1102} | '
+                'Select TimeCreated, @{N="ClearedBy";E={$_.Properties[1].Value}}'
+            ),
+            raw_data={'event_id': 1102, 'count_90d': count, 'detection': 'deepbluecli_anti_forensics'},
             detection_method='event_log_analysis',
         )
 
