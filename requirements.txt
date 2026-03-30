@@ -4,7 +4,7 @@ psutil==7.2.2
 
 # Post-quantum cryptography (NIST FIPS 204 ML-DSA-65 + Ed25519 classical)
 dilithium-py==1.4.0       # ML-DSA-65 post-quantum digital signatures
-cryptography==46.0.5      # Ed25519 classical signatures + general crypto primitives
+cryptography==46.0.6      # Ed25519 classical signatures + general crypto primitives
 
 # Optional dependencies for containerized/multi-user deployment
 psycopg2-binary==2.9.11   # PostgreSQL support (optional, for container mode)
